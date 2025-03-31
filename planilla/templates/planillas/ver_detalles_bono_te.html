@@ -1,0 +1,69 @@
+{% extends 'index_master.html' %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <h2>Detalles Bono TE para Planilla {{ planilla.mes }}/{{ planilla.anio }} ({{ planilla.get_tipo_display }})</h2>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Mes</th>
+                <th>Dias Hábiles</th>
+                <th>Faltas</th>
+                <th>Vacaciones</th>
+                <th>Viajes</th>
+                <th>Bajas Medicas</th>
+                <th>PCGH</th>
+                <th>PSGH</th>
+                <th>Perm_Excep</th>
+                <th>Asuetos</th>
+                <th>PCGH Embarazas y/o enfermanded de base</th>
+                <th>Dias no Pagados</th>
+                <th>Dias Pagados</th>
+                <th>TOTAL</th>
+                <th>Descuentos</th>
+                <th>Liquido Pagable</th>
+                <th>Acciones</th>
+                
+                
+            </tr>
+        </thead>
+        <tbody>
+            {% for detalle in detalles_bono_te %}
+            <tr>
+                <td>{{ detalle.mes|default:"0.00" }}</td>
+                <td>{{ detalle.dias_habiles|default:"0.00" }}</td>
+                <td>{{ detalle.faltas|default:"0.00" }}</td>
+                <td>{{ detalle.vacacion|default:"0.00" }}</td>
+                <td>{{ detalle.viajes|default:"0.00" }}</td>
+                <td>{{ detalle.bajas_medicas|default:"0.00" }}</td>
+                <td>{{ detalle.pcgh|default:"0.00" }}</td>
+                <td>{{ detalle.psgh|default:"0.00" }}</td>
+                <td>{{ detalle.perm_excep|default:"0.00" }}</td>
+                <td>{{ detalle.asuetos|default:"0.00" }}</td>
+                <td>{{ detalle.pcgh_embar_enf_base|default:"0.00" }}</td>
+                <td>{{ detalle.dias_no_pagados|default:"0.00" }}</td>
+                <td>{{ detalle.dias_pagados|default:"0.00" }}</td>
+                <td>{{ detalle.total_ganado|default:"0.00" }}</td>
+                <td>{{ detalle.descuentos|default:"0.00" }}</td>
+                <td>{{ detalle.liquido_pagable|default:"0.00" }}</td>
+                <td>
+                    <a href="{% url 'editar_bono_te' detalle_id=detalle.id %}" class="btn btn-sm btn-primary">Editar</a>
+                    <a href="{% url 'borrar_bono_te' detalle_id=detalle.id %}" class="btn btn-sm btn-danger">Borrar</a>
+                </td>
+
+                
+                
+                <!-- ... otros campos ... -->
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="10">No hay detalles de bono TE para esta planilla.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <a href="{% url 'lista_planillas' %}" class="btn btn-secondary">Volver a la Lista de Planillas</a>
+</div>
+{% endblock %}

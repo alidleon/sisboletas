@@ -1,0 +1,35 @@
+{% extends 'index_master.html' %}
+
+{% block content %}
+<div class="right_col" role="main">
+    
+
+  <h2>Seleccionar Tipo de Planilla Bono TE</h2>
+  {% if error_message %}
+    <div class="alert alert-danger">{{ error_message }}</div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    <label for="tipo">Tipo de Planilla:</label>
+    <select name="tipo" id="tipo">
+      {% for tipo, nombre in tipos_planilla %}
+        <option value="{{ tipo }}">{{ nombre }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Continuar</button>
+  </form>
+
+  {% if messages %}
+    <ul class="messages">
+      {% for message in messages %}
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+
+

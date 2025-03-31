@@ -1,0 +1,12 @@
+{% extends 'index_master.html' %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <h2>¿Estás seguro de que quieres borrar este Detalle Bono TE?</h2>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Borrar Detalle Bono TE</button>
+        <a href="{% url 'lista_bono_te' %}" class="btn btn-secondary">Cancelar</a>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends 'index_master.html' %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <h2>Llenar Detalle Bono TE para Planilla {{ planilla.mes }}/{{ planilla.anio }} ({{ planilla.get_tipo_display }})</h2>
+
+    <p><strong>Días Hábiles de la Planilla:</strong> {{ dias_habiles }}</p>
+
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}  <!-- Muestra todos los campos del formulario -->
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <a href="{% url 'lista_planillas' %}" class="btn btn-secondary">Cancelar</a>
+    </form>
+</div>
+{% endblock %}

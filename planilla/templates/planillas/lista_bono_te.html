@@ -1,0 +1,43 @@
+{% extends 'index_master.html' %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <h2>Lista de Detalles Bono TE para la Planilla {{ planilla.mes }}/{{ planilla.anio }}</h2>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Planilla</th>
+                <th>Mes</th>
+                <th>Días Total Trabajados</th>
+                <th>Días No Pagados</th>
+                <th>Días Pagados</th>
+                <th>Total Ganado</th>
+                <th>Líquido Pagable</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for detalle in detalles_bono_te %}
+            <tr>
+                <td>{{ detalle.id_planilla }}</td>  {#  Muestra la planilla asociada #}
+                <td>{{ detalle.mes }}</td>
+                <td>{{ detalle.dias_total_trab }}</td>
+                <td>{{ detalle.dias_no_pagados }}</td>
+                <td>{{ detalle.dias_pagados }}</td>
+                <td>{{ detalle.total_ganado }}</td>
+                <td>{{ detalle.liquido_pagable }}</td>
+                <td>
+                    <a href="{% url 'editar_bono_te' detalle_id=detalle.id %}" class="btn btn-sm btn-primary">Editar</a>
+                    <a href="{% url 'borrar_bono_te' detalle_id=detalle.id %}" class="btn btn-sm btn-danger">Borrar</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8">No hay detalles de bono TE creados.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

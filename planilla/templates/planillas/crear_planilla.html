@@ -1,0 +1,60 @@
+{% extends 'index_master.html' %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <h2>Crear Planilla Bono TE (Tipo: {{ tipo }})</h2>
+
+    <form method="post">
+        {% csrf_token %}
+        {% if planilla_form.errors %}
+            <div class="alert alert-danger">
+                Por favor, corrige los siguientes errores en el formulario de planilla:
+                <ul>
+                    {% for field, errors in planilla_form.errors.items %}
+                        {% for error in errors %}
+                            <li><strong>{{ field|title }}:</strong> {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        <div class="form-group">
+            <label for="{{ planilla_form.mes.id_for_label }}">Mes:</label>
+            {{ planilla_form.mes }}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ planilla_form.anio.id_for_label }}">Año:</label>
+            {{ planilla_form.anio }}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ planilla_form.dias_habiles.id_for_label }}">Días Hábiles:</label>
+            {{ planilla_form.dias_habiles }}
+        </div>
+
+        <div class="form-group">
+            <label for="planilla_base">Copiar registros DetalleBonoTe de:</label>
+            <select class="form-control" id="planilla_base" name="planilla_base">
+                <option value="">--- Ninguna ---</option>
+                {% for planilla in planillas_con_bono_te %}
+                    <option value="{{ planilla.id }}">{{ planilla.mes }}/{{ planilla.anio }} - {{ planilla.get_tipo_display }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Crear Planilla</button>
+    </form>
+
+    {% if messages %}
+        <ul class="messages">
+            {% for message in messages %}
+                <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <a href="{% url 'seleccionar_tipo_planilla' %}">Volver a seleccionar tipo</a>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends 'index_master.html' %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <h2>Lista de Planillas</h2>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Mes/Año</th>
+                <th>Estado</th>
+                <th>Elaborada por</th>
+                <th>Fecha Elaboración</th>
+                <th>Fecha Inicio</th>
+                <th>Fecha Fin</th>
+                <th>Tipo</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for planilla in planillas %}
+            <tr>
+                <td>{{ planilla.mes }}/{{ planilla.anio }}</td>
+                <td>{{ planilla.estado }}</td>
+                <td>{{ planilla.usuario_elaboracion.username }}</td>
+                <td>{{ planilla.fecha_elaboracion }}</td>
+                <td>{{ planilla.fecha_inicio }}</td>
+                <td>{{ planilla.fecha_fin }}</td>
+                <td>{{ planilla.get_tipo_display }}</td>
+                <td>
+                    <a href="{% url 'ver_detalles_bono_te' planilla_id=planilla.id %}" class="btn btn-sm btn-info">Ver</a>
+                    <a href="{% url 'llenar_detalle_bono_te' planilla_id=planilla.id %}" class="btn btn-sm btn-success">Llenar</a>
+                    <a href="{% url 'editar_planilla' planilla_id=planilla.id %}" class="btn btn-sm btn-primary">Editar</a>
+                    <a href="{% url 'borrar_planilla' planilla_id=planilla.id %}" class="btn btn-sm btn-danger">Borrar</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8">No hay planillas creadas.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <a href="{% url 'seleccionar_tipo_planilla' %}" class="btn btn-primary">Crear Nueva Planilla</a>
+</div>
+{% endblock %}
