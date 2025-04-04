@@ -7,6 +7,7 @@ from .forms import DetalleBonoTeForm
 from .forms import PlanillaForm  # Necesitas crear un formulario para editar la planilla
 from datetime import datetime
 from django.core.exceptions import ValidationError
+from .models import PrincipalPersonal # ¡Importa el nuevo modelo!
 
 @login_required
 def seleccionar_tipo_planilla(request):
@@ -253,3 +254,92 @@ def ver_detalles_bono_te(request, planilla_id):
         'planilla': planilla,
         'detalles_bono_te': detalles_bono_te,
     })
+
+
+
+
+#  ----------------------------------------------------------------
+# consulta a la base de datos externa
+
+# --- Añade esto a tu archivo planilla/views.py ---
+
+
+@login_required
+def listar_personal_externo(request):
+    # Consultamos la tabla 'principal_personal' en la base de datos 'personas_db'
+    try:
+        lista_personal = PrincipalPersonal.objects.using('personas_db').all().order_by('apellido_paterno', 'apellido_materno', 'nombre') # Ordena si quieres
+        error_msg = None
+    except Exception as e:
+        # Captura cualquier error de conexión o consulta
+        lista_personal = []
+        error_msg = f"Error al consultar la base de datos externa: {e}"
+        # Considera loggear el error también: import logging; logging.error(error_msg)
+
+    context = {
+        'personal_externo': lista_personal,
+        'error_message': error_msg,
+    }
+    return render(request, 'planillas/listar_personal_externo.html', context)
+
+
+#----------------------------------------------------------------
+
+
+# --- En planilla/views.py ---
+from django.shortcuts import render
+from django.http import HttpResponse
+from .models import PrincipalDesignacionExterno # Solo necesitamos este modelo externo aquí
+import logging
+
+logger = logging.getLogger(__name__)
+
+# El parámetro tipo_planilla ya no se usa, pero podemos dejarlo
+def probar_consulta_designaciones(request, tipo_planilla="TODOS"):
+    """
+    Vista temporal para probar la consulta a principal_designacion externa.
+    ¡¡SIN FILTROS!! Obtiene todas las designaciones.
+    """
+    logger.info(f"Probando consulta SIN FILTROS para designaciones (Tipo '{tipo_planilla}' ignorado)")
+
+    try:
+        # --- Construcción de la Consulta (SIN FILTROS) ---
+        consulta = PrincipalDesignacionExterno.objects.using('personas_db').select_related(
+            'personal', # Trae datos de PrincipalPersonalExterno
+            'cargo'     # Trae datos de PrincipalCargoExterno
+        )
+
+        # (Sección de filtros eliminada)
+
+        # --- FIN FILTROS ---
+
+        consulta = consulta.order_by('personal__apellido_paterno', 'personal__apellido_materno', 'personal__nombre') # Orden opcional
+        designaciones_encontradas = list(consulta) # Ejecuta la consulta
+        logger.info(f"Consulta ejecutada. Se encontraron {len(designaciones_encontradas)} designaciones en total.")
+
+        # --- Preparar respuesta HTML ---
+        respuesta_html = f"<h1>Resultados de TODAS las Designaciones (Tipo '{tipo_planilla}' ignorado)</h1>"
+        if designaciones_encontradas:
+            respuesta_html += "<table border='1'><thead><tr><th>Item</th><th>CI</th><th>Nombre Completo</th><th>Cargo</th></tr></thead><tbody>" # Quitamos columnas de filtro
+            for desig in designaciones_encontradas:
+                persona = desig.personal
+                cargo = desig.cargo
+                respuesta_html += f"<tr>"
+                respuesta_html += f"<td>{desig.item or 'N/A'}</td>"
+                respuesta_html += f"<td>{persona.ci if persona else 'N/A'}</td>"
+                respuesta_html += f"<td>{persona.nombre_completo if persona else 'N/A'}</td>"
+                respuesta_html += f"<td>{cargo.nombre_cargo if cargo else 'N/A'}</td>"
+                respuesta_html += f"</tr>"
+            respuesta_html += "</tbody></table>"
+        else:
+            respuesta_html += "<p>No se encontraron designaciones en la tabla externa.</p>"
+
+        return HttpResponse(respuesta_html)
+
+    except Exception as e:
+        logger.error(f"Error al ejecutar la consulta de prueba sin filtros: {e}", exc_info=True)
+        # Intenta dar más detalles del error si es posible
+        db_error_info = ""
+        if hasattr(e, 'pgcode') or hasattr(e, 'pgerror'):
+             db_error_info = f" (Code: {getattr(e, 'pgcode', 'N/A')}, Error: {getattr(e, 'pgerror', 'N/A')})"
+        return HttpResponse(f"<h2>Error durante la consulta</h2><p>{e}{db_error_info}</p>", status=500)

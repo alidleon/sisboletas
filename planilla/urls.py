@@ -12,6 +12,9 @@ urlpatterns = [
     path('editar_bono_te/<int:detalle_id>/', views.editar_bono_te, name='editar_bono_te'), # Nueva URL para editar
     path('borrar_bono_te/<int:detalle_id>/', views.borrar_bono_te, name='borrar_bono_te'), # Nueva URL para borrar
     path('ver_detalles_bono_te/<int:planilla_id>/', views.ver_detalles_bono_te, name='ver_detalles_bono_te'),
+    path('personal_externo/', views.listar_personal_externo, name='listar_personal_externo'),
+    path('probar_consulta_externa/<str:tipo_planilla>/', views.probar_consulta_designaciones, name='probar_consulta_designaciones'),
+
 ]
 
 

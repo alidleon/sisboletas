@@ -83,8 +83,21 @@ DATABASES = {
         'PASSWORD': 'root',       # Tu contraseña
         'HOST': 'localhost',               # Cambia esto si usas un servidor remoto
         'PORT': '5432',                        # Deja vacío para usar el puerto por defecto (5432)
+    },
+
+    # otra la base de datos
+
+    'personas_db': {  # <-- Elige un alias descriptivo (ej: 'legacy_data', 'external_hr')
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'personas',  # Nombre de la SEGUNDA base de datos
+        'USER': 'postgres',      # Usuario para la SEGUNDA base de datos
+        'PASSWORD': 'root',
+        'HOST': 'localhost', # IP o hostname del servidor de la SEGUNDA BD
+        'PORT': '5432',                   # Puerto de la SEGUNDA base de datos (puede ser diferente)
     }
 }
+
+
 
 
 # Password validation

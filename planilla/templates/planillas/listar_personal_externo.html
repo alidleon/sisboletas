@@ -1,0 +1,48 @@
+{% extends 'index_master.html' %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <h2>Listado de Personal (Base de Datos Externa)</h2>
+
+    {% if error_message %}
+        <div class="alert alert-danger" role="alert">
+            {{ error_message }}
+        </div>
+    {% endif %}
+
+    {% if personal_externo %}
+        <table class="table table-striped table-bordered">
+            <thead>
+                <tr>
+                    <th>CI</th>
+                    <th>Nombre</th>
+                    <th>Apellido Paterno</th>
+                    <th>Apellido Materno</th>
+                    <th>Fecha de Nacimiento</th>
+                    {# Añade más cabeceras si definiste más campos en el modelo #}
+                </tr>
+            </thead>
+            <tbody>
+                {% for persona in personal_externo %}
+                <tr>
+                    <td>{{ persona.ci|default:"N/A" }}</td>
+                    <td>{{ persona.nombre|default:"" }}</td>
+                    <td>{{ persona.apellido_paterno|default:"" }}</td>
+                    <td>{{ persona.apellido_materno|default:"" }}</td>
+                    <td>{{ persona.fecha_nacimiento|date:"d/m/Y"|default:"--" }}</td>
+                    {# Añade más celdas para más campos #}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        {% if not error_message %}
+        <p>No se encontraron registros en la tabla 'principal_personal' de la base de datos externa.</p>
+        {% endif %}
+    {% endif %}
+
+    <a href="#" class="btn btn-secondary">Volver</a> {# Ajusta el enlace de volver #}
+
+</div>
+
+{% endblock %}

@@ -72,40 +72,11 @@ class Planilla(models.Model):
         )
         planilla.save()
         return planilla
-#tabla estado
-class Estado(models.Model):
-    planilla = models.ForeignKey(Planilla, on_delete=models.CASCADE, related_name='estados')
-    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    fecha = models.DateTimeField(auto_now_add=True)
-    activo = models.BooleanField(default=True)
 
-    class Meta:
-        db_table = 'estado'
-        app_label = 'planillas'
-
-    def __str__(self):
-        return f'Estado {self.id}: {self.activo} en {self.fecha}'
 
     
 
 
-#tabla personal
-class Personal(models.Model):
-    TIPO_PERSONAL_CHOICES = [
-        ('planta', 'Planta'),
-        ('contrato', 'Contrato'),
-        
-    ]
-    id_personal = models.AutoField(primary_key=True, verbose_name='ID Personal')
-    tipo_personal = models.CharField(max_length=10, choices=TIPO_PERSONAL_CHOICES, verbose_name='Tipo Personal')
-    def __str__(self):
-        return (self.id_personal, self.tipo_personal)
-
-class Unidad(models.Model):
-    nombre = models.CharField(max_length=100)
-
-    def __str__(self):
-        return (self.id, self.nombre)
 
     
 class DetalleSueldo(models.Model):
@@ -125,7 +96,7 @@ class DetalleSueldo(models.Model):
         ('efectivo', 'Efectivo')
     ]
 
-    id_personal = models.ForeignKey('Personal', on_delete=models.SET_NULL, null=True, blank=True, related_name='detalles_sueldo', verbose_name="Personal")
+    
     nitem = models.CharField(max_length=50, null=True, blank=True, verbose_name='NITEM')
     cargo = models.CharField(max_length=150, null=True, blank=True, verbose_name='Cargo')
     fecha_ingreso = models.DateField(null=True, blank=True, verbose_name='Fecha de Ingreso')
@@ -147,7 +118,7 @@ class DetalleSueldo(models.Model):
     total_descuentos = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Total Descuentos')
     liquido_pagable = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Líquido Pagable')
     haber_basico_base = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Haber Básico Base')
-    id_unidad = models.ForeignKey('Unidad', on_delete=models.SET_NULL, null=True, blank=True, related_name='detalles_sueldo', verbose_name='Unidad')
+    
     tipo_afp = models.CharField(max_length=10, choices=TIPO_AFP_CHOICES, null=True, blank=True, verbose_name="Tipo de AFP")
     modo_cancelacion = models.CharField(max_length=20, choices=MODO_CANCELACION_CHOICES, null=True, blank=True, verbose_name='Modo de Cancelación')
     hospital = models.CharField(max_length=10, null=True, blank=True, verbose_name='Hospital')
@@ -167,7 +138,7 @@ class DetalleSueldo(models.Model):
 
 
 class DetalleImpositiva(models.Model):
-    id_personal = models.ForeignKey('Personal', on_delete=models.SET_NULL, null=True, blank=True, related_name='detalles_impositiva', verbose_name="Personal")
+    
     total_ganado = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Total Ganado')
     sueldo_neto = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Sueldo Neto')
     f110 = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='F110')
@@ -180,7 +151,7 @@ class DetalleImpositiva(models.Model):
     saldo_proximo_mes = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Saldo Próximo Mes')
     id_planilla = models.ForeignKey('Planilla', on_delete=models.CASCADE, null=True, blank=True, related_name='detalles_impositiva', verbose_name='Planilla')
     id_sueldo = models.ForeignKey('DetalleSueldo', on_delete=models.CASCADE, null=True, blank=True, related_name='detalles_impositiva', verbose_name="Detalle de Sueldo")
-    id_unidad = models.ForeignKey('Unidad', on_delete=models.SET_NULL, null=True, blank=True, related_name='detalles_impositiva', verbose_name='Unidad')
+    
     
     class Meta:
         db_table = 'detalle_impositiva'  # Especifica el nombre de la tabla si no usas el predeterminado
@@ -195,7 +166,7 @@ class DetalleImpositiva(models.Model):
 class DetalleBonoTe(models.Model):
 
 
-    id_personal = models.ForeignKey('Personal', on_delete=models.SET_NULL, null=True, blank=True, related_name='detalles_bono_te', verbose_name="Personal")
+    
     
     mes = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Mes')
     
@@ -219,7 +190,7 @@ class DetalleBonoTe(models.Model):
     id_sueldo = models.ForeignKey('DetalleSueldo', on_delete=models.CASCADE, null=True, blank=True, related_name='detalles_bono_te', verbose_name="Detalle de Sueldo")
     rc_iva = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='RC-IVA')
     dias_total_trab = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Días Total Trabajados')
-    id_unidad = models.ForeignKey('Unidad', on_delete=models.SET_NULL, null=True, blank=True, related_name='detalles_bono_te', verbose_name='Unidad')
+    
     total_ganado = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Total Ganado')
     descuentos = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Descuentos')
     fecha_inicio = models.DateField(null=True, blank=True, verbose_name='Fecha de Inicio')
@@ -271,3 +242,70 @@ class DetalleBonoTe(models.Model):
             self.liquido_pagable = 0  # O puedes lanzar una excepción
 
         super().save(*args, **kwargs)  # Llama al método save() original
+
+
+
+#----------------------------------------------------------------
+
+# --- En planilla/models.py ---
+
+class PrincipalPersonal(models.Model):
+    id = models.AutoField(primary_key=True, db_column='id') # Suponiendo que se llama 'id'
+    nombre = models.CharField(max_length=150, blank=True, null=True, db_column='Nombre') # Ya sabemos que esta es 'Nombre'
+    apellido_paterno = models.CharField(max_length=100, blank=True, null=True, db_column='A_Paterno') # ¡EJEMPLO! Usa el nombre real
+    apellido_materno = models.CharField(max_length=100, blank=True, null=True, db_column='A_Materno') # ¡EJEMPLO! Usa el nombre real
+    ci = models.CharField(max_length=20, blank=True, null=True, unique=True, db_column='CI') # ¡EJEMPLO! Usa el nombre real
+    fecha_nacimiento = models.DateField(blank=True, null=True, db_column='Fecha_nac') # ¡EJEMPLO! Usa el nombre real
+    # ... ajusta db_column para TODOS los demás campos ...
+
+    class Meta:
+        managed = False
+        db_table = 'principal_personal'
+        app_label = 'planilla'
+
+    # ... __str__ y nombre_completo se quedan igual ...
+
+#----------------------------------------------------------------
+
+
+
+
+# Modelo externo principal_personal
+class PrincipalPersonalExterno(models.Model):
+    id = models.AutoField(primary_key=True, db_column='id') # ¡Verifica PK y db_column!
+    nombre = models.CharField(max_length=50, db_column='Nombre', blank=True, null=True)
+    apellido_paterno = models.CharField(max_length=50, db_column='A_Paterno', blank=True, null=True)
+    apellido_materno = models.CharField(max_length=50, db_column='A_Materno', blank=True, null=True)
+    ci = models.CharField(max_length=10, db_column='CI', unique=True, blank=True, null=True)
+
+    class Meta: managed = False; db_table = 'principal_personal'; app_label = 'planilla'
+
+    @property
+    def nombre_completo(self):
+        parts = [self.apellido_paterno, self.apellido_materno, self.nombre]
+        return " ".join(part for part in parts if part).strip()
+
+    def __str__(self): return self.nombre_completo or f"Persona Externa {self.id}"
+
+# Modelo externo principal_cargo
+class PrincipalCargoExterno(models.Model):
+    id = models.AutoField(primary_key=True, db_column='id') # ¡Verifica PK y db_column!
+    nombre_cargo = models.CharField(max_length=80, db_column='Nombre_cargo', blank=True, null=True)
+
+    class Meta: managed = False; db_table = 'principal_cargo'; app_label = 'planilla'
+    def __str__(self): return self.nombre_cargo or f"Cargo Externo {self.id}"
+
+# Modelo externo principal_designacion
+class PrincipalDesignacionExterno(models.Model):
+    id = models.AutoField(primary_key=True, db_column='id') # PK de designacion
+    item = models.IntegerField(db_column='Item', null=True, blank=True)
+
+    # Claves Foráneas (ASEGURA db_column)
+    personal = models.ForeignKey(PrincipalPersonalExterno, on_delete=models.DO_NOTHING, db_column='id_personal', related_name='+')
+    cargo = models.ForeignKey(PrincipalCargoExterno, on_delete=models.DO_NOTHING, db_column='id_cargo_id', related_name='+')
+    # id_unidad_id = models.IntegerField(db_column='id_unidad_id', ...) # Si lo necesitas
+
+    # Quitamos campos de filtro por ahora
+
+    class Meta: managed = False; db_table = 'principal_designacion'; app_label = 'planilla'
+    def __str__(self): return f"Designacion {self.id} (Item: {self.item})"
