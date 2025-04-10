@@ -1,69 +1,84 @@
+{# --- planilla/templates/planilla/ver_detalles_bono_te.html --- #}
 {% extends 'index_master.html' %}
 
 {% block content %}
 <div class="right_col" role="main">
     <h2>Detalles Bono TE para Planilla {{ planilla.mes }}/{{ planilla.anio }} ({{ planilla.get_tipo_display }})</h2>
 
-    <table class="table table-striped">
+    {# ... mensajes ... #}
+
+    <table class="table table-striped table-bordered table-hover">
         <thead>
             <tr>
-                <th>Mes</th>
-                <th>Dias Hábiles</th>
+                <th>N°</th>
+                <th>Item</th>
+                <th>CI</th>
+                <th>Nombre Completo</th>
+                <th>Cargo</th>
+                <th>Mes</th> {# Quizás redundante si es para toda la planilla? #}
+                <th>Días Háb.</th> {# Renombrado para abreviar #}
                 <th>Faltas</th>
-                <th>Vacaciones</th>
+                <th>Vacac.</th> {# Renombrado para abreviar #}
                 <th>Viajes</th>
-                <th>Bajas Medicas</th>
+                <th>B.Médicas</th> {# Renombrado para abreviar #}
                 <th>PCGH</th>
                 <th>PSGH</th>
-                <th>Perm_Excep</th>
+                <th>P.Excep</th> {# Renombrado para abreviar #}
                 <th>Asuetos</th>
-                <th>PCGH Embarazas y/o enfermanded de base</th>
-                <th>Dias no Pagados</th>
-                <th>Dias Pagados</th>
-                <th>TOTAL</th>
-                <th>Descuentos</th>
-                <th>Liquido Pagable</th>
+                <th>PCGH Emb/Enf</th> {# Renombrado para abreviar #}
+                <th>D.No Pag.</th> {# Renombrado para abreviar #}
+                <th>D. Pag.</th> {# Renombrado para abreviar #}
+                <th>Total Ganado</th> {# Renombrado #}
+                <th>Desc.</th> {# Renombrado para abreviar #}
+                <th>Líquido Pag.</th> {# Renombrado para abreviar #}
                 <th>Acciones</th>
-                
-                
             </tr>
         </thead>
         <tbody>
-            {% for detalle in detalles_bono_te %}
+            {% for detalle in detalles_bono_te %} {# Usamos la lista enriquecida #}
             <tr>
-                <td>{{ detalle.mes|default:"0.00" }}</td>
-                <td>{{ detalle.dias_habiles|default:"0.00" }}</td>
-                <td>{{ detalle.faltas|default:"0.00" }}</td>
-                <td>{{ detalle.vacacion|default:"0.00" }}</td>
-                <td>{{ detalle.viajes|default:"0.00" }}</td>
-                <td>{{ detalle.bajas_medicas|default:"0.00" }}</td>
-                <td>{{ detalle.pcgh|default:"0.00" }}</td>
-                <td>{{ detalle.psgh|default:"0.00" }}</td>
-                <td>{{ detalle.perm_excep|default:"0.00" }}</td>
-                <td>{{ detalle.asuetos|default:"0.00" }}</td>
-                <td>{{ detalle.pcgh_embar_enf_base|default:"0.00" }}</td>
-                <td>{{ detalle.dias_no_pagados|default:"0.00" }}</td>
-                <td>{{ detalle.dias_pagados|default:"0.00" }}</td>
-                <td>{{ detalle.total_ganado|default:"0.00" }}</td>
-                <td>{{ detalle.descuentos|default:"0.00" }}</td>
-                <td>{{ detalle.liquido_pagable|default:"0.00" }}</td>
-                <td>
-                    <a href="{% url 'editar_bono_te' detalle_id=detalle.id %}" class="btn btn-sm btn-primary">Editar</a>
-                    <a href="{% url 'borrar_bono_te' detalle_id=detalle.id %}" class="btn btn-sm btn-danger">Borrar</a>
-                </td>
+                <td>{{ forloop.counter }}</td> {# Usa el contador del bucle #}
+                {# --- Acceder a los datos enriquecidos --- #}
+                <td>{{ detalle.item_externo|default:"N/A" }}</td>
+                <td>{{ detalle.ci_externo|default:"N/A" }}</td> {# Acceso directo #}
+                <td>{{ detalle.nombre_completo_externo|default:"N/A" }}</td> {# Acceso directo #}
+                {# Alternativamente, si prefieres usar el objeto: #}
+                {# <td>{{ detalle.persona_externa_obj.ci|default:"N/A" }}</td> #}
+                {# <td>{{ detalle.persona_externa_obj.nombre_completo|default:"N/A" }}</td> #}
+                <td>{{ detalle.cargo_externo|default:"N/A" }}</td>
+                {# --- Fin Celdas Nuevas Columnas --- #}
 
-                
-                
-                <!-- ... otros campos ... -->
+                {# --- Celdas Existentes --- #}
+                <td>{{ detalle.mes|floatformat:0|default:"0" }}</td>
+                <td>{{ detalle.id_planilla.dias_habiles|floatformat:2|default:"0.00" }}</td>
+                <td>{{ detalle.faltas|floatformat:2|default:"0.00" }}</td>
+                <td>{{ detalle.vacacion|floatformat:2|default:"0.00" }}</td>
+                <td>{{ detalle.viajes|floatformat:2|default:"0.00" }}</td>
+                <td>{{ detalle.bajas_medicas|floatformat:2|default:"0.00" }}</td>
+                <td>{{ detalle.pcgh|floatformat:2|default:"0.00" }}</td>
+                <td>{{ detalle.psgh|floatformat:2|default:"0.00" }}</td>
+                <td>{{ detalle.perm_excep|floatformat:2|default:"0.00" }}</td>
+                <td>{{ detalle.asuetos|floatformat:2|default:"0.00" }}</td>
+                <td>{{ detalle.pcgh_embar_enf_base|floatformat:2|default:"0.00" }}</td>
+                <td>{{ detalle.dias_no_pagados|floatformat:2|default:"0.00" }}</td>
+                <td>{{ detalle.dias_pagados|floatformat:2|default:"0.00" }}</td>
+                <td>{{ detalle.total_ganado|floatformat:2|default:"0.00" }}</td>
+                <td>{{ detalle.descuentos|floatformat:2|default:"0.00" }}</td>
+                <td>{{ detalle.liquido_pagable|floatformat:2|default:"0.00" }}</td>
+                <td>
+                    <a href="{% url 'editar_bono_te' detalle.id %}" class="btn btn-sm btn-primary" title="Editar"><i class="fa fa-pencil"></i></a>
+                    <a href="{% url 'borrar_bono_te' detalle.id %}" class="btn btn-sm btn-danger" title="Borrar" onclick="return confirm('¿Está seguro de que desea eliminar este detalle?');"><i class="fa fa-trash"></i></a>
+                </td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="10">No hay detalles de bono TE para esta planilla.</td>
+                <td colspan="21">No hay detalles de bono TE registrados para esta planilla.</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 
-    <a href="{% url 'lista_planillas' %}" class="btn btn-secondary">Volver a la Lista de Planillas</a>
+    <a href="{% url 'lista_planillas' %}" class="btn btn-secondary">Volver a la Lista</a>
+
 </div>
 {% endblock %}

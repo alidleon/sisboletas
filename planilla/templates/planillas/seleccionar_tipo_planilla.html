@@ -1,33 +1,29 @@
+{# --- planillas/seleccionar_tipo_planilla.html (Ejemplo Inferido) --- #}
 {% extends 'index_master.html' %}
 
 {% block content %}
 <div class="right_col" role="main">
-    
+    <h2>Seleccionar Tipo de Planilla a Crear</h2>
 
-  <h2>Seleccionar Tipo de Planilla Bono TE</h2>
-  {% if error_message %}
-    <div class="alert alert-danger">{{ error_message }}</div>
-  {% endif %}
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
 
-  <form method="post">
-    {% csrf_token %}
-    <label for="tipo">Tipo de Planilla:</label>
-    <select name="tipo" id="tipo">
-      {% for tipo, nombre in tipos_planilla %}
-        <option value="{{ tipo }}">{{ nombre }}</option>
-      {% endfor %}
-    </select>
-    <button type="submit">Continuar</button>
-  </form>
-
-  {% if messages %}
-    <ul class="messages">
-      {% for message in messages %}
-        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-      {% endfor %}
-    </ul>
-  {% endif %}
-
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="tipo_planilla">Tipo de Planilla:</label>
+            <select name="tipo" id="tipo_planilla" class="form-control" required> {# 'required' es un control HTML5 #}
+                <option value="">--- Seleccione ---</option> {# Opción vacía para forzar selección #}
+                {% for value, display_name in tipos_planilla %}
+                    <option value="{{ value }}">{{ display_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Continuar</button>
+    </form>
 </div>
 {% endblock %}
 

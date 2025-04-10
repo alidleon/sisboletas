@@ -29,7 +29,7 @@
                 <td>{{ planilla.get_tipo_display }}</td>
                 <td>
                     <a href="{% url 'ver_detalles_bono_te' planilla_id=planilla.id %}" class="btn btn-sm btn-info">Ver</a>
-                    <a href="{% url 'llenar_detalle_bono_te' planilla_id=planilla.id %}" class="btn btn-sm btn-success">Llenar</a>
+                    <a href="#" class="btn btn-sm btn-success">Llenar</a>
                     <a href="{% url 'editar_planilla' planilla_id=planilla.id %}" class="btn btn-sm btn-primary">Editar</a>
                     <a href="{% url 'borrar_planilla' planilla_id=planilla.id %}" class="btn btn-sm btn-danger">Borrar</a>
                 </td>

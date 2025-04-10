@@ -3,12 +3,75 @@
 {% block content %}
 <div class="right_col" role="main">
     <h2>Editar Detalle Bono TE</h2>
+
+    {# --- Sección de Información del Personal (Read-Only) --- #}
+    <div class="x_panel"> {# Usamos un panel para agrupar visualmente #}
+        <div class="x_title">
+            <h2>Información del Personal</h2>
+            <div class="clearfix"></div>
+        </div>
+        <div class="x_content">
+            {% if persona_externa %}
+                <p><strong>CI:</strong> {{ persona_externa.ci | default:"No disponible" }}</p>
+                <p><strong>Nombre Completo:</strong> {{ persona_externa.nombre_completo | default:"No disponible" }}</p>
+                <p><strong>Item:</strong> {{ item_externo | default:"No disponible" }}</p> {# Usamos las variables del contexto #}
+                <p><strong>Cargo:</strong> {{ cargo_externo | default:"No disponible" }}</p> {# Usamos las variables del contexto #}
+            {% elif detalle_bono_te.personal_externo_id %}
+                <p class="text-warning">No se pudo cargar la información del personal externo (ID: {{ detalle_bono_te.personal_externo_id }}).</p>
+            {% else %}
+                 <p class="text-muted">Este registro no está asociado a ningún personal externo.</p>
+            {% endif %}
+        </div>
+    </div>
+    {# --- Fin Sección de Información --- #}
+
+
+    {# --- Inicio del Formulario Editable --- #}
     <form method="post">
         {% csrf_token %}
-        {{ form.as_p }}
+
+        {# Muestra errores generales del formulario #}
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+                {% for error in form.non_field_errors %}
+                    <p>{{ error }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {# --- Campo Mes --- #}
+        <div class="form-group">
+            {{ form.mes.label_tag }}
+            {{ form.mes }}
+            {% if form.mes.errors %}<div class="text-danger">{{ form.mes.errors }}</div>{% endif %}
+            {% if form.mes.help_text %}<small class="form-text text-muted">{{ form.mes.help_text }}</small>{% endif %}
+        </div>
+
+        {# --- Campo Días Hábiles --- #}
+        <div class="form-group">
+            {{ form.dias_habiles.label_tag }}
+            {{ form.dias_habiles }}
+            {% if form.dias_habiles.errors %}<div class="text-danger">{{ form.dias_habiles.errors }}</div>{% endif %}
+            {% if form.dias_habiles.help_text %}<small class="form-text text-muted">{{ form.dias_habiles.help_text }}</small>{% endif %}
+        </div>
+
+        {# --- Resto de los campos editables --- #}
+        {% for field in form %}
+            {% if field.name != 'mes' and field.name != 'dias_habiles' %}
+                <div class="form-group">
+                    {{ field.label_tag }}
+                    {{ field }}
+                    {% if field.errors %}<div class="text-danger">{{ field.errors }}</div>{% endif %}
+                    {% if field.help_text %}<small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
+                </div>
+            {% endif %}
+        {% endfor %}
+
+        {# --- Botones --- #}
         <button type="submit" class="btn btn-primary">Guardar Cambios</button>
-        <!-- Modificamos la URL del botón Cancelar -->
         <a href="{% url 'ver_detalles_bono_te' planilla_id=detalle_bono_te.id_planilla.id %}" class="btn btn-secondary">Cancelar</a>
     </form>
+     {# --- Fin del Formulario Editable --- #}
+
 </div>
 {% endblock %}

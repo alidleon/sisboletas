@@ -3,18 +3,25 @@ from .models import DetalleBonoTe, Planilla
 from django.core.exceptions import ValidationError
 
 class DetalleBonoTeForm(forms.ModelForm):
-    dias_habiles = forms.DecimalField(label='Días Hábiles')
-    dias_no_pagados = forms.DecimalField(label='Días No Pagados', initial=0)
+    # El campo sigue declarado aquí para que aparezca en el form
+    dias_habiles = forms.DecimalField(
+        label='Días Hábiles (Planilla)',
+        required=False, # Es informativo, no requerido por el usuario
+        widget=forms.NumberInput(attrs={'readonly': 'readonly'}) # Hacemos explícito que es readonly
+    )
+    # ... otros campos explícitos si los hay ...
 
     class Meta:
         model = DetalleBonoTe
-        fields = ['mes', 'dias_habiles', 'dias_no_pagados', 'faltas', 'vacacion', 'viajes', 'bajas_medicas', 'pcgh', 'psgh', 'perm_excep', 'asuetos',
-                  'pcgh_embar_enf_base', 'descuentos']  # Campos omitidos: id_sueldo, id_unidad, fecha_inicio, fecha_fin, rc_iva
-    
+        # Asegúrate de que 'dias_habiles' NO esté en esta lista
+        fields = ['mes', 'faltas', 'vacacion', 'viajes', 'bajas_medicas', 'pcgh', 'psgh', 'perm_excep', 'asuetos',
+                  'pcgh_embar_enf_base', 'descuentos'] # Añade aquí los campos del *modelo* que SÍ deben editarse
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['mes'].widget.attrs['readonly'] = True
-        self.fields['dias_habiles'].widget.attrs['readonly'] = True
+        if 'mes' in self.fields:
+            self.fields['mes'].widget.attrs['readonly'] = True
+        # La configuración de readonly para dias_habiles ya está en la declaración del campo.
 
 
 class PlanillaForm(forms.ModelForm):
