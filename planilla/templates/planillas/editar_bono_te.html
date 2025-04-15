@@ -29,6 +29,8 @@
     {# --- Inicio del Formulario Editable --- #}
     <form method="post">
         {% csrf_token %}
+        <input type="hidden" name="redirect_secretaria" value="{{ request.GET.secretaria|default:'' }}">
+        <input type="hidden" name="redirect_unidad" value="{{ request.GET.unidad|default:'' }}">
 
         {# Muestra errores generales del formulario #}
         {% if form.non_field_errors %}
@@ -69,7 +71,7 @@
 
         {# --- Botones --- #}
         <button type="submit" class="btn btn-primary">Guardar Cambios</button>
-        <a href="{% url 'ver_detalles_bono_te' planilla_id=detalle_bono_te.id_planilla.id %}" class="btn btn-secondary">Cancelar</a>
+        <a href="{% url 'ver_detalles_bono_te' planilla_id=detalle_bono_te.id_planilla.id %}?secretaria={{ request.GET.secretaria|default:'' }}&unidad={{ request.GET.unidad|default:'' }}&q={{ request.GET.q|default:'' }}" class="btn btn-secondary">Cancelar</a>
     </form>
      {# --- Fin del Formulario Editable --- #}
 

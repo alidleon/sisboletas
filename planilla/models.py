@@ -40,6 +40,70 @@ class PrincipalCargoExterno(models.Model):
 
     def __str__(self):
         return self.nombre_cargo or f"Cargo Externo ID {self.id}"
+    
+#--------------------------------------------------------------
+# --- NUEVO: Modelo para principal_secretaria ---
+class PrincipalSecretariaExterna(models.Model):
+    # Asumiendo que la PK en principal_secretaria es 'id' y es numérica.
+    # ¡¡AJUSTA 'id' si se llama diferente!!
+    id = models.AutoField(primary_key=True, db_column='id')
+
+    # Campo para el nombre de la secretaría
+    # ¡¡AJUSTA db_column si se llama diferente a 'Nombre_secretaria'!!
+    nombre_secretaria = models.CharField(
+        max_length=100,
+        db_column='Nombre_secretaria', # Nombre de columna que proporcionaste
+        blank=True, null=True          # Ser flexible con datos externos
+    )
+    # Añade aquí otros campos de principal_secretaria si los necesitas
+
+    class Meta:
+        managed = False                 # No crear/modificar tabla con migrate
+        db_table = 'principal_secretaria' # Nombre EXACTO de la tabla externa
+        app_label = 'planilla'          # Agrupar bajo la app 'planilla'
+
+    def __str__(self):
+        return self.nombre_secretaria or f"Secretaria Externa ID {self.id}"
+
+# --- NUEVO/MODIFICADO: Modelo para principal_unidad ---
+class PrincipalUnidadExterna(models.Model):
+    # Asumiendo PK 'id' numérica para principal_unidad. ¡¡AJUSTA si es diferente!!
+    id = models.AutoField(primary_key=True, db_column='id')
+
+    # Campo para el nombre de la unidad
+    # ¡¡AJUSTA db_column si se llama diferente a 'Nombre_unidad'!!
+    nombre_unidad = models.CharField(
+        max_length=86,
+        db_column='Nombre_unidad',     # Nombre de columna que proporcionaste
+        blank=True, null=True
+    )
+
+    # --- Clave Foránea (FK) a PrincipalSecretariaExterna ---
+    # ¡¡AJUSTA db_column si se llama diferente a 'id_secretaria_id'!!
+    # NOTA: Aunque dijiste varchar(50), es EXTREMADAMENTE raro que una FK
+    #       sea varchar. Lo modelamos como ForeignKey asumiendo que la columna
+    #       'id_secretaria_id' en 'principal_unidad' contiene el ID numérico
+    #       de la secretaría. Si REALMENTE es varchar, necesitaremos otro enfoque.
+    secretaria = models.ForeignKey(
+        PrincipalSecretariaExterna,
+        on_delete=models.DO_NOTHING,   # Política segura para datos externos
+        db_column='id_secretaria_id',  # Nombre de columna FK que proporcionaste
+        related_name='unidades',       # Para acceder a unidades desde secretaria (opcional)
+        db_constraint=False,           # ¡¡CRUCIAL!! No crear restricción FK física
+        null=True, blank=True          # Permitir unidades sin secretaría si es posible
+    )
+    # ------------------------------------------------------
+
+    # Añade aquí otros campos de principal_unidad si los necesitas
+
+    class Meta:
+        managed = False
+        db_table = 'principal_unidad'    # Nombre EXACTO de la tabla externa
+        app_label = 'planilla'
+
+    def __str__(self):
+        return self.nombre_unidad or f"Unidad Externa ID {self.id}"
+
 
 # Modelo externo principal_designacion (¡ASEGÚRATE que los db_column son correctos!)
 class PrincipalDesignacionExterno(models.Model):
@@ -71,6 +135,14 @@ class PrincipalDesignacionExterno(models.Model):
         related_name='+'
     )
     # id_unidad_id = models.IntegerField(db_column='id_unidad_id', ...) # Si lo necesitas
+    unidad = models.ForeignKey(
+        PrincipalUnidadExterna,
+        on_delete=models.DO_NOTHING,   # Política segura
+        db_column='id_unidad_id',      # Nombre de columna FK que mencionaste
+        related_name='designaciones',  # Para acceder a designaciones desde unidad (opcional)
+        db_constraint=False,           # ¡¡CRUCIAL!!
+        null=True, blank=True          # Permitir designaciones sin unidad si es posible
+    )
 
     class Meta:
         managed = False
@@ -78,8 +150,9 @@ class PrincipalDesignacionExterno(models.Model):
         app_label = 'planilla'
 
     def __str__(self):
-        return f"Designacion ID {self.id} (Item: {self.item}, Personal: {self.personal_id}, Cargo: {self.cargo_id})"
-
+        # Actualizado para incluir unidad_id
+        return (f"Designacion ID {self.id} (Tipo: {self.tipo_designacion}, Estado: {self.estado}, "
+                f"Item: {self.item}, Personal: {self.personal_id}, Unidad: {self.unidad_id})")
 
 
 #tabla planilla

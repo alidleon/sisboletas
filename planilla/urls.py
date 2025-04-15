@@ -13,7 +13,7 @@ urlpatterns = [
     path('ver_detalles_bono_te/<int:planilla_id>/', views.ver_detalles_bono_te, name='ver_detalles_bono_te'),
     path('personal_externo/', views.listar_personal_externo, name='listar_personal_externo'),
     path('probar_consulta_externa/<str:tipo_planilla>/', views.probar_consulta_designaciones, name='probar_consulta_designaciones'),
-
+    path('exportar_xlsx/<int:planilla_id>/', views.exportar_planilla_xlsx, name='exportar_planilla_xlsx'),
 ]
 
 

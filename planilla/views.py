@@ -1,5 +1,11 @@
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+import os
+from django.conf import settings
+
+from django.urls import reverse # <--- Importar reverse
+from urllib.parse import urlencode # <--- Importar urlencode
 
 from datetime import date
 from django.contrib import messages
@@ -8,6 +14,9 @@ from .forms import PlanillaForm  # Necesitas crear un formulario para editar la 
 from datetime import datetime
 from django.core.exceptions import ValidationError
 from .models import PrincipalPersonal # ¡Importa el nuevo modelo!
+from decimal import Decimal, InvalidOperation
+from calendar import month_name
+from openpyxl.drawing.image import Image
 
 from django.db import transaction, IntegrityError       # Para transacciones y manejo de errores BD
 from django.db.models import Q   
@@ -17,8 +26,33 @@ from .models import (
     DetalleBonoTe,
     PrincipalDesignacionExterno,
     PrincipalPersonalExterno, # Ahora necesitamos importar este
-    PrincipalCargoExterno      # Y este si accedes a su nombre directamente
+    PrincipalCargoExterno,      # Y este si accedes a su nombre directamente
+    PrincipalUnidadExterna,      # <--- Modelo de Unidad
+    PrincipalSecretariaExterna # <--- Modelo de Secretaría
 )
+
+
+from .utils import get_processed_planilla_details
+try:
+    import openpyxl
+    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    # Importar Image aquí; su uso real se manejará con try-except
+    from openpyxl.drawing.image import Image
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    OPENPYXL_AVAILABLE = False
+    # Clases dummy si openpyxl falta, para evitar NameErrors más adelante
+    class Font: pass
+    class Alignment: pass
+    class PatternFill: pass
+    class Border: pass
+    class Side: pass
+    class Image: pass # La clase Image dummy no funcionará, pero evita el NameError
+logger = logging.getLogger(__name__)
+# ---------------------------------
+    
+
 
 @login_required
 def seleccionar_tipo_planilla(request):
@@ -257,7 +291,7 @@ def lista_bono_te(request):
 
 # ... (otras importaciones y vistas) ...
 
-@login_required
+
 @login_required
 def editar_bono_te(request, detalle_id):
     # Obtener el DetalleBonoTe y su Planilla asociada (BD 'default')
@@ -291,7 +325,9 @@ def editar_bono_te(request, detalle_id):
             # Construir la consulta base
             consulta_desig = PrincipalDesignacionExterno.objects.using('personas_db') \
                 .filter(personal_id=personal_externo_id) \
-                .select_related('cargo') # Incluir el cargo
+                .select_related('cargo') \
+                .order_by('-id') # O por fecha si tienes
+            
 
             # ----- !!!!! APLICA AQUÍ LOS MISMOS FILTROS DE ACTIVIDAD/TIPO !!!!! -----
             #       QUE USASTE EN LA VISTA 'crear_planilla' y 'ver_detalles_bono_te'.
@@ -321,7 +357,24 @@ def editar_bono_te(request, detalle_id):
         if form.is_valid():
             form.save()
             messages.success(request, 'Detalle Bono TE editado correctamente.')
-            return redirect('ver_detalles_bono_te', planilla_id=planilla.id)
+            redirect_secretaria = request.POST.get('redirect_secretaria', '')
+            redirect_unidad = request.POST.get('redirect_unidad', '')
+            redirect_q = request.POST.get('redirect_q', '')
+            base_url = reverse('ver_detalles_bono_te', kwargs={'planilla_id': planilla.id})
+            params = {}
+            if redirect_secretaria:
+                params['secretaria'] = redirect_secretaria
+            if redirect_unidad:
+                params['unidad'] = redirect_unidad
+            if redirect_q: params['q'] = redirect_q
+
+            if params: params['buscar'] = 'true'
+            redirect_url = f"{base_url}?{urlencode(params)}" if params else base_url
+
+            logger.debug(f"Redirigiendo a: {redirect_url}")
+            return redirect(redirect_url)
+
+
         else:
             messages.error(request, 'Por favor, corrige los errores en el formulario.')
             # Se renderizará el template con el form inválido y los datos externos ya cargados
@@ -394,146 +447,321 @@ def borrar_planilla(request, planilla_id):
 
 ################################################################
 
+# Importar la función auxiliar
+
 
 @login_required
 def ver_detalles_bono_te(request, planilla_id):
-    # Obtener la Planilla
-    planilla = get_object_or_404(Planilla, pk=planilla_id)
-    logger.info(f"Viendo detalles para Planilla ID {planilla.id} (Tipo: {planilla.get_tipo_display()})")
-
-    detalles_bono_te_list = []
-    try:
-        # Obtener Detalles Locales (DetalleBonoTe)
-        detalles_bono_te_qs = DetalleBonoTe.objects.filter(id_planilla=planilla).order_by('id')
-        detalles_bono_te_list = list(detalles_bono_te_qs)
-        logger.info(f"Obtenidos {len(detalles_bono_te_list)} detalles locales para Planilla {planilla.id}")
-
-    except Exception as e_default:
-         logger.error(f"Error obteniendo detalles locales para Planilla {planilla.id}: {e_default}", exc_info=True)
-         messages.error(request, f"Error al cargar los detalles base de la planilla: {e_default}")
-         detalles_bono_te_list = [] # Asegurar lista vacía si falla
-
-    # Recolectar IDs de personal externo para buscar info
-    personal_ids = {d.personal_externo_id for d in detalles_bono_te_list if d.personal_externo_id is not None}
-
-    # Diccionarios para información externa
-    personal_info = {}
-    designaciones_info = {}
-
-    # Consultar Datos Externos (si hay IDs)
-    if personal_ids:
-        # 1. Consultar Personal Externo
-        logger.info(f"Consultando {len(personal_ids)} registros de personal en 'personas_db'...")
-        try:
-            personal_externo_qs = PrincipalPersonalExterno.objects.using('personas_db') \
-                .filter(id__in=personal_ids)
-            for persona in personal_externo_qs:
-                personal_info[persona.id] = persona
-            logger.info(f"Mapeo 'personal_info' creado con {len(personal_info)} entradas para Planilla {planilla.id}.")
-        except Exception as e_pers:
-            logger.error(f"Error consultando personal externo en 'personas_db' para Planilla {planilla.id}: {e_pers}", exc_info=True)
-            messages.warning(request, f"No se pudo obtener info de nombres/CI: {e_pers}.")
-            # personal_info se quedará vacío o incompleto
-
-        # 2. Consultar Designaciones Externas (¡CON FILTRO DE ACTIVIDAD!)
-        logger.info(f"Consultando designaciones ACTIVAS en 'personas_db' para {len(personal_ids)} IDs...")
-        try:
-            consulta_desig_externa = PrincipalDesignacionExterno.objects.using('personas_db') \
-                .filter(personal_id__in=personal_ids) \
-                .select_related('cargo')
-
-            # ----- APLICAR FILTRO DE ESTADO AQUÍ TAMBIÉN -----
-            # Para mostrar Item/Cargo de la designación ACTIVA
-            estado_activo_valor = 'ACTIVO'
-            if hasattr(PrincipalDesignacionExterno, 'estado'):
-                consulta_desig_externa = consulta_desig_externa.filter(estado=estado_activo_valor)
-                logger.info(f"Aplicado filtro de actividad: estado = '{estado_activo_valor}' al buscar Item/Cargo.")
-            else:
-                 logger.error("¡¡MODELO SIN CAMPO 'estado'!! No se pudo filtrar designaciones activas para Item/Cargo.")
-                 messages.warning(request,"No se pudo filtrar por estado activo al buscar Item/Cargo (campo 'estado' falta en modelo).")
-                 # Se continuará sin filtro de estado, podría mostrar datos de designaciones no activas.
-            # --------------------------------------------------
-
-            # ----- (Opcional) Filtro por Tipo -----
-            # Si una persona pudiera tener múltiples designaciones ACTIVAS de diferentes tipos,
-            # y quisieras mostrar solo la info de la designación del tipo de la planilla.
-            # external_type = EXTERNAL_TYPE_MAP.get(planilla.tipo) # Necesitarías EXTERNAL_TYPE_MAP aquí también
-            # if external_type and hasattr(PrincipalDesignacionExterno, 'tipo_designacion'):
-            #    consulta_desig_externa = consulta_desig_externa.filter(tipo_designacion=external_type)
-            #    logger.info(f"Aplicado filtro por tipo '{external_type}' al buscar Item/Cargo.")
-            # --------------------------------------
-
-            designaciones_externas = list(consulta_desig_externa)
-            logger.info(f"Consulta designaciones externas devolvió {len(designaciones_externas)} registros activos.")
-            # Crear mapeo (puede sobrescribir si hay múltiples designaciones activas para la misma persona)
-            for desig in designaciones_externas:
-                designaciones_info[desig.personal_id] = {
-                    'item': desig.item,
-                    'cargo': desig.cargo.nombre_cargo if desig.cargo else 'N/A'
-                }
-            logger.info(f"Mapeo 'designaciones_info' creado con {len(designaciones_info)} entradas para Planilla {planilla.id}.")
-        except Exception as e_desig:
-            logger.error(f"Error consultando designaciones externas en 'personas_db' para Planilla {planilla.id}: {e_desig}", exc_info=True)
-            messages.warning(request, f"No se pudo obtener la información de item/cargo: {e_desig}.")
-            # designaciones_info se quedará vacío o incompleto
-
-    # 3. Enriquecer los detalles locales con la info externa
-    detalles_enriquecidos = []
-    logger.info(f"Iniciando enriquecimiento para {len(detalles_bono_te_list)} detalles...")
-    for detalle in detalles_bono_te_list:
-        # Obtener datos de los mapeos (serán None/vacío si hubo error o no se encontró)
-        persona_obj = personal_info.get(detalle.personal_externo_id)
-        info_designacion_dict = designaciones_info.get(detalle.personal_externo_id)
-
-        # Extraer valores para la plantilla (con manejo de None/errores)
-        item_val = info_designacion_dict.get('item', 'N/A') if info_designacion_dict else 'N/A'
-        cargo_val = info_designacion_dict.get('cargo', 'N/A') if info_designacion_dict else 'N/A'
-        ci_val = 'N/A'
-        nombre_val = 'Personal no encontrado' # Valor por defecto más informativo
-
-        if persona_obj:
-            try:
-                ci_val = persona_obj.ci if hasattr(persona_obj, 'ci') else 'Sin CI'
-                nombre_val = persona_obj.nombre_completo if hasattr(persona_obj, 'nombre_completo') else 'Sin NombreC'
-            except AttributeError as e_attr_pers:
-                logger.warning(f"AttributeError al acceder a datos de Persona ID {detalle.personal_externo_id}: {e_attr_pers}")
-                ci_val = 'Error Attr'
-                nombre_val = 'Error Attr'
-
-        # Añadir atributos directamente al objeto 'detalle' para usar en la plantilla
-        detalle.persona_externa_obj = persona_obj # Útil si necesitas más datos de la persona en la plantilla
-        detalle.item_externo = item_val
-        detalle.cargo_externo = cargo_val
-        detalle.ci_externo = ci_val
-        detalle.nombre_completo_externo = nombre_val
-
-        detalles_enriquecidos.append(detalle)
-
-    logger.info(f"Enriquecimiento terminado. {len(detalles_enriquecidos)} detalles enriquecidos.")
-
-    # 4. Opcional: Re-ordenar la lista final
-    try:
-        detalles_enriquecidos.sort(key=lambda d: (
-            getattr(d.persona_externa_obj, 'apellido_paterno', '') or '',
-            getattr(d.persona_externa_obj, 'apellido_materno', '') or '',
-            getattr(d.persona_externa_obj, 'nombre', '') or ''
-        ))
-    except Exception as e_sort:
-        logger.warning(f"No se pudo re-ordenar la lista de detalles para Planilla {planilla.id}: {e_sort}")
-
-    # 5. Preparar Contexto y Renderizar
-    context = {
-        'planilla': planilla,
-        'detalles_bono_te': detalles_enriquecidos, # Pasar la lista final
-    }
-    # logger.debug(f"Contexto final listo. 'detalles_bono_te' tiene {len(detalles_enriquecidos)} elementos.") # Log opcional
+    """
+    Vista que usa la función auxiliar para obtener datos y renderizar la plantilla.
+    """
+    logger.debug(f"Vista ver_detalles_bono_te llamada para planilla_id={planilla_id}")
 
     try:
+        # Llamar a la función auxiliar para obtener todos los datos procesados
+        processed_data = get_processed_planilla_details(request, planilla_id)
+
+        # Verificar si hubo un error grave reportado por la función auxiliar
+        if processed_data.get('error_message'):
+            # Mostrar el mensaje de error al usuario
+            messages.error(request, processed_data['error_message'])
+            # Si el error fue que no se encontró la planilla, redirigir
+            if not processed_data.get('planilla'):
+                 logger.warning(f"Planilla {planilla_id} no encontrada por util, redirigiendo.")
+                 return redirect('lista_planillas') # O a donde sea apropiado
+
+        # Preparar el contexto para la plantilla usando los datos devueltos
+        context = {
+            'planilla': processed_data.get('planilla'),
+            'all_secretarias': processed_data.get('all_secretarias'),
+            'unidades_for_select': processed_data.get('unidades_for_select'),
+            'selected_secretaria_id': processed_data.get('selected_secretaria_id'),
+            'selected_unidad_id': processed_data.get('selected_unidad_id'),
+            'detalles_bono_te': processed_data.get('detalles_enriquecidos'), # Nombre usado en plantilla
+            'search_active': processed_data.get('search_active')
+        }
+
+        # Renderizar la plantilla con el contexto
         return render(request, 'planillas/ver_detalles_bono_te.html', context)
-    except Exception as e_render:
-         logger.error(f"Error renderizando plantilla ver_detalles_bono_te para Planilla {planilla.id}: {e_render}", exc_info=True)
-         messages.error(request,"Ocurrió un error al intentar mostrar la página de detalles.")
-         return redirect('lista_planillas') # O a otra página segura
+
+    except Exception as e_view:
+        # Capturar cualquier error inesperado que ocurra EN LA VISTA (no en la util)
+        logger.error(f"Error inesperado en vista ver_detalles_bono_te para ID {planilla_id}: {e_view}", exc_info=True)
+        messages.error(request, "Ocurrió un error inesperado al procesar la solicitud.")
+        return redirect('lista_planillas') # Redirigir a lugar seguro
+    
+#---------------------------------------------
+
+# --- NUEVA VISTA PARA EXPORTAR A XLSX ---
+
+@login_required
+def exportar_planilla_xlsx(request, planilla_id):
+    """
+    Genera un archivo XLSX con encabezado institucional (A1:E3), logo (Fila 1),
+    encabezado de planilla (desde Fila 4), datos (desde Fila 9).
+    """
+    # 1. Verificar openpyxl
+    if not OPENPYXL_AVAILABLE:
+        messages.error(request, "La funcionalidad de exportación a Excel no está disponible (falta 'openpyxl').")
+        return redirect('ver_detalles_bono_te', planilla_id=planilla_id)
+
+    logger.info(f"Solicitud de exportación XLSX para Planilla ID {planilla_id}")
+
+    # 2. Obtener datos procesados
+    try:
+        processed_data = get_processed_planilla_details(request, planilla_id)
+    except Exception as e_get_data:
+        logger.error(f"Error crítico obteniendo datos para exportar Planilla {planilla_id}: {e_get_data}", exc_info=True)
+        messages.error(request, f"No se pudieron obtener los datos para exportar: {e_get_data}")
+        return redirect('lista_planillas')
+
+    # 3. Validar datos obtenidos
+    if processed_data.get('error_message') and not processed_data.get('detalles_enriquecidos'):
+        messages.error(request, f"Error al preparar datos para exportar: {processed_data['error_message']}")
+        return redirect('ver_detalles_bono_te', planilla_id=planilla_id)
+
+    planilla = processed_data.get('planilla')
+    detalles_filtrados = processed_data.get('detalles_enriquecidos')
+    selected_unidad_id = processed_data.get('selected_unidad_id')
+    selected_secretaria_id = processed_data.get('selected_secretaria_id')
+
+    if not planilla:
+         messages.error(request, "No se pudo encontrar la información de la planilla para exportar.")
+         return redirect('lista_planillas')
+
+    if not detalles_filtrados:
+         # Advertir si no hay detalles, pero continuar para generar cabecera
+         if selected_unidad_id: logger.warning(...); messages.warning(...)
+         else: logger.warning(...); messages.warning(...)
+         # No retornamos, generamos el archivo vacío
+
+    # --- 4. Crear el archivo XLSX ---
+    try:
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.title = f"BonoTE_{planilla.mes}_{planilla.anio}"[:31]
+
+        # --- 5. Definir Estilos ---
+        inst_header_bold_font = Font(name='Calibri', size=9, bold=True)
+        title_font = Font(name='Calibri', size=14, bold=True, color='FF000080')
+        subtitle_font = Font(name='Calibri', size=12, bold=True)
+        value_font = Font(name='Calibri', size=10)
+        header_font = Font(bold=True, name='Calibri', size=10, color='FFFFFFFF')
+        wrap_left_alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
+        centered_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        left_alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+        right_alignment = Alignment(horizontal='right', vertical='center')
+        decimal_format = '#,##0.00'; integer_format = '#,##0'
+        header_fill = PatternFill(start_color='FF000080', end_color='FF000080', fill_type='solid')
+        thin_border_side = Side(border_style="thin", color="FF000000")
+        header_border = Border(left=thin_border_side, right=thin_border_side, top=thin_border_side, bottom=thin_border_side)
+
+        # --- 6. Definir Encabezados de Datos y Fila de Inicio ---
+        data_headers = [ # Tu lista de encabezados
+            'Nro.', 'Item', 'CI', 'Nombre Completo', 'Cargo', 'Mes', 'Días Háb.',
+            'Faltas', 'Vacac.', 'Viajes', 'B.Médicas', 'PCGH', 'PSGH', 'P.Excep',
+            'Asuetos', 'PCGH Emb/Enf', 'D.No Pag.', 'D. Pag.', 'Total Ganado (Bono)',
+            'Desc.', 'Líquido Pag. (Bono)'
+        ]
+        num_data_columns = len(data_headers)
+        # Fila donde empiezan los encabezados 'Nro.', 'Item', etc.
+        start_data_row = 8 # (A1:E3) + (Titulo 4) + (Periodo 5) + (Filtro 6) + (Blanco 7) = Inicio 8
+
+        # --- 7. Escribir Encabezado Personalizado (Texto e Imagen) ---
+
+        # 7.a Encabezado Institucional (Combinando A1:E3)
+        institucional_text = (
+            "GOBIERNO AUTONOMO DEPARTAMENTAL DE POTOSI\n"
+            "SECRETARIA DEPTAL. ADMINISTRATIVA FINANCIERA\n"
+            "UNIDAD DE RECURSOS HUMANOS"
+        )
+        num_cols_to_merge_header = 5 # Ajusta el ancho si es necesario
+        sheet.merge_cells(start_row=1, start_column=1, end_row=3, end_column=num_cols_to_merge_header)
+        # Escribir valor y aplicar estilo a la celda superior izquierda (A1)
+        inst_cell = sheet.cell(row=1, column=1, value=institucional_text)
+        inst_cell.font = inst_header_bold_font
+        inst_cell.alignment = wrap_left_alignment
+
+        # 7.b Añadir Imagen (Logo)
+        image_path = None
+        try: # Encontrar RUTA
+            logo_filename = 'gadp.png'
+            potential_path = os.path.join(settings.BASE_DIR, 'static', 'img', logo_filename)
+            if os.path.exists(potential_path): image_path = potential_path
+            else: logger.warning(f"Logo no encontrado en ruta: {potential_path}")
+        except Exception as e_path: logger.error(f"Error determinando ruta del logo: {e_path}")
+
+        if image_path:
+            try: # CARGAR Y AÑADIR
+                img = Image(image_path)
+                # Ajustar tamaño (usa los valores que te funcionaron)
+                img.height = 110
+                img.width = 100
+                # Ancla en la última columna, Fila 1
+                anchor_col_letter = get_column_letter(num_data_columns)
+                anchor_cell = f'{anchor_col_letter}1' # Anclar en Fila 1
+                sheet.add_image(img, anchor_cell)
+                logger.info(f"Imagen '{logo_filename}' añadida anclada en {anchor_cell}")
+            except Exception as e_img: # Manejo de errores de imagen
+                 logger.error(f"Error al procesar o añadir la imagen: {e_img}", exc_info=True)
+                 messages.warning(request, f"No se pudo añadir el logo al Excel (Error: {type(e_img).__name__}).")
+        # else: (si no se encontró la ruta)
+             # messages.warning(request, "Archivo de logo no encontrado, no se incluirá.")
+
+        # 7.c Encabezado de Planilla (Título, Periodo, Filtros) - DESPLAZADOS
+        # Fila 4: Título Principal
+        sheet.merge_cells(start_row=4, start_column=1, end_row=4, end_column=num_data_columns)
+        # *** ASEGURAR column=1 ***
+        title_cell = sheet.cell(row=4, column=1, value="PLANILLA DE PAGO BONO TÉ DE REFRIGERIO")
+        title_cell.font = title_font
+        title_cell.alignment = centered_alignment
+
+        # Fila 5: Periodo
+        sheet.merge_cells(start_row=5, start_column=1, end_row=5, end_column=num_data_columns)
+        try: nombre_mes = month_name[planilla.mes].upper()
+        except: nombre_mes = f"MES {planilla.mes}"
+        # *** ASEGURAR column=1 ***
+        periodo_cell = sheet.cell(row=5, column=1, value=f"CORRESPONDIENTE AL MES DE {nombre_mes} DE {planilla.anio}")
+        periodo_cell.font = subtitle_font
+        periodo_cell.alignment = centered_alignment
+
+        # Fila 6: Filtros Aplicados
+        sheet.merge_cells(start_row=6, start_column=1, end_row=6, end_column=num_data_columns)
+        # Lógica para obtener filter_info
+        filter_info = f"Tipo Planilla: {planilla.get_tipo_display()}"
+        secretaria_nombre = "Todas"; unidad_nombre = "Todas"
+        # ... (obtener nombres secretaria/unidad) ...
+        if selected_secretaria_id:
+            try: secretaria = PrincipalSecretariaExterna.objects.using('personas_db').get(pk=selected_secretaria_id); secretaria_nombre = secretaria.nombre_secretaria or f"ID {selected_secretaria_id}"
+            except: secretaria_nombre = f"ID {selected_secretaria_id} (?)"
+        if selected_unidad_id:
+            try: unidad = PrincipalUnidadExterna.objects.using('personas_db').get(pk=selected_unidad_id); unidad_nombre = unidad.nombre_unidad or f"ID {selected_unidad_id}"
+            except: unidad_nombre = f"ID {selected_unidad_id} (?)"
+            filter_info += f" | Secretaría: {secretaria_nombre} | Unidad: {unidad_nombre}"
+        elif selected_secretaria_id: filter_info += f" | Secretaría: {secretaria_nombre}"
+        # *** ASEGURAR column=1 ***
+        filter_cell = sheet.cell(row=6, column=1, value=filter_info)
+        filter_cell.font = value_font
+        filter_cell.alignment = left_alignment
+
+        # Fila 7: Fila en blanco (implícita)
+
+        # --- 8. Escribir Encabezados de Datos (Ahora en Fila 8) ---
+        for col_num, header_title in enumerate(data_headers, 1):
+            cell = sheet.cell(row=start_data_row, column=col_num, value=header_title)
+            cell.font = header_font
+            cell.alignment = centered_alignment
+            cell.fill = header_fill
+            cell.border = header_border
+
+        # --- 9. Escribir Filas de Datos (Ahora desde Fila 9) ---
+        def safe_decimal(value, default=Decimal('0')):
+            if value is None: return default; 
+        
+            try: 
+                return Decimal(str(value).strip()); 
+        
+            except: return default
+        def safe_int(value, default=0):
+            if value is None: return default; 
+            
+            try: 
+                return int(Decimal(str(value).strip()));
+            except: return default
+
+        current_data_row = start_data_row + 1 # Empezar en fila 9
+        if detalles_filtrados:
+            for i, detalle in enumerate(detalles_filtrados, 1):
+                try: # Añadir try/except por fila por si acaso
+                    # Extracción de datos
+                    mes_val=safe_int(getattr(planilla,'mes',None));dias_habiles_val=safe_decimal(getattr(planilla,'dias_habiles',None));faltas_val=safe_decimal(getattr(detalle,'faltas',None));vacacion_val=safe_decimal(getattr(detalle,'vacacion',None));viajes_val=safe_decimal(getattr(detalle,'viajes',None));bajas_medicas_val=safe_decimal(getattr(detalle,'bajas_medicas',None));pcgh_val=safe_decimal(getattr(detalle,'pcgh',None));psgh_val=safe_decimal(getattr(detalle,'psgh',None));perm_excep_val=safe_decimal(getattr(detalle,'perm_excep',None));asuetos_val=safe_decimal(getattr(detalle,'asuetos',None));pcgh_emb_val=safe_decimal(getattr(detalle,'pcgh_embar_enf_base',None));dias_no_pag_val=safe_decimal(getattr(detalle,'dias_no_pagados',None));dias_pag_val=safe_decimal(getattr(detalle,'dias_pagados',None));total_ganado_val=safe_decimal(getattr(detalle,'total_ganado',None));descuentos_val=safe_decimal(getattr(detalle,'descuentos',None));liquido_pag_val=safe_decimal(getattr(detalle,'liquido_pagable',None));
+                    row_data=[i,getattr(detalle,'item_externo',''),getattr(detalle,'ci_externo',''),getattr(detalle,'nombre_completo_externo',''),getattr(detalle,'cargo_externo',''),mes_val,dias_habiles_val,faltas_val,vacacion_val,viajes_val,bajas_medicas_val,pcgh_val,psgh_val,perm_excep_val,asuetos_val,pcgh_emb_val,dias_no_pag_val,dias_pag_val,total_ganado_val,descuentos_val,liquido_pag_val]
+
+                    # Escribir datos y aplicar estilos
+                    for col_idx, cell_value in enumerate(row_data, 1):
+                        cell = sheet.cell(row=current_data_row, column=col_idx, value=cell_value)
+                        header_name = data_headers[col_idx-1]
+                        if col_idx <= 5: cell.alignment = left_alignment; cell.font = value_font # Texto
+                        else: # Números
+                            cell.alignment = right_alignment; cell.font = value_font
+                            if header_name == 'Mes': cell.number_format = integer_format
+                            elif header_name in ['Días Háb.', 'Faltas', 'Vacac.', 'Viajes', 'B.Médicas', 'PCGH', 'PSGH', 'P.Excep', 'Asuetos', 'PCGH Emb/Enf', 'D.No Pag.', 'D. Pag.']:
+                                if isinstance(cell_value, Decimal) and cell_value.normalize().quantize(Decimal('1')) != cell_value: cell.number_format = decimal_format
+                                else: cell.number_format = integer_format
+                            elif isinstance(cell_value, Decimal): cell.number_format = decimal_format
+                    current_data_row += 1 # Incrementar fila para el siguiente registro
+                except Exception as e_row:
+                    logger.error(f"Error procesando fila {current_data_row} para detalle ID {getattr(detalle, 'id', 'N/A')}: {e_row}", exc_info=True)
+                    # Considera qué hacer si una fila falla: continuar, detenerse?
+                    # Por ahora, incrementamos y continuamos
+                    current_data_row += 1
+
+
+        # --- 10. AJUSTAR ANCHO DE COLUMNAS ---
+        # (Calcula desde start_data_row=8 hacia abajo. Sin ajuste especial Col A)
+        logger.debug("Ajustando ancho de columnas...")
+        column_widths = {}
+        max_row_for_width = max(start_data_row, sheet.max_row)
+        for row_idx in range(start_data_row, max_row_for_width + 1):
+             for col_idx in range(1, num_data_columns + 1):
+                 cell = sheet.cell(row=row_idx, column=col_idx)
+                 try: # Calcular ancho necesario
+                     text_representation = str(cell.value) if cell.value is not None else ''
+                     if cell.number_format == decimal_format and isinstance(cell.value, (Decimal, float, int)): text_representation = f"{Decimal(cell.value):,.2f}"
+                     elif cell.number_format == integer_format and isinstance(cell.value, (Decimal, float, int)): text_representation = f"{Decimal(cell.value):,.0f}"
+                     cell_width = len(text_representation)
+                     if row_idx == start_data_row and cell.font and cell.font.bold: cell_width += 2
+                     current_max_width = column_widths.get(col_idx, 0)
+                     column_widths[col_idx] = max(current_max_width, cell_width)
+                 except Exception: pass
+        # Aplicar anchos calculados
+        for col_idx, max_width in column_widths.items():
+            column_letter = get_column_letter(col_idx)
+            adjusted_width = max(5, min(max_width + 2, 60)) # Limitar ancho
+            sheet.column_dimensions[column_letter].width = adjusted_width
+        logger.debug("Ancho de columnas ajustado.")
+
+    except Exception as e_xlsx:
+        # --- Manejo de Errores General ---
+        logger.error(f"Error crítico generando archivo XLSX para Planilla {planilla_id}: {e_xlsx}", exc_info=True)
+        messages.error(request, f"Error interno al generar el archivo Excel: {e_xlsx}")
+        return redirect('ver_detalles_bono_te', planilla_id=planilla_id)
+
+    # --- 11. Crear la Respuesta HTTP ---
+    try:
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        # Generar nombre de archivo
+        tipo_planilla_safe = "".join(c if c.isalnum() else '_' for c in planilla.get_tipo_display())
+        filename = f"BonoTE_{tipo_planilla_safe}_{planilla.mes}_{planilla.anio}"
+        # ... (añadir unidad al filename si aplica) ...
+        if selected_unidad_id:
+             unidad_name_safe = f"UnidadID_{selected_unidad_id}"
+             try:
+                 if 'unidad_nombre' in locals() and unidad_nombre != f"ID {selected_unidad_id} (?)":
+                      unidad_name_safe = "".join(c if c.isalnum() or c in ('_','-') else '_' for c in unidad_nombre)
+                 else:
+                    unidad = PrincipalUnidadExterna.objects.using('personas_db').get(pk=selected_unidad_id)
+                    unidad_name_safe = "".join(c if c.isalnum() or c in ('_','-') else '_' for c in (unidad.nombre_unidad or f"Unidad_{selected_unidad_id}"))
+                 filename += f"_Unidad_{unidad_name_safe[:30]}"
+             except Exception as e_fname: logger.warning(...)
+        filename += ".xlsx"
+
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        # Guardar y devolver
+        workbook.save(response)
+        logger.info(f"Archivo XLSX '{filename}' generado y enviado para Planilla {planilla.id}.")
+        return response
+
+    except Exception as e_resp:
+        # --- Manejo de Errores Respuesta ---
+        logger.error(f"Error creando o enviando HttpResponse para XLSX (Planilla {planilla_id}): {e_resp}", exc_info=True)
+        messages.error(request, f"Error final al preparar la descarga del archivo: {e_resp}")
+        return redirect('ver_detalles_bono_te', planilla_id=planilla_id)
+#-----------------------------------------------
+
+
 @login_required
 def listar_personal_externo(request):
     # Consultamos la tabla 'principal_personal' en la base de datos 'personas_db'
@@ -557,10 +785,10 @@ def listar_personal_externo(request):
 
 
 # --- En planilla/views.py ---
-from django.shortcuts import render
+
 from django.http import HttpResponse
-from .models import PrincipalDesignacionExterno # Solo necesitamos este modelo externo aquí
-import logging
+
+
 
 logger = logging.getLogger(__name__)
 
