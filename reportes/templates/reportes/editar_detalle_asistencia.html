@@ -1,0 +1,131 @@
+{# templates/reportes/editar_detalle_asistencia.html #}
+{% extends 'index_master.html' %}
+
+{% block title %}Editar Asistencia{% endblock %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <h2>{% firstof titulo_pagina "Editar Registro de Asistencia" %}</h2>
+    <hr>
+
+    {% if messages %}
+        {# ... (código de mensajes) ... #}
+    {% endif %}
+
+    {# Info Personal y Periodo #}
+    <div class="card mb-3">
+        <div class="card-header">Información del Personal y Periodo</div>
+        <div class="card-body">
+             <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Nombre:</strong> {{ persona_externa.nombre_completo|default:"No encontrado" }}</p>
+                    <p><strong>CI:</strong> {{ persona_externa.ci|default:"N/A" }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Item:</strong> {{ item_externo|default:"N/A" }}</p>
+                    <p><strong>Cargo:</strong> {{ cargo_externo|default:"N/A" }}</p>
+                    <p><strong>Periodo:</strong> {{ planilla_asistencia.mes }}/{{ planilla_asistencia.anio }} ({{ planilla_asistencia.get_tipo_display }})</p>
+                 </div>
+            </div>
+        </div>
+    </div>
+
+    {# Formulario de Edición #}
+    <div class="card">
+        <div class="card-header">Editar Detalles de Asistencia</div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+            
+                {# --- Renderizar formulario campo por campo --- #}
+                <h5>Incidencias y Sanciones</h5>
+                <div class="row mb-2">
+                    {# Fila 1 de Incidencias #}
+                    <div class="col-md-3">{{ form.omision_cant.label_tag }} {{ form.omision_cant }} {% if form.omision_cant.errors %}<div class="invalid-feedback d-block">{{ form.omision_cant.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.omision_sancion.label_tag }} {{ form.omision_sancion }} {% if form.omision_sancion.errors %}<div class="invalid-feedback d-block">{{ form.omision_sancion.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.abandono_dias.label_tag }} {{ form.abandono_dias }} {% if form.abandono_dias.errors %}<div class="invalid-feedback d-block">{{ form.abandono_dias.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.abandono_sancion.label_tag }} {{ form.abandono_sancion }} {% if form.abandono_sancion.errors %}<div class="invalid-feedback d-block">{{ form.abandono_sancion.errors|striptags }}</div>{% endif %}</div>
+                </div>
+                <div class="row mb-3">
+                    {# Fila 2 de Incidencias #}
+                    <div class="col-md-3">{{ form.faltas_dias.label_tag }} {{ form.faltas_dias }} {% if form.faltas_dias.errors %}<div class="invalid-feedback d-block">{{ form.faltas_dias.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.faltas_sancion.label_tag }} {{ form.faltas_sancion }} {% if form.faltas_sancion.errors %}<div class="invalid-feedback d-block">{{ form.faltas_sancion.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.atrasos_minutos.label_tag }} {{ form.atrasos_minutos }} {% if form.atrasos_minutos.errors %}<div class="invalid-feedback d-block">{{ form.atrasos_minutos.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.atrasos_sancion.label_tag }} {{ form.atrasos_sancion }} {% if form.atrasos_sancion.errors %}<div class="invalid-feedback d-block">{{ form.atrasos_sancion.errors|striptags }}</div>{% endif %}</div>
+                </div>
+            
+                <hr>
+                <h5>Ausencias y Permisos (en días)</h5>
+                <div class="row mb-3">
+                    {# Fila 1 de Ausencias #}
+                    <div class="col-md-3">{{ form.vacacion.label_tag }} {{ form.vacacion }} {% if form.vacacion.errors %}<div class="invalid-feedback d-block">{{ form.vacacion.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.viajes.label_tag }} {{ form.viajes }} {% if form.viajes.errors %}<div class="invalid-feedback d-block">{{ form.viajes.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.bajas_medicas.label_tag }} {{ form.bajas_medicas }} {% if form.bajas_medicas.errors %}<div class="invalid-feedback d-block">{{ form.bajas_medicas.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.pcgh.label_tag }} {{ form.pcgh }} {% if form.pcgh.errors %}<div class="invalid-feedback d-block">{{ form.pcgh.errors|striptags }}</div>{% endif %}</div>
+                </div>
+                <div class="row mb-3">
+                    {# Fila 2 de Ausencias #}
+                    <div class="col-md-3">{{ form.perm_excep.label_tag }} {{ form.perm_excep }} {% if form.perm_excep.errors %}<div class="invalid-feedback d-block">{{ form.perm_excep.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.asuetos.label_tag }} {{ form.asuetos }} {% if form.asuetos.errors %}<div class="invalid-feedback d-block">{{ form.asuetos.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.psgh.label_tag }} {{ form.psgh }} {% if form.psgh.errors %}<div class="invalid-feedback d-block">{{ form.psgh.errors|striptags }}</div>{% endif %}</div>
+                    {# Descomentar si se usa pcgh_embar_enf_base #}
+                    <div class="col-md-3">{{ form.pcgh_embar_enf_base.label_tag }} {{ form.pcgh_embar_enf_base }} {% if form.pcgh_embar_enf_base.errors %}<div class="invalid-feedback d-block">{{ form.pcgh_embar_enf_base.errors|striptags }}</div>{% endif %}</div>
+                </div>
+            
+                <hr>
+                <h5>Otros</h5>
+                <div class="row mb-3">
+                    <div class="col-md-3">{{ form.actividad_navidad.label_tag }} {{ form.actividad_navidad }} {% if form.actividad_navidad.errors %}<div class="invalid-feedback d-block">{{ form.actividad_navidad.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.iza_bandera.label_tag }} {{ form.iza_bandera }} {% if form.iza_bandera.errors %}<div class="invalid-feedback d-block">{{ form.iza_bandera.errors|striptags }}</div>{% endif %}</div>
+                </div>
+            
+                <hr>
+                <div class="mb-3">
+                    {{ form.observaciones.label_tag }}
+                    {{ form.observaciones }}
+                    {% if form.observaciones.errors %}<div class="invalid-feedback d-block">{{ form.observaciones.errors|striptags }}</div>{% endif %}
+                </div>
+            
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i> Guardar Cambios</button>
+                <a href="{{ cancel_url }}" class="btn btn-secondary"><i class="fas fa-times me-1"></i> Cancelar</a>
+            </form>
+            
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{# Script para añadir clases de Bootstrap (igual que en la otra plantilla) #}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const formControls = document.querySelectorAll(
+            'input[type="number"], input[type="text"], textarea, select'
+        );
+        formControls.forEach(function(control) {
+            // Añadir 'form-control' a inputs y textareas si no lo tienen
+            if ((control.tagName === 'INPUT' || control.tagName === 'TEXTAREA') && !control.classList.contains('form-control')) {
+                 control.classList.add('form-control');
+            }
+            // Añadir 'form-select' a selects si no lo tienen
+            if (control.tagName === 'SELECT' && !control.classList.contains('form-select')) {
+                 control.classList.add('form-select');
+            }
+            // Opcional: Hacerlos pequeños
+            // if (control.tagName !== 'TEXTAREA') { control.classList.add('form-control-sm'); }
+
+            // Hacer readonly los campos mes y dias_habiles visualmente (aunque ya lo estén por el form)
+             if (control.name === 'mes' || control.name === 'dias_habiles') {
+                 control.readOnly = true; // Asegura readonly
+                 control.style.backgroundColor = '#e9ecef'; // Estilo grisáceo
+             }
+        });
+        // Añadir clases a labels
+        const labels = document.querySelectorAll('label');
+        labels.forEach(function(label) {
+            label.classList.add('form-label');
+            label.classList.add('fw-bold'); // Negrita
+        });
+    });
+</script>
+{% endblock %}

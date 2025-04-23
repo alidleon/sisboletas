@@ -2,11 +2,32 @@
 
 {% block content %}
 <div class="right_col" role="main">
-    <h2>¿Estás seguro de que quieres borrar la planilla {{ planilla.mes }}/{{ planilla.anio }}?</h2>
+    {# Título mejorado para incluir el tipo de planilla #}
+    <h2>¿Estás seguro de que quieres borrar la planilla {{ planilla.get_tipo_display }} {{ planilla.mes }}/{{ planilla.anio }}?</h2>
+
+    <p class="text-danger"><strong>Advertencia:</strong> Esta acción es irreversible y también eliminará todos los detalles de bono asociados a esta planilla.</p> {# Mensaje de advertencia adicional #}
+
     <form method="post">
         {% csrf_token %}
-        <button type="submit" class="btn btn-danger">Borrar Planilla</button>
-        <a href="{% url 'lista_planillas' %}" class="btn btn-secondary">Cancelar</a>
+        {# Botones con iconos (opcional) #}
+        <button type="submit" class="btn btn-danger">
+            <i class="fa fa-trash"></i> Sí, Borrar Planilla
+        </button>
+        <a href="{% url 'lista_planillas' %}" class="btn btn-secondary">
+            <i class="fa fa-times"></i> Cancelar
+        </a>
     </form>
+
+    {# Mostrar mensajes flash si hubo un error previo (ej: ProtectError) #}
+    {% if messages %}
+        <div class="mt-3">
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}warning{% endif %}" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
 </div>
 {% endblock %}

@@ -1,0 +1,239 @@
+{% extends 'index_master.html' %}
+
+{% block content %}
+<div class="right_col" role="main">
+    {# --- CAMBIO: Título usa planilla_asistencia --- #}
+    <h2>Reporte Asistencia {{ planilla_asistencia.get_tipo_display }} - {{ planilla_asistencia.mes }}/{{ planilla_asistencia.anio }}</h2>
+    {# --- CAMBIO: Muestra estado de asistencia, quita días hábiles --- #}
+    <p>Reporte ID: {{ planilla_asistencia.id }} | Estado: {{ planilla_asistencia.get_estado_display }}</p>
+
+    {# Mensajes (sin cambios) #}
+    {% if messages %}
+        {% for message in messages %}
+            {# ... (código de mensajes) ... #}
+        {% endfor %}
+    {% endif %}
+
+    {# --- Panel de Filtros (Adaptar URLs y nombres) --- #}
+    <div class="x_panel">
+        <div class="x_title">
+            <h2>Filtros de Personal</h2>
+            <ul class="nav navbar-right panel_toolbox">
+                <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+            </ul>
+            <div class="clearfix"></div>
+        </div>
+        <div class="x_content">
+            {# --- CAMBIO: action apunta a ver_detalles_asistencia --- #}
+            <form method="get" action="{% url 'ver_detalles_asistencia' planilla_asistencia.id %}" class="form-horizontal">
+
+                {# --- Filtro Secretaría (sin cambios funcionales) --- #}
+                <div class="form-group row">
+                    <label class="control-label col-md-3 col-sm-3 ">Secretaría:</label>
+                    <div class="col-md-6 col-sm-6 ">
+                        <select name="secretaria" class="form-control" onchange="this.form.submit()">
+                            <option value="">--- Todas ---</option>
+                            {% for sec in all_secretarias %}
+                                <option value="{{ sec.id }}" {% if sec.id|stringformat:"s" == request.GET.secretaria %}selected{% endif %}>
+                                    {{ sec.nombre_secretaria|default:"(Sin Nombre)" }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                {# --- Filtro Unidad (sin cambios funcionales) --- #}
+                <div class="form-group row">
+                    <label class="control-label col-md-3 col-sm-3 ">Unidad:</label>
+                    <div class="col-md-6 col-sm-6 ">
+                        <select name="unidad" class="form-control">
+                            {% if selected_secretaria_id %}
+                                <option value="">--- Todas las de esta Secretaría ---</option>
+                            {% else %}
+                                <option value="">--- Seleccione Secretaría Primero ---</option>
+                            {% endif %}
+                            {% for uni in unidades_for_select %}
+                                <option value="{{ uni.id }}" {% if uni.id|stringformat:"s" == request.GET.unidad %}selected{% endif %}>
+                                    {{ uni.nombre_unidad|default:"(Sin Nombre)" }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                {# --- Búsqueda CI/Item (sin cambios funcionales) --- #}
+                <div class="form-group row">
+                    <label for="search_q" class="control-label col-md-3 col-sm-3 ">Buscar (CI o Item):</label>
+                    <div class="col-md-6 col-sm-6 ">
+                        <input type="text" name="q" id="search_q" class="form-control" value="{{ search_term|default:'' }}" placeholder="Ingrese CI o Nro. Item...">
+                    </div>
+                    <div class="col-md-3 col-sm-3">
+                        <button type="submit" name="buscar" class="btn btn-primary">Buscar</button> {# Mantener botón Buscar aquí #}
+                    </div>
+                </div>
+
+                <div class="ln_solid"></div>
+
+                <div class="form-group row">
+                    <div class="col-md-9 col-sm-9 offset-md-3">
+                        {# Botón Buscar/Filtrar #}
+                        <button type="submit" name="buscar" class="btn btn-success"> {# Podría ser submit() si no existe el de arriba #}
+                            <i class="fa fa-filter"></i> Aplicar Filtros
+                        </button>
+
+                        {# --- CAMBIO: Limpiar Filtros apunta a ver_detalles_asistencia --- #}
+                        <a href="{% url 'ver_detalles_asistencia' planilla_asistencia.id %}" class="btn btn-warning">
+                            <i class="fa fa-eraser"></i> Limpiar Filtros
+                        </a>
+
+                        {% if planilla_asistencia.estado == 'borrador' or planilla_asistencia.estado == 'completo' %} {# Solo mostrar si se puede editar #}
+                            <a href="{% url 'add_detalle_asistencia' planilla_asistencia.pk %}" class="btn btn-success">
+                                <i class="fas fa-user-plus"></i> Añadir Registro Manual
+                            </a>
+                        {% endif %}
+
+                        {# --- ELIMINADO O ADAPTAR: Exportar Excel (requeriría nueva vista/lógica) --- #}
+                        {# <a href="#" {# url 'exportar_asistencia_xlsx' planilla_asistencia.id #} ...> Exportar </a> #}
+
+                         {# --- CAMBIO: Volver a Lista de Reportes Asistencia --- #}
+                        <a href="{% url 'lista_planillas_asistencia' %}" class="btn btn-secondary">
+                            <i class="fa fa-list"></i> Volver a Lista de Reportes
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div> {# Fin x_content Filtros #}
+    </div> {# Fin x_panel Filtros #}
+
+    {# --- Estilos CSS para columnas fijas (Sin cambios si quieres mantenerlo) --- #}
+    <style>
+        .table-responsive { overflow-x: auto; position: relative; }
+        .tabla-asistencia th.sticky-col,
+        .tabla-asistencia td.sticky-col {
+            position: -webkit-sticky; position: sticky; z-index: 1;
+            background-color: #ffffff; border-left: 1px solid #dee2e6;
+        }
+        .tabla-asistencia thead th.sticky-col { background-color: #f8f9fa; }
+        /* Última Columna: Acciones */
+        .tabla-asistencia th.sticky-col-last,
+        .tabla-asistencia td.sticky-col-last {
+            right: 0; z-index: 2; min-width: 90px; /* Ancho mínimo para 2 botones pequeños */
+        }
+        /* Penúltima Columna: Observaciones */
+        .tabla-asistencia th.sticky-col-second-last,
+        .tabla-asistencia td.sticky-col-second-last {
+            right: 90px; /* <<<--- AJUSTAR SI EL ANCHO DE ACCIONES CAMBIA */
+            /* Hereda z-index: 1 de .sticky-col */
+        }
+    </style>
+
+    {# --- Panel de Resultados (Tabla Adaptada) --- #}
+    {# --- CAMBIO: Condición usa detalles_asistencia --- #}
+    {% if detalles_asistencia or not search_active %} {# Mostrar tabla si hay detalles o si no se ha buscado #}
+        <div class="x_panel">
+            <div class="x_title">
+                 {# --- CAMBIO: Título resultados --- #}
+                <h2>Registros de Asistencia del Personal</h2>
+                <div class="clearfix"></div>
+            </div>
+            <div class="x_content">
+                {# --- CAMBIO: Verificar detalles_asistencia antes de la tabla --- #}
+                {% if detalles_asistencia %}
+                    <div class="table-responsive">
+                        {# --- CAMBIO: Clase tabla (opcional) --- #}
+                        <table class="table table-striped table-bordered table-hover dataTable tabla-asistencia">
+                            <thead>
+                                <tr>
+                                    {# Columnas de Información Personal (igual) #}
+                                    <th>Nro.</th>
+                                    <th>Item</th>
+                                    <th>CI</th>
+                                    <th>Nombre Completo</th>
+                                    <th>Cargo</th>
+                                    {# --- CAMBIO: Columnas de Asistencia --- #}
+                                    <th>Omis. Cant</th>
+                                    <th>Omis. Sanc</th>
+                                    <th>Aban. Días</th>
+                                    <th>Aban. Sanc</th>
+                                    <th>Faltas Días</th>
+                                    <th>Faltas Sanc</th>
+                                    <th>Atr. Min</th>
+                                    <th>Atr. Sanc</th>
+                                    <th>Vacac.</th>
+                                    <th>Viajes</th>
+                                    <th>B.Médicas</th>
+                                    <th>PCGH</th>
+                                    <th>Perm.Exc</th>
+                                    <th>Asuetos</th>
+                                    <th>PSGH</th>
+                                    <th>PCGH Emb/Enf</th>
+                                    <th>Act.Nav</th>
+                                    <th>Iza.Band</th>
+                                    <th>Observ.</th>
+                                    {# --- CAMBIO: Última columna fija: Acciones --- #}
+                                    <th class="sticky-col sticky-col-last">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {# --- CAMBIO: Bucle usa detalles_asistencia --- #}
+                                {% for detalle in detalles_asistencia %}
+                                <tr>
+                                    {# Datos personales (igual) #}
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>{{ detalle.item_externo|default:"N/A" }}</td>
+                                    <td>{{ detalle.ci_externo|default:"N/A" }}</td>
+                                    <td>{{ detalle.nombre_completo_externo|default:"N/A" }}</td>
+                                    <td>{{ detalle.cargo_externo|default:"N/A" }}</td>
+                                    {# --- CAMBIO: Datos de Asistencia --- #}
+                                    <td>{{ detalle.omision_cant|default:"0" }}</td>
+                                    <td>{{ detalle.omision_sancion|floatformat:2|default:"0.00" }}</td>
+                                    <td>{{ detalle.abandono_dias|floatformat:2|default:"0.00" }}</td>
+                                    <td>{{ detalle.abandono_sancion|floatformat:2|default:"0.00" }}</td>
+                                    <td>{{ detalle.faltas_dias|floatformat:2|default:"0.00" }}</td>
+                                    <td>{{ detalle.faltas_sancion|floatformat:2|default:"0.00" }}</td>
+                                    <td>{{ detalle.atrasos_minutos|default:"0" }}</td>
+                                    <td>{{ detalle.atrasos_sancion|floatformat:2|default:"0.00" }}</td>
+                                    <td>{{ detalle.vacacion|floatformat:2|default:"0.00" }}</td>
+                                    <td>{{ detalle.viajes|floatformat:2|default:"0.00" }}</td>
+                                    <td>{{ detalle.bajas_medicas|floatformat:2|default:"0.00" }}</td>
+                                    <td>{{ detalle.pcgh|floatformat:2|default:"0.00" }}</td>
+                                    <td>{{ detalle.perm_excep|floatformat:2|default:"0.00" }}</td>
+                                    <td>{{ detalle.asuetos|floatformat:2|default:"0.00" }}</td>
+                                    <td>{{ detalle.psgh|floatformat:2|default:"0.00" }}</td>
+                                    <td>{{ detalle.pcgh_embar_enf_base|floatformat:2|default:"0.00" }}</td>
+                                    <td>{{ detalle.actividad_navidad|floatformat:2|default:"0.00" }}</td>
+                                    <td>{{ detalle.iza_bandera|floatformat:2|default:"0.00" }}</td>
+                                    {# Mostrar solo inicio de observaciones o con tooltip #}
+                                    <td title="{{ detalle.observaciones|default:'' }}">{{ detalle.observaciones|truncatechars:20|default:"" }}</td>
+                                    {# --- CAMBIO: Acciones apuntan a editar/borrar DetalleAsistencia --- #}
+                                    <td class="sticky-col sticky-col-last">
+                                        <a href="{% url 'editar_detalle_asistencia' detalle.pk %}?secretaria={{ request.GET.secretaria|default:'' }}&unidad={{ request.GET.unidad|default:'' }}&q={{ request.GET.q|default:'' }}" class="btn btn-sm btn-primary" title="Editar Asistencia"><i class="fa fa-pencil"></i></a>                                        {# --- CAMBIO: Enlace a futura vista borrar_detalle_asistencia --- #}
+                                        <a href="{% url 'borrar_detalle_asistencia' detalle.pk %}" class="btn btn-sm btn-danger" title="Borrar Registro" onclick="return confirm('¿Está seguro de que desea borrar este registro de asistencia para {{ detalle.nombre_completo_externo|default:detalle.personal_externo_id|escapejs }}? Esta acción no se puede deshacer.');">
+                                            <i class="fa fa-trash"></i>
+                                        </a>                                    
+                                    </td>
+                                </tr>
+                                {% endfor %} {# Fin del bucle for #}
+                            </tbody>
+                        </table>
+                    </div> {# Fin table-responsive #}
+                {% else %} {# Si no hay detalles_asistencia pero se hizo búsqueda/filtro #}
+                     <div class="alert alert-warning">
+                         No se encontraron registros de asistencia que coincidan con los filtros aplicados.
+                     </div>
+                {% endif %} {# Fin if detalles_asistencia #}
+            </div> {# Fin x_content Resultados #}
+        </div> {# Fin x_panel Resultados #}
+    {% elif search_active %} {# Si no hay detalles Y se hizo búsqueda/filtro #}
+         <div class="alert alert-warning">
+             No se encontraron registros de asistencia que coincidan con los filtros aplicados.
+         </div>
+    {% else %} {# Mensaje inicial si no hay detalles Y no se ha buscado #}
+         <div class="alert alert-info">
+             Este reporte aún no tiene detalles de asistencia o no se han aplicado filtros. Use los filtros de arriba para buscar personal.
+         </div>
+    {% endif %}
+    {# --- Fin Panel de Resultados --- #}
+
+</div> {# Fin right_col #}
+{% endblock %}

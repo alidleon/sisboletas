@@ -56,6 +56,19 @@
                   <li><a href="" ><i class="fa fa-edit"></i> Usuarios </a>
                     
                   </li>
+
+                  <li>
+                    <a href="{% url 'lista_planillas_asistencia' %}" ><i class="fa fa-edit"></i> Reportes </a>
+                    <ul class="feat-show">
+                      <li><a href="{% url 'crear_planilla_asistencia' %}">Crear Planilla</a></li>
+                      <li><a href="{% url 'lista_planillas_asistencia' %}">Ver Planillas</a></li>
+                    </ul>
+                    
+                    
+                  </li>
+
+
+
                   <li>
                     <a href="{% url 'lista_planillas' %}" ><i class="fa fa-edit"></i> Bono Te </a>
                     <ul class="feat-show">

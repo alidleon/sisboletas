@@ -1,0 +1,36 @@
+{% extends 'index_master.html' %} {# Ajusta si tu template base es diferente #}
+
+{% block title %}Confirmar Borrado Registro Asistencia{% endblock %}
+
+{% block content %}
+<div class="right_col" role="main"> {# Manteniendo tu clase original #}
+    <h2>{% firstof titulo_pagina "Confirmar Borrado de Registro de Asistencia" %}</h2>
+    <hr>
+
+    <div class="alert alert-danger" role="alert">
+        <h4 class="alert-heading">¡Advertencia!</h4>
+        <p>Estás a punto de borrar permanentemente el registro de asistencia para:</p>
+        <p><strong>{{ persona_nombre }}</strong></p>
+        <p>Correspondiente al reporte:</p>
+        <p><strong>{{ planilla_asistencia }}</strong></p>
+        <hr>
+        <p class="mb-0"><strong>¿Estás seguro de que deseas continuar? Esta acción no se puede deshacer.</strong></p>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+             <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">
+                    <i class="fas fa-trash-alt me-1"></i> Sí, Borrar Registro
+                </button>
+                {# Enlace para cancelar y volver a la vista de detalles de la planilla #}
+                <a href="{% url 'ver_detalles_asistencia' pk=planilla_asistencia.pk %}" class="btn btn-secondary">
+                    <i class="fas fa-times me-1"></i> Cancelar
+                </a>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends 'index_master.html' %} {# Ajusta si tu template base es diferente #}
+
+{% block title %}Editar Reporte Asistencia{% endblock %}
+
+{% block content %}
+<div class="right_col" role="main"> {# Manteniendo tu clase original #}
+    <h2>{% firstof titulo_pagina "Editar Reporte de Asistencia" %}</h2>
+    <p>Editando cabecera para el tipo: <strong>{{ planilla.get_tipo_display }}</strong></p> {# Mostramos tipo que no es editable #}
+    <hr>
+
+    {% if messages %}
+        {% for message in messages %}
+            {# ... (código de mensajes sin cambios) ... #}
+        {% endfor %}
+    {% endif %}
+
+    {# Mostrar errores generales del formulario (ej. validación de duplicados) #}
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger" role="alert">
+            {% for error in form.non_field_errors %}
+                <p class="mb-0">{{ error }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+
+                {# --- Renderizar campos editables --- #}
+                <div class="row mb-3">
+                    {# -- CAMBIO: Añadir campo Año -- #}
+                    <div class="col-md-4">
+                        <label for="{{ form.anio.id_for_label }}" class="form-label fw-bold">{{ form.anio.label }}</label>
+                        {{ form.anio }}
+                        {% if form.anio.errors %}<div class="invalid-feedback d-block">{{ form.anio.errors|striptags }}</div>{% endif %}
+                        {% if form.anio.help_text %}<div class="form-text">{{ form.anio.help_text }}</div>{% endif %}
+                    </div>
+                    {# -- CAMBIO: Añadir campo Mes -- #}
+                    <div class="col-md-4">
+                        <label for="{{ form.mes.id_for_label }}" class="form-label fw-bold">{{ form.mes.label }}</label>
+                        {{ form.mes }}
+                        {% if form.mes.errors %}<div class="invalid-feedback d-block">{{ form.mes.errors|striptags }}</div>{% endif %}
+                        {% if form.mes.help_text %}<div class="form-text">{{ form.mes.help_text }}</div>{% endif %}
+                    </div>
+                     {# -- Campo Estado (sin cambios) -- #}
+                    <div class="col-md-4">
+                        <label for="{{ form.estado.id_for_label }}" class="form-label fw-bold">{{ form.estado.label }}</label>
+                        {{ form.estado }}
+                        {% if form.estado.errors %}<div class="invalid-feedback d-block">{{ form.estado.errors|striptags }}</div>{% endif %}
+                        {% if form.estado.help_text %}<div class="form-text">{{ form.estado.help_text }}</div>{% endif %}
+                    </div>
+                </div>
+
+                {# --- ELIMINADO: Campo Observaciones Generales --- #}
+                {# <div class="mb-3"> ... </div> #}
+
+                {# --- ELIMINADO: Mostrar Mes/Año/Tipo no editables --- #}
+                {# <div class="row mb-3"> ... </div> #}
+
+                <button type="submit" class="btn btn-primary" {% if form.mes.disabled or form.anio.disabled or form.estado.disabled %}disabled{% endif %}> {# Ajustar condición disabled si estado también se deshabilita #}
+                    <i class="fas fa-save me-1"></i> Guardar Cambios
+                </button>
+                <a href="{% url 'lista_planillas_asistencia' %}" class="btn btn-secondary">
+                    <i class="fas fa-times me-1"></i> Cancelar
+                </a>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Añadir clases de Bootstrap a los campos si no se hizo en el widget
+    document.addEventListener('DOMContentLoaded', function() {
+        const formControls = document.querySelectorAll(
+            // Añadimos input[type="number"]
+            'input[type="number"], textarea, select'
+        );
+        formControls.forEach(function(control) {
+            if (control.tagName === 'SELECT' && !control.classList.contains('form-select')) {
+                 control.classList.add('form-select');
+            } else if (control.tagName === 'TEXTAREA' && !control.classList.contains('form-control')) {
+                 // Ya no hay textarea, pero dejamos por si acaso
+                 control.classList.add('form-control');
+                 if (!control.rows) { control.rows = 4; }
+            } else if (control.tagName === 'INPUT' && !control.classList.contains('form-control')) {
+                 // Añadimos clase a inputs (mes, año)
+                 control.classList.add('form-control');
+            }
+        });
+    });
+</script>
+{% endblock %}

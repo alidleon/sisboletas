@@ -22,4 +22,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.index, name='index'),
     path('planillas/', include('planilla.urls')),
+    path('reportes/', include('reportes.urls')),
 ]

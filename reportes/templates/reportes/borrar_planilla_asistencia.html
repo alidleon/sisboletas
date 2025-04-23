@@ -1,0 +1,34 @@
+{% extends 'index_master.html' %} {# Ajusta si tu template base es diferente #}
+
+{% block title %}Confirmar Borrado{% endblock %}
+
+{% block content %}
+<div class="right_col" role="main"> {# Manteniendo tu clase original #}
+    <h2>{% firstof titulo_pagina "Confirmar Borrado de Reporte" %}</h2>
+    <hr>
+
+    <div class="alert alert-danger" role="alert">
+        <h4 class="alert-heading">¡Advertencia!</h4>
+        <p>Estás a punto de borrar permanentemente el reporte de asistencia:</p>
+        <p><strong>{{ planilla }}</strong></p>
+        <p>Esto también eliminará <strong>{{ num_detalles }} registro{{ num_detalles|pluralize:" ,s" }} de asistencia</strong> asociados a este reporte.</p>
+        <hr>
+        <p class="mb-0"><strong>¿Estás seguro de que deseas continuar? Esta acción no se puede deshacer.</strong></p>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+             <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">
+                    <i class="fas fa-trash-alt me-1"></i> Sí, Borrar Permanentemente
+                </button>
+                <a href="{% url 'lista_planillas_asistencia' %}" class="btn btn-secondary">
+                    <i class="fas fa-times me-1"></i> Cancelar
+                </a>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

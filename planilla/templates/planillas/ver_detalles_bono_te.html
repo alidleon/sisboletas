@@ -180,6 +180,7 @@
                                 <th>Cargo</th>
                                 <th>Mes</th>
                                 <th>Días Háb.</th>
+                                <th>Aban. Días</th>
                                 <th>Faltas</th>
                                 <th>Vacac.</th>
                                 <th>Viajes</th>
@@ -209,6 +210,7 @@
                                 <td>{{ detalle.cargo_externo|default:"N/A" }}</td>
                                 <td>{{ detalle.mes|floatformat:0|default:"0" }}</td>
                                 <td>{{ detalle.id_planilla.dias_habiles|floatformat:2|default:"0.00" }}</td>
+                                <td>{{ detalle.abandono_dias|floatformat:2|default:"0.00" }}</td>
                                 <td>{{ detalle.faltas|floatformat:2|default:"0.00" }}</td>
                                 <td>{{ detalle.vacacion|floatformat:2|default:"0.00" }}</td>
                                 <td>{{ detalle.viajes|floatformat:2|default:"0.00" }}</td>

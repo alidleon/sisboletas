@@ -1,79 +1,163 @@
 {% extends 'index_master.html' %}
 
+{% block title %}Editar Detalle Bono TE{% endblock %} {# Añadido block title #}
+
 {% block content %}
 <div class="right_col" role="main">
     <h2>Editar Detalle Bono TE</h2>
+    <hr> {# Añadido hr para consistencia #}
 
-    {# --- Sección de Información del Personal (Read-Only) --- #}
-    <div class="x_panel"> {# Usamos un panel para agrupar visualmente #}
-        <div class="x_title">
-            <h2>Información del Personal</h2>
-            <div class="clearfix"></div>
-        </div>
-        <div class="x_content">
-            {% if persona_externa %}
-                <p><strong>CI:</strong> {{ persona_externa.ci | default:"No disponible" }}</p>
-                <p><strong>Nombre Completo:</strong> {{ persona_externa.nombre_completo | default:"No disponible" }}</p>
-                <p><strong>Item:</strong> {{ item_externo | default:"No disponible" }}</p> {# Usamos las variables del contexto #}
-                <p><strong>Cargo:</strong> {{ cargo_externo | default:"No disponible" }}</p> {# Usamos las variables del contexto #}
-            {% elif detalle_bono_te.personal_externo_id %}
-                <p class="text-warning">No se pudo cargar la información del personal externo (ID: {{ detalle_bono_te.personal_externo_id }}).</p>
-            {% else %}
-                 <p class="text-muted">Este registro no está asociado a ningún personal externo.</p>
+    {# Mensajes (si los usas aquí) #}
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button> {# Usando btn-close de Bootstrap 5 #}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {# --- Sección de Información del Personal (Mantenida y con estilo card) --- #}
+    <div class="card mb-3">
+        <div class="card-header">Información del Personal</div>
+        <div class="card-body">
+            <div class="row">
+                 <div class="col-md-6">
+                    <p><strong>Nombre:</strong> {{ persona_externa.nombre_completo|default:"No disponible" }}</p>
+                    <p><strong>CI:</strong> {{ persona_externa.ci|default:"N/A" }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Item:</strong> {{ item_externo|default:"N/A" }}</p>
+                    <p><strong>Cargo:</strong> {{ cargo_externo|default:"N/A" }}</p>
+                    {# Mostrar mes/año aquí también para contexto #}
+                    {% if detalle_bono_te.id_planilla %}
+                    <p><strong>Periodo:</strong> {{ detalle_bono_te.id_planilla.mes }}/{{ detalle_bono_te.id_planilla.anio }} ({{ detalle_bono_te.id_planilla.get_tipo_display }})</p>
+                    {% endif %}
+                 </div>
+            </div>
+             {% if not persona_externa and detalle_bono_te.personal_externo_id %}
+                <p class="text-warning mb-0">Advertencia: No se pudo cargar la información completa del personal externo (ID: {{ detalle_bono_te.personal_externo_id }}).</p>
+            {% elif not persona_externa and not detalle_bono_te.personal_externo_id %}
+                 <p class="text-muted mb-0">Este registro no está asociado a ningún personal externo.</p>
             {% endif %}
         </div>
     </div>
     {# --- Fin Sección de Información --- #}
 
 
-    {# --- Inicio del Formulario Editable --- #}
-    <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="redirect_secretaria" value="{{ request.GET.secretaria|default:'' }}">
-        <input type="hidden" name="redirect_unidad" value="{{ request.GET.unidad|default:'' }}">
+    {# --- Inicio del Formulario Editable (con nueva estructura) --- #}
+    <div class="card">
+        <div class="card-header">Editar Días de Ausencia/Permiso y Descuentos</div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                {# Pasamos parámetros para redirección (sin cambios) #}
+                <input type="hidden" name="redirect_secretaria" value="{{ request.GET.secretaria|default:'' }}">
+                <input type="hidden" name="redirect_unidad" value="{{ request.GET.unidad|default:'' }}">
+                <input type="hidden" name="redirect_q" value="{{ request.GET.q|default:'' }}"> {# Mantenemos q también #}
 
-        {# Muestra errores generales del formulario #}
-        {% if form.non_field_errors %}
-            <div class="alert alert-danger">
-                {% for error in form.non_field_errors %}
-                    <p>{{ error }}</p>
-                {% endfor %}
-            </div>
-        {% endif %}
 
-        {# --- Campo Mes --- #}
-        <div class="form-group">
-            {{ form.mes.label_tag }}
-            {{ form.mes }}
-            {% if form.mes.errors %}<div class="text-danger">{{ form.mes.errors }}</div>{% endif %}
-            {% if form.mes.help_text %}<small class="form-text text-muted">{{ form.mes.help_text }}</small>{% endif %}
-        </div>
+                {# Muestra errores generales del formulario #}
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                            <p>{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
 
-        {# --- Campo Días Hábiles --- #}
-        <div class="form-group">
-            {{ form.dias_habiles.label_tag }}
-            {{ form.dias_habiles }}
-            {% if form.dias_habiles.errors %}<div class="text-danger">{{ form.dias_habiles.errors }}</div>{% endif %}
-            {% if form.dias_habiles.help_text %}<small class="form-text text-muted">{{ form.dias_habiles.help_text }}</small>{% endif %}
-        </div>
-
-        {# --- Resto de los campos editables --- #}
-        {% for field in form %}
-            {% if field.name != 'mes' and field.name != 'dias_habiles' %}
-                <div class="form-group">
-                    {{ field.label_tag }}
-                    {{ field }}
-                    {% if field.errors %}<div class="text-danger">{{ field.errors }}</div>{% endif %}
-                    {% if field.help_text %}<small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
+                {# --- Mostrar Mes y Días Hábiles (Read-Only) --- #}
+                 <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="{{ form.mes.id_for_label }}" class="form-label fw-bold">{{ form.mes.label }}</label>
+                        {{ form.mes }} {# Renderiza el input readonly/disabled del form #}
+                        {% if form.mes.errors %}<div class="invalid-feedback d-block">{{ form.mes.errors|striptags }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label for="{{ form.dias_habiles.id_for_label }}" class="form-label fw-bold">{{ form.dias_habiles.label }}</label>
+                        {{ form.dias_habiles }} {# Renderiza el input readonly/disabled del form #}
+                        {% if form.dias_habiles.errors %}<div class="invalid-feedback d-block">{{ form.dias_habiles.errors|striptags }}</div>{% endif %}
+                    </div>
                 </div>
-            {% endif %}
-        {% endfor %}
+                <hr>
 
-        {# --- Botones --- #}
-        <button type="submit" class="btn btn-primary">Guardar Cambios</button>
-        <a href="{% url 'ver_detalles_bono_te' planilla_id=detalle_bono_te.id_planilla.id %}?secretaria={{ request.GET.secretaria|default:'' }}&unidad={{ request.GET.unidad|default:'' }}&q={{ request.GET.q|default:'' }}" class="btn btn-secondary">Cancelar</a>
-    </form>
+                {# --- Campos Editables: Ausencias y Permisos --- #}
+                <h5>Ausencias y Permisos (en días)</h5>
+                <div class="row mb-3">
+                    {# Fila 1 #}
+                    <div class="col-md-3">{{ form.abandono_dias.label_tag }} {{ form.abandono_dias }} {% if form.abandono_dias.errors %}<div class="invalid-feedback d-block">{{ form.abandono_dias.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.faltas.label_tag }} {{ form.faltas }} {% if form.faltas.errors %}<div class="invalid-feedback d-block">{{ form.faltas.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.vacacion.label_tag }} {{ form.vacacion }} {% if form.vacacion.errors %}<div class="invalid-feedback d-block">{{ form.vacacion.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.viajes.label_tag }} {{ form.viajes }} {% if form.viajes.errors %}<div class="invalid-feedback d-block">{{ form.viajes.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.bajas_medicas.label_tag }} {{ form.bajas_medicas }} {% if form.bajas_medicas.errors %}<div class="invalid-feedback d-block">{{ form.bajas_medicas.errors|striptags }}</div>{% endif %}</div>
+                 </div>
+                 <div class="row mb-3">
+                    {# Fila 2 #}
+                    <div class="col-md-3">{{ form.pcgh.label_tag }} {{ form.pcgh }} {% if form.pcgh.errors %}<div class="invalid-feedback d-block">{{ form.pcgh.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.psgh.label_tag }} {{ form.psgh }} {% if form.psgh.errors %}<div class="invalid-feedback d-block">{{ form.psgh.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.perm_excep.label_tag }} {{ form.perm_excep }} {% if form.perm_excep.errors %}<div class="invalid-feedback d-block">{{ form.perm_excep.errors|striptags }}</div>{% endif %}</div>
+                    <div class="col-md-3">{{ form.asuetos.label_tag }} {{ form.asuetos }} {% if form.asuetos.errors %}<div class="invalid-feedback d-block">{{ form.asuetos.errors|striptags }}</div>{% endif %}</div>
+                 </div>
+                 <div class="row mb-3">
+                     {# Fila 3 (si aplica) #}
+                     {% if form.pcgh_embar_enf_base %} {# Solo mostrar si el campo existe en el form #}
+                     <div class="col-md-3">{{ form.pcgh_embar_enf_base.label_tag }} {{ form.pcgh_embar_enf_base }} {% if form.pcgh_embar_enf_base.errors %}<div class="invalid-feedback d-block">{{ form.pcgh_embar_enf_base.errors|striptags }}</div>{% endif %}</div>
+                     {% endif %}
+                 </div>
+
+                <hr>
+                {# --- Campo Descuentos --- #}
+                <h5>Otros Descuentos (al Bono TE)</h5>
+                <div class="row mb-3">
+                     <div class="col-md-4"> {# O col-md-6 si quieres más ancho #}
+                         {{ form.descuentos.label_tag }}
+                         {{ form.descuentos }}
+                         {% if form.descuentos.errors %}<div class="invalid-feedback d-block">{{ form.descuentos.errors|striptags }}</div>{% endif %}
+                    </div>
+                </div>
+
+                {# --- Botones --- #}
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i> Guardar Cambios</button>
+                <a href="{% url 'ver_detalles_bono_te' planilla_id=detalle_bono_te.id_planilla.id %}?secretaria={{ request.GET.secretaria|default:'' }}&unidad={{ request.GET.unidad|default:'' }}&q={{ request.GET.q|default:'' }}" class="btn btn-secondary"><i class="fas fa-times me-1"></i> Cancelar</a>
+            </form>
+        </div> {# Fin card-body #}
+    </div> {# Fin card #}
      {# --- Fin del Formulario Editable --- #}
 
-</div>
+</div> {# Fin right_col #}
+{% endblock %}
+
+{% block extra_js %}
+{# Script para añadir clases de Bootstrap (igual que en la otra plantilla) #}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const formControls = document.querySelectorAll(
+            'input[type="number"], input[type="text"], textarea, select'
+        );
+        formControls.forEach(function(control) {
+            // Añadir 'form-control' a inputs y textareas si no lo tienen
+            if ((control.tagName === 'INPUT' || control.tagName === 'TEXTAREA') && !control.classList.contains('form-control')) {
+                 control.classList.add('form-control');
+            }
+            // Añadir 'form-select' a selects si no lo tienen
+            if (control.tagName === 'SELECT' && !control.classList.contains('form-select')) {
+                 control.classList.add('form-select');
+            }
+            // Opcional: Hacerlos pequeños
+            // if (control.tagName !== 'TEXTAREA') { control.classList.add('form-control-sm'); }
+
+            // Hacer readonly los campos mes y dias_habiles visualmente (aunque ya lo estén por el form)
+             if (control.name === 'mes' || control.name === 'dias_habiles') {
+                 control.readOnly = true; // Asegura readonly
+                 control.style.backgroundColor = '#e9ecef'; // Estilo grisáceo
+             }
+        });
+        // Añadir clases a labels
+        const labels = document.querySelectorAll('label');
+        labels.forEach(function(label) {
+            label.classList.add('form-label');
+            label.classList.add('fw-bold'); // Negrita
+        });
+    });
+</script>
 {% endblock %}

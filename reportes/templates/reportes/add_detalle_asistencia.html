@@ -1,0 +1,68 @@
+{% extends 'index_master.html' %} {# Ajusta si tu template base es diferente #}
+
+{% block title %}Añadir Registro Asistencia{% endblock %}
+
+{% block content %}
+<div class="right_col" role="main"> {# Manteniendo tu clase original #}
+    <h2>{% firstof titulo_pagina "Añadir Registro de Asistencia" %}</h2>
+    <p>Añadiendo registro al reporte: <strong>{{ planilla_asistencia }}</strong></p>
+    <hr>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+
+                 {# Renderizar el campo ci_o_item #}
+                 <div class="mb-3">
+                     <label for="{{ form.ci_o_item.id_for_label }}" class="form-label fw-bold">{{ form.ci_o_item.label }}</label>
+                     {{ form.ci_o_item }}
+                     {% if form.ci_o_item.errors %}
+                         <div class="invalid-feedback d-block">{{ form.ci_o_item.errors|striptags }}</div>
+                     {% endif %}
+                     {% if form.ci_o_item.help_text %}
+                         <div class="form-text">{{ form.ci_o_item.help_text }}</div>
+                     {% endif %}
+                 </div>
+
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-search-plus me-1"></i> Buscar y Añadir Registro
+                </button>
+                {# Enlace para cancelar y volver a la vista de detalles de la planilla #}
+                <a href="{% url 'ver_detalles_asistencia' pk=planilla_asistencia.pk %}" class="btn btn-secondary">
+                    <i class="fas fa-times me-1"></i> Cancelar
+                </a>
+            </form>
+             <hr>
+             <p class="text-muted small">
+                 Nota: Al añadir el registro, los valores iniciales de asistencia (faltas, viajes, etc.) se establecerán en cero.
+                 Deberá editar el registro recién añadido desde la pantalla de detalles para ingresar los valores correctos.
+             </p>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Añadir clases de Bootstrap a los campos si no se hizo en el widget
+    document.addEventListener('DOMContentLoaded', function() {
+        const formControls = document.querySelectorAll('input[type="text"]');
+        formControls.forEach(function(control) {
+             if (!control.classList.contains('form-control')) {
+                 control.classList.add('form-control');
+             }
+        });
+    });
+</script>
+{% endblock %}
