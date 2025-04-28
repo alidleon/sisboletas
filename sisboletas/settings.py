@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 import os
 from pathlib import Path
+from decimal import Decimal # Asegúrate de tener esta importación si la necesitas en otro lugar
+from django.db import models # Asegúrate de tener esta importación si la necesitas en otro lugar
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,6 +29,69 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+# settings.py
+
+# ... (otras configuraciones) ...
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False, # Importante para no silenciar loggers por defecto
+    'formatters': { # Define cómo se ven los mensajes
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {asctime} [{module}] {message}',
+            'style': '{',
+        },
+    },
+    'handlers': { # Define dónde van los mensajes
+        'console': {
+            'level': 'DEBUG', # <-- Mostrar DEBUG y superiores en consola
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple', # Puedes usar 'verbose' para más detalle
+        },
+        # Puedes añadir un handler 'file' si quieres guardar logs en un archivo
+        # 'file': {
+        #     'level': 'DEBUG',
+        #     'class': 'logging.FileHandler',
+        #     'filename': BASE_DIR / 'django_debug.log', # Asegúrate que BASE_DIR está definido
+        #     'formatter': 'verbose',
+        # },
+    },
+    'loggers': { # Define qué loggers usar y a qué handlers enviar
+        'django': { # Logger por defecto de Django
+            'handlers': ['console'], # Enviar a consola
+            'level': 'INFO', # Mostrar INFO y superiores de Django (menos verboso)
+            'propagate': True,
+        },
+        'django.request': { # Logger para peticiones
+             'handlers': ['console'],
+             'level': 'WARNING', # Solo mostrar errores de peticiones
+             'propagate': False,
+         },
+        'reportes': { # Logger específico para tu app 'reportes'
+            'handlers': ['console'], # Enviar a consola
+            'level': 'DEBUG', # <-- Mostrar DEBUG y superiores de tu app
+            'propagate': True, # Permitir que los mensajes también vayan a loggers superiores (root) si es necesario
+        },
+        # Añade aquí loggers para otras apps si lo necesitas
+        # 'planilla': {
+        #     'handlers': ['console'],
+        #     'level': 'DEBUG',
+        #     'propagate': True,
+        # },
+        # Logger raíz (captura todo lo no capturado específicamente)
+        # '': {
+        #     'handlers': ['console'],
+        #     'level': 'INFO',
+        # },
+    },
+}
+
+# ... (resto de settings.py) ...
+
 
 # Application definition
 
@@ -36,11 +101,12 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'django.contrib.staticfiles',
+    'django.contrib.staticfiles', # <-- Necesario para archivos estáticos
     'administracion',
     'planilla',
     'reportes',
-    
+    'widget_tweaks', # <-- Añade esto si usaste {% load widget_tweaks %} en la plantilla
+
 ]
 
 MIDDLEWARE = [
@@ -58,8 +124,9 @@ ROOT_URLCONF = 'sisboletas.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': ['plantillas'],
-        'APP_DIRS': True,
+        # --- Corregido: Usar BASE_DIR que es un objeto Path ---
+        'DIRS': [BASE_DIR / 'plantillas'], # Busca en la carpeta 'plantillas' de tu proyecto
+        'APP_DIRS': True, # Busca plantillas dentro de las apps
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
@@ -80,44 +147,30 @@ WSGI_APPLICATION = 'sisboletas.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'sisboletas',  # Nombre de la base de datos
-        'USER': 'postgres',              # Tu usuario de PostgreSQL
-        'PASSWORD': 'root',       # Tu contraseña
-        'HOST': 'localhost',               # Cambia esto si usas un servidor remoto
-        'PORT': '5432',                        # Deja vacío para usar el puerto por defecto (5432)
-    },
-
-    # otra la base de datos
-
-    'personas_db': {  # <-- Elige un alias descriptivo (ej: 'legacy_data', 'external_hr')
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'personas',  # Nombre de la SEGUNDA base de datos
-        'USER': 'postgres',      # Usuario para la SEGUNDA base de datos
+        'NAME': 'sisboletas',
+        'USER': 'postgres',
         'PASSWORD': 'root',
-        'HOST': 'localhost', # IP o hostname del servidor de la SEGUNDA BD
-        'PORT': '5432',                   # Puerto de la SEGUNDA base de datos (puede ser diferente)
+        'HOST': 'localhost',
+        'PORT': '5432',
+    },
+    'personas_db': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'personas',
+        'USER': 'postgres',
+        'PASSWORD': 'root',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
-
-
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    { 'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator', },
+    { 'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', },
+    { 'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator', },
+    { 'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
 ]
 
 
@@ -125,25 +178,45 @@ AUTH_PASSWORD_VALIDATORS = [
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
 
 LANGUAGE_CODE = 'es-es'
-
 TIME_ZONE = 'America/La_Paz'
-
 USE_I18N = True
-
-USE_TZ = True
+USE_TZ = True # Recomendado mantener en True
 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = 'static/' # URL para referenciar archivos estáticos
+
+# --- Directorios adicionales donde buscar archivos estáticos (además de las apps) ---
+STATICFILES_DIRS = [
+    BASE_DIR / 'static', # Busca en la carpeta 'static' de tu proyecto (a nivel de manage.py)
+]
+
+# --- Directorio donde collectstatic copiará TODOS los archivos estáticos para PRODUCCIÓN ---
+# --- AÑADIDO ---
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+# Asegúrate de que esta carpeta 'staticfiles' NO esté en tu control de versiones (añádela a .gitignore)
+# y que el usuario que corre el servidor Django en producción tenga permisos de escritura aquí.
+
+# --- Finders (usualmente no necesitas cambiarlos) ---
+# STATICFILES_FINDERS = [
+#     'django.contrib.staticfiles.finders.FileSystemFinder', # Busca en STATICFILES_DIRS
+#     'django.contrib.staticfiles.finders.AppDirectoriesFinder', # Busca en app/static/
+# ]
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),  # Busca en la carpeta 'static' de tu proyecto
-]
+# --- Opcional: Configuración de Mensajes (si usas Bootstrap) ---
+# from django.contrib.messages import constants as messages_constants
+# MESSAGE_TAGS = {
+#     messages_constants.DEBUG: 'alert-secondary',
+#     messages_constants.INFO: 'alert-info',
+#     messages_constants.SUCCESS: 'alert-success',
+#     messages_constants.WARNING: 'alert-warning',
+#     messages_constants.ERROR: 'alert-danger',
+# }

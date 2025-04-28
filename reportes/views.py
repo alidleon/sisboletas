@@ -13,6 +13,17 @@ from .models import PlanillaAsistencia, DetalleAsistencia
 from .forms import PlanillaAsistenciaForm
 from .utils import get_processed_asistencia_details
 from .forms import AddDetalleAsistenciaForm # Importar el nuevo form
+from urllib.parse import urlencode
+from django.http import JsonResponse, HttpResponseBadRequest, Http404 # 
+from django.template.loader import render_to_string # Para renderizar 
+from django.views.decorators.http import require_POST, require_GET # 
+from .forms import DetalleAsistenciaForm # <-- Importante
+
+from decimal import Decimal # <--- Para reconocer 'Decimal'
+from django.db import models 
+
+from django.http import JsonResponse # Asegúrate de importar JsonResponse
+import json # Para decodificar errores del formulario
 
 
 # Importar modelos externos de la app 'planilla'
@@ -271,46 +282,77 @@ def borrar_planilla_asistencia(request, pk):
 
 #-----------------------------------------------
 
+
+
+#----------------------------------------
+
+
+# reportes/views.py
+# ... (tus imports y otras vistas) ...
+
 @login_required
 def ver_detalles_asistencia(request, pk):
     """
-    Muestra los detalles de asistencia filtrados y enriquecidos para
-    una PlanillaAsistencia específica. Usa la función de utilidad.
+    Muestra los detalles de asistencia filtrados y enriquecidos, pasando la
+    lista de IDs visibles y una instancia del form a la plantilla.
     """
     logger.debug(f"Vista ver_detalles_asistencia llamada para planilla_asistencia_id={pk}")
     try:
-        # Llamada a la función de utils adaptada
+        # 1. Obtener todos los datos procesados desde la utilidad
+        #    Asumimos que processed_data contendrá:
+        #    'planilla_asistencia', 'error_message', 'all_secretarias',
+        #    'unidades_for_select', 'selected_secretaria_id', 'selected_unidad_id',
+        #    'search_term', 'detalles_asistencia', 'detalle_ids_order', 'search_active'
         processed_data = get_processed_asistencia_details(request, pk)
 
-        # Manejar error si la planilla no se encontró en la utilidad
+        # 2. Manejar errores fatales (planilla no encontrada)
         if processed_data.get('error_message') and not processed_data.get('planilla_asistencia'):
             messages.error(request, processed_data['error_message'])
-            return redirect('lista_planillas_asistencia') # Redirigir a la lista
+            return redirect('lista_planillas_asistencia')
 
-        # Mensaje de error no fatal (ej. error al cargar secretarías)
+        # 3. Mostrar warnings por errores no fatales
         elif processed_data.get('error_message'):
              messages.warning(request, processed_data['error_message'])
 
-        # Construir el contexto para la plantilla con los datos devueltos
+        # 4. Crear instancia del formulario para el panel de edición rápida
+        #    Se pasa vacío, el JS lo llenará con datos vía AJAX.
+        form_para_panel = DetalleAsistenciaForm()
+
+        # 5. Extraer la lista de detalles y la lista de IDs del resultado de la utilidad
+        detalles_actuales = processed_data.get('detalles_asistencia', [])
+        # Usamos 'detalle_ids_order' que tu utilidad ya genera
+        lista_ids_visibles = processed_data.get('detalle_ids_order', [])
+
+        # 6. Construir el contexto final para la plantilla
         context = {
-            # Usamos los nombres de clave definidos en la utilidad
+            # Datos de la cabecera y filtros (vienen de processed_data)
             'planilla_asistencia': processed_data.get('planilla_asistencia'),
-            'all_secretarias': processed_data.get('all_secretarias'),
-            'unidades_for_select': processed_data.get('unidades_for_select'),
+            'all_secretarias': processed_data.get('all_secretarias', []),
+            'unidades_for_select': processed_data.get('unidades_for_select', []),
             'selected_secretaria_id': processed_data.get('selected_secretaria_id'),
             'selected_unidad_id': processed_data.get('selected_unidad_id'),
             'search_term': processed_data.get('search_term', ''),
-            'detalles_asistencia': processed_data.get('detalles_asistencia'), # Clave adaptada
             'search_active': processed_data.get('search_active', False),
-            'titulo_pagina': f"Detalles Asistencia - {processed_data.get('planilla_asistencia')}"
+
+            # Datos para la tabla
+            'detalles_asistencia': detalles_actuales,
+
+            # Datos para el JavaScript (edición rápida)
+            'visible_ids_list': lista_ids_visibles, # Lista de IDs para el json_script
+            'form_edit': form_para_panel,         # Instancia del form para renderizar el panel
+
+            # Título de la página
+            'titulo_pagina': f"Detalles Asistencia - {processed_data.get('planilla_asistencia')}" if processed_data.get('planilla_asistencia') else "Detalles Asistencia"
         }
+
+        # 7. Renderizar la plantilla
         return render(request, 'reportes/ver_detalles_asistencia.html', context)
 
+    # Manejo de excepciones generales en la vista
     except Exception as e_view:
         logger.error(f"Error inesperado en vista ver_detalles_asistencia ID {pk}: {e_view}", exc_info=True)
-        messages.error(request, "Ocurrió un error inesperado al mostrar los detalles.")
+        messages.error(request, "Ocurrió un error inesperado al intentar mostrar los detalles de asistencia.")
         return redirect('lista_planillas_asistencia')
-
 
 #-------------------------------------------
 
@@ -345,95 +387,153 @@ EXTERNAL_TYPE_MAP = {
 
 
 
+# reportes/views.py
+# ... (imports: JsonResponse, json) ...
+
+# reportes/views.py
+# ... (imports como antes: JsonResponse, json, Decimal, models, etc.) ...
+from urllib.parse import urlencode # <-- Asegúrate de tener esta importación
+
 @login_required
 def editar_detalle_asistencia(request, detalle_id):
     """
     Permite editar los campos de un registro DetalleAsistencia específico.
+    Maneja tanto peticiones normales (renderizando HTML) como AJAX (devolviendo JSON).
     """
     detalle = get_object_or_404(
         DetalleAsistencia.objects.select_related('planilla_asistencia'),
         pk=detalle_id
     )
     planilla_asistencia = detalle.planilla_asistencia
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
-    # --- Obtener Datos Externos para Contexto ---
+    # --- Variables para datos externos y URL de redirección (inicializar) ---
     persona_externa = None
     item_externo = "N/A"
     cargo_externo = "N/A"
-    if PLANILLA_APP_AVAILABLE and detalle.personal_externo_id:
+    redirect_url = reverse('lista_planillas_asistencia') # Fallback por defecto
+
+    # --- Lógica que SÓLO se necesita si NO es una petición AJAX ---
+    if not is_ajax:
+        # Obtener Datos Externos para el contexto HTML
+        if PLANILLA_APP_AVAILABLE and detalle.personal_externo_id:
+            try:
+                persona_externa = PrincipalPersonalExterno.objects.using('personas_db').get(pk=detalle.personal_externo_id)
+                # Busca designación para item y cargo (como en tu código original)
+                designacion = PrincipalDesignacionExterno.objects.using('personas_db') \
+                    .select_related('cargo') \
+                    .filter(personal_id=detalle.personal_externo_id, estado='ACTIVO') \
+                    .order_by('-id').first()
+                if designacion:
+                    item_externo = designacion.item if designacion.item is not None else 'N/A'
+                    cargo_externo = designacion.cargo.nombre_cargo if designacion.cargo else 'N/A'
+            except PrincipalPersonalExterno.DoesNotExist:
+                logger.warning(f"No se encontró PrincipalPersonalExterno ID {detalle.personal_externo_id} (editar_detalle_asistencia HTML)")
+            except Exception as e_ext:
+                logger.error(f"Error consultando datos externos para DetalleAsistencia ID {detalle.id} (editar_detalle_asistencia HTML): {e_ext}", exc_info=True)
+                messages.warning(request, "Advertencia: No se pudieron cargar todos los datos complementarios del personal.")
+
+        # Construir URL de redirección con parámetros GET (para no perder filtros)
         try:
-            persona_externa = PrincipalPersonalExterno.objects.using('personas_db').get(pk=detalle.personal_externo_id)
-            designacion = PrincipalDesignacionExterno.objects.using('personas_db') \
-                .select_related('cargo') \
-                .filter(personal_id=detalle.personal_externo_id, estado='ACTIVO') \
-                .order_by('-id').first()
-            if designacion:
-                item_externo = designacion.item if designacion.item is not None else 'N/A'
-                cargo_externo = designacion.cargo.nombre_cargo if designacion.cargo else 'N/A'
-        except PrincipalPersonalExterno.DoesNotExist:
-            logger.warning(f"No se encontró PrincipalPersonalExterno ID {detalle.personal_externo_id} para DetalleAsistencia ID {detalle.id}")
-            # No bloqueamos, pero el template debe manejar persona_externa=None
-        except Exception as e_ext:
-            logger.error(f"Error consultando datos externos para DetalleAsistencia ID {detalle.id}: {e_ext}", exc_info=True)
-            messages.warning(request, "Advertencia: No se pudieron cargar todos los datos complementarios del personal.")
-    # --- Fin Obtener Datos Externos ---
+            # Capturamos los parámetros de filtro que venían de la vista de detalles
+            redirect_params = {
+                'secretaria': request.GET.get('secretaria', ''),
+                'unidad': request.GET.get('unidad', ''),
+                'q': request.GET.get('q', ''),
+                # Puedes añadir 'buscar': 'true' si es necesario para reactivar la búsqueda
+            }
+            # Limpiamos parámetros vacíos
+            redirect_params = {k: v for k, v in redirect_params.items() if v}
 
-    # --- Manejo de parámetros GET para redirección ---
-    # Capturamos los parámetros de filtro que venían de la vista de detalles
-    redirect_params = {
-        'secretaria': request.GET.get('secretaria', ''),
-        'unidad': request.GET.get('unidad', ''),
-        'q': request.GET.get('q', ''),
-        'buscar': 'true' # Para reactivar la búsqueda en la vista de detalles
-    }
-    # Limpiamos parámetros vacíos
-    redirect_params = {k: v for k, v in redirect_params.items() if v}
+            base_redirect_url = reverse('ver_detalles_asistencia', kwargs={'pk': planilla_asistencia.pk})
+            # Añadimos los parámetros GET si existen
+            redirect_url = f"{base_redirect_url}?{urlencode(redirect_params)}" if redirect_params else base_redirect_url
+        except Exception as e_url:
+            logger.error(f"Error generando URL de redirección para ver_detalles_asistencia {planilla_asistencia.pk}: {e_url}")
+            # El fallback a lista_planillas_asistencia ya está definido arriba
 
-    # Construimos la URL de retorno a la vista de detalles
-    try:
-        # Usamos reverse para construir la URL base
-        base_redirect_url = reverse('ver_detalles_asistencia', kwargs={'pk': planilla_asistencia.pk})
-        # Añadimos los parámetros GET si existen
-        from urllib.parse import urlencode
-        redirect_url = f"{base_redirect_url}?{urlencode(redirect_params)}" if redirect_params else base_redirect_url
-    except Exception as e_url:
-        logger.error(f"Error generando URL de redirección para ver_detalles_asistencia {planilla_asistencia.pk}: {e_url}")
-        # Fallback a la lista general si falla la generación de URL específica
-        redirect_url = reverse('lista_planillas_asistencia')
-
-
+    # --- Procesamiento POST (Común para AJAX y no-AJAX) ---
     if request.method == 'POST':
         form = DetalleAsistenciaForm(request.POST, instance=detalle)
         if form.is_valid():
             try:
-                form.save()
-                messages.success(request, f"Asistencia para '{persona_externa.nombre_completo if persona_externa else f'ID Ext {detalle.personal_externo_id}'}' actualizada.")
-                # Redirigir a la vista de detalles, manteniendo los filtros
-                return redirect(redirect_url)
+                detalle_guardado = form.save()
+                # --- Respuesta Diferente para AJAX ---
+                if is_ajax:
+                    # Preparar datos actualizados para la tabla JS
+                    # (Usando los nombres de campo del formulario como antes)
+                    updated_data_for_table = {}
+                    for field_name in DetalleAsistenciaForm.Meta.fields:
+                        value = getattr(detalle_guardado, field_name)
+                        if isinstance(value, Decimal):
+                            updated_data_for_table[field_name] = str(value)
+                        elif value is None and isinstance(detalle_guardado._meta.get_field(field_name), models.TextField):
+                             updated_data_for_table[field_name] = ""
+                        else:
+                            updated_data_for_table[field_name] = value
+
+                    # ¡IMPORTANTE! Añadir aquí los datos externos si los necesitas
+                    # para actualizar la tabla directamente (si item/cargo/nombre cambian)
+                    # Ejemplo (necesitarías obtenerlos de nuevo o de la instancia guardada):
+                    # updated_data_for_table['item_externo'] = item_externo # O recalcular
+                    # updated_data_for_table['cargo_externo'] = cargo_externo # O recalcular
+                    # updated_data_for_table['nombre_completo_externo'] = persona_externa.nombre_completo if persona_externa else ...
+                    # updated_data_for_table['ci_externo'] = persona_externa.ci if persona_externa else ...
+
+                    return JsonResponse({
+                        'status': 'success',
+                        'message': 'Registro actualizado correctamente.',
+                        'updated_data': updated_data_for_table
+                     })
+                else: # No AJAX (POST normal)
+                     nombre_display = persona_externa.nombre_completo if persona_externa else f'ID Ext {detalle.personal_externo_id}'
+                     messages.success(request, f"Asistencia para '{nombre_display}' actualizada.")
+                     return redirect(redirect_url) # Usar la URL construida con parámetros
 
             except Exception as e_save:
                  logger.error(f"Error guardando DetalleAsistencia ID {detalle.id}: {e_save}", exc_info=True)
-                 messages.error(request, f"Ocurrió un error al guardar los cambios: {e_save}")
+                 if is_ajax:
+                      return JsonResponse({'status': 'error', 'message': f'Error al guardar: {e_save}'}, status=500)
+                 else: # No AJAX
+                      messages.error(request, f"Ocurrió un error al guardar los cambios: {e_save}")
+                      # Continuará para re-renderizar el formulario HTML con el error
+
+        # --- Si el formulario POST NO es válido ---
         else:
-            messages.error(request, "El formulario contiene errores.")
+            if is_ajax:
+                # Devolver errores del formulario como JSON
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'El formulario contiene errores.',
+                    'errors': json.loads(form.errors.as_json())
+                 }, status=400) # Bad Request
+            else: # No AJAX (POST inválido)
+                messages.error(request, "El formulario contiene errores. Por favor, corrígelos.")
+                # Continuará para re-renderizar el formulario HTML con errores
 
-    else: # GET
-        form = DetalleAsistenciaForm(instance=detalle)
+    # --- Si es GET (o si es POST inválido no-AJAX, llega aquí) ---
+    else: # Método GET
+        form = DetalleAsistenciaForm(instance=detalle) # Cargar form con datos existentes
 
+    # --- Renderizado HTML (Solo para GET no-AJAX o POST inválido no-AJAX) ---
+    # No deberíamos llegar aquí en un GET AJAX exitoso
+    if is_ajax and request.method == 'GET':
+         # Esto no debería pasar si el JS llama a get_detalle_asistencia_json
+         logger.error(f"Se recibió un GET AJAX inesperado en editar_detalle_asistencia para ID {detalle_id}")
+         return JsonResponse({'error': 'Método GET AJAX no soportado aquí'}, status=405)
+
+    # Preparar contexto para renderizar la plantilla HTML
     context = {
         'form': form,
         'detalle': detalle,
         'planilla_asistencia': planilla_asistencia,
-        'persona_externa': persona_externa,
-        'item_externo': item_externo,
-        'cargo_externo': cargo_externo,
-        'redirect_params': redirect_params, # Pasamos params para botones/links
-        'cancel_url': redirect_url, # URL para el botón Cancelar
+        'persona_externa': persona_externa, # Definido solo si no es AJAX
+        'item_externo': item_externo,       # Definido solo si no es AJAX
+        'cargo_externo': cargo_externo,     # Definido solo si no es AJAX
+        'cancel_url': redirect_url,         # Definido solo si no es AJAX (o el fallback)
         'titulo_pagina': f"Editar Asistencia - {persona_externa.nombre_completo if persona_externa else f'ID Ext {detalle.personal_externo_id}'} ({planilla_asistencia.mes}/{planilla_asistencia.anio})"
     }
     return render(request, 'reportes/editar_detalle_asistencia.html', context)
-
-
 #----------------------------------------------
 
 # reportes/views.py
@@ -601,3 +701,92 @@ def add_detalle_asistencia(request, planilla_asistencia_id):
         'titulo_pagina': f"Añadir Registro a Reporte {planilla_asistencia}"
     }
     return render(request, 'reportes/add_detalle_asistencia.html', context)
+
+
+
+
+# reportes/views.py
+# ... (después de tus otras vistas) ...
+
+@login_required
+def get_detalle_asistencia_json(request, detalle_id):
+    """
+    Devuelve los datos de un DetalleAsistencia específico en formato JSON
+    para ser usados por el panel de edición rápida (AJAX). Incluye manejo
+    de errores para la consulta a la base de datos externa.
+    """
+    try:
+        # 1. Obtener el detalle de asistencia local
+        detalle = get_object_or_404(DetalleAsistencia, pk=detalle_id)
+
+        # 2. Preparar diccionario con datos del detalle local
+        #    Usando los campos definidos en el formulario para asegurar consistencia.
+        form_fields = DetalleAsistenciaForm.Meta.fields
+        data = {}
+        for field_name in form_fields:
+            # Obtener el valor del modelo DetalleAsistencia
+            value = getattr(detalle, field_name, None) # Usar default None por si acaso
+
+            # Convertir Decimal a string para JSON
+            if isinstance(value, Decimal):
+                data[field_name] = str(value)
+            # Convertir None en TextField a string vacío
+            elif value is None and isinstance(detalle._meta.get_field(field_name), models.TextField):
+                 data[field_name] = ""
+            # Mantener otros valores (int, str, bool, etc.)
+            else:
+                data[field_name] = value
+
+        # Añadir el ID del detalle (siempre útil)
+        data['id'] = detalle.pk
+
+        # 3. Intentar obtener y añadir datos básicos del personal externo
+        #    (Estos datos son principalmente para mostrar en el panel, no para el formulario en sí)
+        data['nombre_completo_externo'] = f"ID Ext: {detalle.personal_externo_id}" # Valor por defecto
+        data['ci_externo'] = "N/A" # Valor por defecto
+
+        if PLANILLA_APP_AVAILABLE and detalle.personal_externo_id:
+            try:
+                # --- ¡¡¡VERIFICA ESTOS NOMBRES DE CAMPO!!! ---
+                # Asegúrate que 'nombres', 'ap_paterno', 'ap_materno', 'nro_documento'
+                # son los nombres EXACTOS en tu modelo planilla.models.PrincipalPersonalExterno
+                campos_a_traer = ['nombre', 'apellido_paterno', 'apellido_materno', 'ci']
+                # --- Fin verificación ---
+
+                # Consultar BD externa trayendo solo los campos necesarios
+                persona_ext = PrincipalPersonalExterno.objects.using('personas_db').only(
+                    *campos_a_traer # Desempaqueta la lista de campos
+                ).get(pk=detalle.personal_externo_id)
+
+                # Construir nombre completo y obtener CI, manejando valores None
+                nombre = getattr(persona_ext, 'nombre', '') or ''
+                paterno = getattr(persona_ext, 'apellido_paterno', '') or ''
+                materno = getattr(persona_ext, 'apellido_materno', '') or ''
+                nombre_completo = f"{nombre} {paterno} {materno}".strip().replace('  ', ' ') # Limpiar espacios extra
+
+                data['nombre_completo_externo'] = nombre_completo if nombre_completo else f"ID Ext: {detalle.personal_externo_id}"
+                data['ci_externo'] = getattr(persona_ext, 'ci', None) or "N/A" # Obtener CI
+
+            except PrincipalPersonalExterno.DoesNotExist:
+                logger.warning(f"No se encontró PrincipalPersonalExterno ID {detalle.personal_externo_id} en get_detalle_asistencia_json")
+                # Mantener valores por defecto definidos arriba
+            except AttributeError as e_attr:
+                # Este error ocurre si uno de los campos en 'campos_a_traer' no existe en el modelo externo
+                logger.error(f"Error de atributo consultando PrincipalPersonalExterno ID {detalle.personal_externo_id} en get_detalle_asistencia_json: {e_attr}. Verifica los nombres de campo.")
+                # Mantener valores por defecto
+            except Exception as e_ext:
+                # Otros errores de base de datos o inesperados
+                logger.error(f"Error consultando BD externa ('personas_db') en get_detalle_asistencia_json para ID {detalle.personal_externo_id}: {e_ext}", exc_info=True)
+                # Mantener valores por defecto
+
+        # 4. Devolver todos los datos recolectados como JSON
+        return JsonResponse(data)
+
+    except Http404:
+        # Si el DetalleAsistencia local no se encontró
+        logger.warning(f"Intento de acceso a DetalleAsistencia ID {detalle_id} no encontrado (get_detalle_asistencia_json).")
+        return JsonResponse({'error': 'Registro de asistencia no encontrado.'}, status=404)
+    except Exception as e:
+        # Cualquier otro error inesperado en la vista
+        logger.error(f"Error inesperado en get_detalle_asistencia_json para ID {detalle_id}: {e}", exc_info=True)
+        return JsonResponse({'error': 'Error interno del servidor al procesar la solicitud.'}, status=500)
