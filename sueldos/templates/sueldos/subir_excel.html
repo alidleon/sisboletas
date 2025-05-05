@@ -1,0 +1,133 @@
+{% extends 'index_master.html' %} {# Asegúrate que 'index_master.html' es tu plantilla base correcta #}
+{% load static %}
+
+{% block title_suffix %} - Cargar Excel Sueldos{% endblock %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <div class="">
+        <div class="page-title">
+            <div class="title_left">
+                <h3>{{ titulo_pagina|default:"Cargar Archivo Excel de Sueldos" }}</h3>
+            </div>
+        </div>
+        <div class="clearfix"></div>
+
+        <div class="row">
+            <div class="col-md-12 col-sm-12 ">
+                <div class="x_panel">
+                    <div class="x_title">
+                        <h2>Subir Archivo Excel (.xlsx) para Planilla: {{ planilla_sueldo }}</h2>
+                        <ul class="nav navbar-right panel_toolbox">
+                            <li>
+                                <a href="{% url 'lista_planillas_sueldo' %}" class="btn btn-sm btn-secondary">
+                                    <i class="fa fa-list"></i> Volver a Lista
+                                </a>
+                            </li>
+                        </ul>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="x_content">
+
+                        {# Mostrar mensajes de Django (éxito, error, advertencia) #}
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                                    {{ message|safe }}
+                                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                        <span aria-hidden="true">×</span>
+                                    </button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+
+                        {# Instrucciones e información importante #}
+                        <p>Seleccione el archivo Excel (.xlsx) correspondiente a la planilla de sueldos del periodo <strong>{{ planilla_sueldo.mes }}/{{ planilla_sueldo.anio }}</strong> para el tipo <strong>{{ planilla_sueldo.get_tipo_display }}</strong>.</p>
+                        <div class="alert alert-warning" role="alert">
+                            <i class="fa fa-exclamation-triangle"></i> <strong>Importante:</strong>
+                            <ul>
+                                <li>Asegúrese de que el archivo tenga el formato correcto y las columnas esperadas (Item en A, CI en B, ..., Líquido Pagable en R).</li>
+                                <li>Los datos de los empleados deben comenzar en la <strong>Fila 12</strong>.</li>
+                                <li>Solo se procesarán archivos con extensión <strong>.xlsx</strong>.</li>
+                                {% if planilla_sueldo.estado == 'cargado' or planilla_sueldo.estado == 'error_carga' %}
+                                <li class="text-danger"><strong>Atención:</strong> Si carga un nuevo archivo, los detalles de sueldo previamente cargados para esta planilla (si existen) serán <strong>BORRADOS</strong> y reemplazados por los del nuevo archivo.</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+
+                        {# Formulario de subida - enctype es ESENCIAL #}
+                        <form method="post" enctype="multipart/form-data" class="form-horizontal form-label-left" novalidate>
+                            {% csrf_token %}
+
+                            {# Renderizar el campo del formulario de subida #}
+                            <div class="item form-group mb-3"> {# mb-3 para espacio #}
+                                <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.archivo_excel.id_for_label }}">
+                                    {{ form.archivo_excel.label }} <span class="required">*</span>
+                                </label>
+                                <div class="col-md-6 col-sm-6 ">
+                                    {{ form.archivo_excel }} {# Asume widget con clases Bootstrap #}
+                                    {% if form.archivo_excel.errors %}
+                                        <ul class="parsley-errors-list filled mt-1"> {# mt-1 margen #}
+                                        {% for error in form.archivo_excel.errors %}
+                                            <li class="parsley-required">{{ error }}</li>
+                                        {% endfor %}
+                                        </ul>
+                                    {% endif %}
+                                    {% if form.archivo_excel.help_text %}
+                                      <small class="form-text text-muted">{{ form.archivo_excel.help_text }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="ln_solid"></div>
+                            <div class="item form-group">
+                                <div class="col-md-6 col-sm-6 offset-md-3">
+                                    <a href="{% url 'lista_planillas_sueldo' %}" class="btn btn-secondary" type="button">Cancelar</a>
+                                    <button type="submit" class="btn btn-success"> {# Cambiado a success #}
+                                        <i class="fa fa-upload"></i> Cargar y Procesar Archivo
+                                    </button>
+                                </div>
+                            </div>
+                        </form> {# Fin del formulario #}
+
+                        <hr>
+
+                        {# Sección para mostrar observaciones/historial de la planilla #}
+                        {% if planilla_sueldo.observaciones or planilla_sueldo.archivo_excel_cargado %}
+                        <div class="x_panel mt-4"> {# mt-4 más margen #}
+                            <div class="x_title">
+                                <h2>Historial / Última Carga</h2>
+                                <div class="clearfix"></div>
+                            </div>
+                            <div class="x_content">
+                                {% if planilla_sueldo.archivo_excel_cargado %}
+                                    <p><strong>Último archivo cargado:</strong>
+                                       <a href="{{ planilla_sueldo.archivo_excel_cargado.url }}" target="_blank" title="Descargar/Ver último archivo cargado">
+                                           <i class="fa fa-file-excel-o"></i> {{ planilla_sueldo.filename }}
+                                       </a>
+                                       <br>
+                                       <small>(Fecha de carga: {{ planilla_sueldo.fecha_carga_excel|date:"d/m/Y H:i:s"|default:"No registrada" }})</small>
+                                    </p>
+                                    <hr>
+                                {% endif %}
+                                {% if planilla_sueldo.observaciones %}
+                                    <p><strong>Observaciones / Resumen:</strong></p>
+                                    <pre style="white-space: pre-wrap; word-wrap: break-word; padding: 10px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">{{ planilla_sueldo.observaciones }}</pre>
+                                {% else %}
+                                    <p>No hay observaciones registradas.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                    </div> {# Fin x_content #}
+                </div> {# Fin x_panel #}
+            </div> {# Fin col-md-12 #}
+        </div> {# Fin row #}
+    </div> {# Fin container #}
+</div> {# Fin right_col #}
+{% endblock %}
+
+{% block extra_js %}
+{# No se necesita JS extra por ahora para esta funcionalidad básica #}
+{% endblock %}

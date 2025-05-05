@@ -1,0 +1,169 @@
+{% extends 'index_master.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title_suffix %} - Editar Detalle Sueldo{% endblock %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <div class="">
+        <div class="page-title">
+            <div class="title_left">
+                <h3>{{ titulo_pagina|default:"Editar Detalle de Sueldo" }}</h3>
+            </div>
+        </div>
+        <div class="clearfix"></div>
+
+        {% if messages %}
+            {% for message in messages %}
+                 <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                     {{ message|safe }}
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button>
+                 </div>
+             {% endfor %}
+        {% endif %}
+
+        {# Panel de Información del Personal y Periodo #}
+        <div class="x_panel">
+            <div class="x_title">
+                <h2>Información</h2>
+                <ul class="nav navbar-right panel_toolbox">
+                    <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                </ul>
+                <div class="clearfix"></div>
+            </div>
+            <div class="x_content">
+                 <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Nombre:</strong> {{ persona_externa.nombre_completo|default:"No encontrado" }}</p>
+                        <p><strong>CI:</strong> {{ persona_externa.ci|default:"N/A" }}</p>
+                        <p><strong>Item:</strong> {{ item_externo|default:"N/A" }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Cargo:</strong> {{ cargo_externo|default:"N/A" }}</p>
+                        <p><strong>Planilla:</strong> {{ planilla_sueldo }}</p>
+                        <p><strong>Periodo:</strong> {{ planilla_sueldo.mes }}/{{ planilla_sueldo.anio }}</p>
+                     </div>
+                </div>
+            </div>
+        </div>
+
+        {# Panel con el Formulario de Edición #}
+        <div class="x_panel">
+            <div class="x_title">
+                <h2>Editar Valores del Detalle de Sueldo</h2>
+                <div class="clearfix"></div>
+            </div>
+            <div class="x_content">
+                <form method="post" class="form-horizontal form-label-left" novalidate> {# Ajustado class #}
+                    {% csrf_token %}
+                    {# NO SE NECESITAN CAMPOS OCULTOS redirect_* #}
+
+                    {# Renderizar campos en filas/columnas para organizar #}
+                    {# Fila 1: Haber Básico, Categoría, Días Trab #}
+                     <div class="row">
+                        <div class="col-md-4 col-sm-6 item form-group mb-3">
+                            <label class="col-form-label label-align" for="{{ form.haber_basico.id_for_label }}">{{ form.haber_basico.label }}</label>
+                            {{ form.haber_basico }}
+                            {% if form.haber_basico.errors %}<ul class="parsley-errors-list filled mt-1">{% for e in form.haber_basico.errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
+                        </div>
+                        <div class="col-md-4 col-sm-6 item form-group mb-3">
+                            <label class="col-form-label label-align" for="{{ form.categoria.id_for_label }}">{{ form.categoria.label }}</label>
+                             {{ form.categoria }}
+                            {% if form.categoria.errors %}<ul class="parsley-errors-list filled mt-1">{% for e in form.categoria.errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
+                        </div>
+                         <div class="col-md-4 col-sm-6 item form-group mb-3">
+                            <label class="col-form-label label-align" for="{{ form.dias_trab.id_for_label }}">{{ form.dias_trab.label }}</label>
+                            {{ form.dias_trab }}
+                            {% if form.dias_trab.errors %}<ul class="parsley-errors-list filled mt-1">{% for e in form.dias_trab.errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
+                        </div>
+                    </div>
+
+                    <hr>
+                    <h5>Descuentos de Ley</h5>
+                    <div class="row">
+                        <div class="col-md-4 col-sm-6 item form-group mb-3">
+                            <label class="col-form-label label-align" for="{{ form.gestora_publica.id_for_label }}">{{ form.gestora_publica.label }}</label>
+                            {{ form.gestora_publica }}
+                            {% if form.gestora_publica.errors %}<ul class="parsley-errors-list filled mt-1">{% for e in form.gestora_publica.errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
+                        </div>
+                         <div class="col-md-4 col-sm-6 item form-group mb-3">
+                            <label class="col-form-label label-align" for="{{ form.rc_iva_retenido.id_for_label }}">{{ form.rc_iva_retenido.label }}</label>
+                            {{ form.rc_iva_retenido }}
+                            {% if form.rc_iva_retenido.errors %}<ul class="parsley-errors-list filled mt-1">{% for e in form.rc_iva_retenido.errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
+                        </div>
+                        <div class="col-md-4 col-sm-6 item form-group mb-3">
+                            <label class="col-form-label label-align" for="{{ form.aporte_nac_solidario.id_for_label }}">{{ form.aporte_nac_solidario.label }}</label>
+                            {{ form.aporte_nac_solidario }}
+                            {% if form.aporte_nac_solidario.errors %}<ul class="parsley-errors-list filled mt-1">{% for e in form.aporte_nac_solidario.errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
+                        </div>
+                    </div>
+
+                     <hr>
+                    <h5>Otros Descuentos</h5>
+                     <div class="row">
+                        <div class="col-md-3 col-sm-6 item form-group mb-3">
+                            <label class="col-form-label label-align" for="{{ form.cooperativa.id_for_label }}">{{ form.cooperativa.label }}</label>
+                            {{ form.cooperativa }}
+                            {% if form.cooperativa.errors %}<ul class="parsley-errors-list filled mt-1">{% for e in form.cooperativa.errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
+                        </div>
+                        <div class="col-md-3 col-sm-6 item form-group mb-3">
+                            <label class="col-form-label label-align" for="{{ form.faltas.id_for_label }}">{{ form.faltas.label }}</label>
+                            {{ form.faltas }}
+                            {% if form.faltas.errors %}<ul class="parsley-errors-list filled mt-1">{% for e in form.faltas.errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
+                        </div>
+                        <div class="col-md-3 col-sm-6 item form-group mb-3">
+                             <label class="col-form-label label-align" for="{{ form.memorandums.id_for_label }}">{{ form.memorandums.label }}</label>
+                             {{ form.memorandums }}
+                            {% if form.memorandums.errors %}<ul class="parsley-errors-list filled mt-1">{% for e in form.memorandums.errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
+                        </div>
+                        <div class="col-md-3 col-sm-6 item form-group mb-3">
+                            <label class="col-form-label label-align" for="{{ form.otros_descuentos.id_for_label }}">{{ form.otros_descuentos.label }}</label>
+                            {{ form.otros_descuentos }}
+                            {% if form.otros_descuentos.errors %}<ul class="parsley-errors-list filled mt-1">{% for e in form.otros_descuentos.errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
+                        </div>
+                    </div>
+
+                    <hr>
+                    <h5>Totales (Leídos del Excel {% if form.total_ganado.field.widget.attrs.readonly %}- No editables{% endif %})</h5>
+                     <div class="row">
+                         <div class="col-md-4 col-sm-6 item form-group mb-3">
+                            <label class="col-form-label label-align" for="{{ form.total_ganado.id_for_label }}">{{ form.total_ganado.label }}</label>
+                             {{ form.total_ganado }} {# Renderiza input (readonly si se definió en widget) #}
+                        </div>
+                         <div class="col-md-4 col-sm-6 item form-group mb-3">
+                            <label class="col-form-label label-align" for="{{ form.total_descuentos.id_for_label }}">{{ form.total_descuentos.label }}</label>
+                             {{ form.total_descuentos }} {# Renderiza input (readonly si se definió en widget) #}
+                        </div>
+                         <div class="col-md-4 col-sm-6 item form-group mb-3">
+                            <label class="col-form-label label-align" for="{{ form.liquido_pagable.id_for_label }}">{{ form.liquido_pagable.label }}</label>
+                             {{ form.liquido_pagable }} {# Renderiza input (readonly si se definió en widget) #}
+                        </div>
+                    </div>
+
+                    <div class="ln_solid"></div>
+                    <div class="form-group row">
+                        {# Ajustar offset para centrar botones #}
+                        <div class="col-md-9 offset-md-3">
+                            {# El href ahora usa la variable pasada desde la vista #}
+                            <a href="{{ cancel_url }}" class="btn btn-secondary"><i class="fa fa-times"></i> Cancelar</a>
+                            <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> Guardar Cambios</button>
+                        </div>
+                    </div>
+                </form>
+            </div> {# Fin x_content #}
+        </div> {# Fin x_panel #}
+    </div> {# Fin right_col #}
+    {% endblock %}
+
+    {% block extra_js %}
+    {# Puedes añadir JS para aplicar clases o validaciones extra si es necesario #}
+    <style>
+        /* Estilo opcional para inputs readonly */
+        input[readonly].disabled-look {
+             background-color: #e9ecef;
+             opacity: 1;
+             cursor: not-allowed;
+        }
+    </style>
+    {% endblock %}

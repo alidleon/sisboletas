@@ -1,0 +1,115 @@
+{% extends 'index_master.html' %}
+{% load static %}
+
+{% block title_suffix %} - Lista Planillas Sueldos{% endblock %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <div class="">
+        <div class="page-title">
+            <div class="title_left">
+                <h3>{{ titulo_pagina|default:"Planillas de Sueldos Generadas" }}</h3>
+            </div>
+             <div class="title_right">
+                <div class="pull-right">
+                     {# Botón para ir a la vista de creación #}
+                    <a href="{% url 'crear_planilla_sueldo' %}" class="btn btn-success">
+                        <i class="fa fa-plus"></i> Crear Nueva Planilla
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="clearfix"></div>
+
+        <div class="row">
+            <div class="col-md-12 col-sm-12 ">
+                <div class="x_panel">
+                    <div class="x_title">
+                        <h2>Listado de Planillas</h2>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="x_content">
+                        {# Mostrar mensajes de Django #}
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                                    {{ message|safe }}
+                                    <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+
+                        <div class="table-responsive">
+                            <table class="table table-striped table-bordered jambo_table bulk_action">
+                                <thead>
+                                    <tr class="headings">
+                                        <th class="column-title">Periodo</th>
+                                        <th class="column-title">Tipo Planilla</th>
+                                        <th class="column-title">Estado</th>
+                                        <th class="column-title">Fecha Creación</th>
+                                        <th class="column-title">Usuario Creación</th>
+                                        <th class="column-title">Archivo Cargado</th>
+                                        <th class="column-title">Fecha Carga</th>
+                                        <th class="column-title no-link last"><span class="nobr">Acciones</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for planilla in planillas_sueldo %}
+                                    <tr class="{% cycle 'even' 'odd' %} pointer">
+                                        <td>{{ planilla.mes }}/{{ planilla.anio }}</td>
+                                        <td>{{ planilla.get_tipo_display }}</td>
+                                        <td>
+                                            {# Puedes añadir clases CSS basadas en el estado #}
+                                            <span class="badge badge-{% if planilla.estado == 'cargado' %}info{% elif planilla.estado == 'validado' %}success{% elif planilla.estado == 'error_carga' %}danger{% else %}secondary{% endif %}">
+                                                {{ planilla.get_estado_display }}
+                                            </span>
+                                        </td>
+                                        <td>{{ planilla.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                                        <td>{{ planilla.usuario_creacion.username|default:"-" }}</td>
+                                        <td>
+                                            {% if planilla.archivo_excel_cargado %}
+                                                <a href="{{ planilla.archivo_excel_cargado.url }}" target="_blank" title="Descargar archivo">
+                                                    <i class="fa fa-file-excel-o"></i> {{ planilla.filename }}
+                                                </a>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ planilla.fecha_carga_excel|date:"d/m/Y H:i"|default:"-" }}</td>
+                                        <td class=" last">
+                                            {# Enlace para Cargar/Re-cargar Excel #}
+                                            <a href="{% url 'subir_excel_sueldos' planilla.id %}" class="btn btn-primary btn-sm" title="Cargar/Re-cargar Excel">
+                                                <i class="fa fa-upload"></i> Cargar Excel
+                                            </a>
+                                            {# Enlace para Ver Detalles (Cuando lo implementes) #}
+                                            <a href="{% url 'ver_detalles_sueldo' planilla.id %}" class="btn btn-info btn-sm" title="Ver Detalles">
+                                                <i class="fa fa-eye"></i> Ver Detalles
+                                            </a>
+                                            {# Enlace para Editar Cabecera (Cuando lo implementes) #}
+                                            <a href="{% url 'editar_planilla_sueldo' planilla.id %}" class="btn btn-warning btn-sm" title="Editar Cabecera">
+                                                <i class="fa fa-pencil"></i> Editar
+                                            </a>
+                                             {# Enlace para Borrar (Cuando lo implementes) #}
+                                            <a href="{% url 'borrar_planilla_sueldo' planilla.id %}" class="btn btn-danger btn-sm" title="Borrar Planilla">
+                                                <i class="fa fa-trash"></i> Borrar
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="8" class="text-center">No hay planillas de sueldo creadas todavía.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {# Aquí podrías añadir paginación si esperas muchas planillas #}
+
+                    </div> {# Fin x_content #}
+                </div> {# Fin x_panel #}
+            </div> {# Fin col #}
+        </div> {# Fin row #}
+    </div> {# Fin container #}
+</div> {# Fin right_col #}
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends 'index_master.html' %}
+{% load static %}
+
+{% block title_suffix %} - Confirmar Borrado Detalle Sueldo{% endblock %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <div class="">
+        <div class="page-title">
+             <div class="title_left">
+                <h3>{{ titulo_pagina|default:"Confirmar Borrado de Detalle de Sueldo" }}</h3>
+             </div>
+        </div>
+        <div class="clearfix"></div>
+
+        <div class="row">
+             <div class="col-md-8 col-sm-10 offset-md-2 offset-sm-1"> {# Centrar panel #}
+                <div class="x_panel">
+                    <div class="x_title">
+                        <h2>Borrar Detalle de Sueldo</h2>
+                         {# Botón Volver usa cancel_url que ya tiene los filtros #}
+                        <ul class="nav navbar-right panel_toolbox">
+                            <li><a href="{{ cancel_url }}" class="btn btn-sm btn-secondary" title="Volver a Detalles"><i class="fa fa-arrow-left"></i> Volver</a></li>
+                        </ul>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="x_content">
+
+                        <div class="alert alert-danger" role="alert">
+                            <h4 class="alert-heading"><i class="fa fa-exclamation-triangle"></i> ¡Atención!</h4>
+                            <p>Está a punto de borrar permanentemente el detalle de sueldo para:</p>
+                            <p><strong>{{ persona_nombre }}</strong></p>
+                            <p>Correspondiente a la planilla:</p>
+                            <p><strong>{{ planilla_sueldo }}</strong></p>
+                            <hr>
+                            <p class="mb-0"><strong>¿Está seguro de que desea continuar? Esta acción no se puede deshacer.</strong></p>
+                        </div>
+
+
+                        <form method="post">
+                            {% csrf_token %}
+                            {# No se necesitan campos ocultos redirect_* #}
+
+                            <div class="ln_solid"></div>
+                            <div class="form-group row">
+                                {# Ajustar offset si es necesario para alinear botones #}
+                                <div class="col-md-9 offset-md-3">
+                                     {# Botón para Cancelar usa cancel_url #}
+                                    <a href="{{ cancel_url }}" class="btn btn-secondary">No, Cancelar</a>
+                                     {# Botón para Confirmar Borrado #}
+                                    <button type="submit" class="btn btn-danger">
+                                        <i class="fa fa-trash"></i> Sí, Borrar Detalle
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+
+                    </div> {# Fin x_content #}
+                </div> {# Fin x_panel #}
+            </div> {# Fin col #}
+        </div> {# Fin row #}
+    </div> {# Fin container #}
+</div> {# Fin right_col #}
+{% endblock %}

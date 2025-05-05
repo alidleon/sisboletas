@@ -101,11 +101,13 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'django.contrib.staticfiles', # <-- Necesario para archivos estáticos
+    'django.contrib.staticfiles',
+    'django.contrib.humanize', 
     'administracion',
     'planilla',
     'reportes',
-    'widget_tweaks', # <-- Añade esto si usaste {% load widget_tweaks %} en la plantilla
+    'widget_tweaks',
+    'sueldos', 
 
 ]
 
@@ -155,7 +157,7 @@ DATABASES = {
     },
     'personas_db': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'personas',
+        'NAME': 'sigap_personal_simulacion',
         'USER': 'postgres',
         'PASSWORD': 'root',
         'HOST': 'localhost',
@@ -220,3 +222,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 #     messages_constants.WARNING: 'alert-warning',
 #     messages_constants.ERROR: 'alert-danger',
 # }
+
+
+MEDIA_URL = '/media/'
+
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

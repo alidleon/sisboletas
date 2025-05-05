@@ -23,4 +23,7 @@ urlpatterns = [
     path('', views.index, name='index'),
     path('planillas/', include('planilla.urls')),
     path('reportes/', include('reportes.urls')),
+    path('sueldos/', include('sueldos.urls')),
+    #path('accounts/', include('django.contrib.auth.urls')),
 ]
+
