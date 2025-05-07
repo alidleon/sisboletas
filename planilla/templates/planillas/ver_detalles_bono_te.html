@@ -190,12 +190,15 @@
                                 <th>P.Excep</th>
                                 <th>Asuetos</th>
                                 <th>PCGH Emb/Enf</th>
+                                <th>Obs. Asistencia</th>
+
                                 <th>D.No Pag.</th>
                                 <th>D. Pag.</th>
                                 <th>Total Ganado</th>
                                 <th>Desc.</th>
                                 {# *** CORREGIDO: Añadidas clases a TH *** #}
                                 <th class="sticky-col sticky-col-second-last">Líquido Pag.</th>
+                                <th class="column-title">Obs. Bono TE</th>
                                 <th class="sticky-col sticky-col-last">Acciones</th>
                                 
                             </tr>
@@ -220,12 +223,17 @@
                                 <td>{{ detalle.perm_excep|floatformat:2|default:"0.00" }}</td>
                                 <td>{{ detalle.asuetos|floatformat:2|default:"0.00" }}</td>
                                 <td>{{ detalle.pcgh_embar_enf_base|floatformat:2|default:"0.00" }}</td>
+                                <td title="{{ detalle.observaciones_asistencia|default:'' }}">
+                                    {{ detalle.observaciones_asistencia|truncatechars:30|default:"" }}
+                                </td>
                                 <td>{{ detalle.dias_no_pagados|floatformat:2|default:"0.00" }}</td>
                                 <td>{{ detalle.dias_pagados|floatformat:2|default:"0.00" }}</td>
                                 <td>{{ detalle.total_ganado|floatformat:2|default:"0.00" }}</td>
                                 <td>{{ detalle.descuentos|floatformat:2|default:"0.00" }}</td>
+                                
                                 {# *** CORREGIDO: Añadidas clases a TD *** #}
                                 <td class="sticky-col sticky-col-second-last">{{ detalle.liquido_pagable|floatformat:2|default:"0.00" }}</td>
+                                <td title="{{ detalle.observaciones_bono|default:'' }}">{{ detalle.observaciones_bono|truncatechars:20|default:"" }}</td>         {# <-- NUEVA #}
                                 <td class="sticky-col sticky-col-last">
                                     <a href="{% url 'editar_bono_te' detalle.id %}?secretaria={{ request.GET.secretaria|default:'' }}&unidad={{ request.GET.unidad|default:'' }}&q={{ request.GET.q|default:'' }}" class="btn btn-sm btn-primary" title="Editar"><i class="fa fa-pencil"></i></a>
                                     <a href="{% url 'borrar_bono_te' detalle.id %}" class="btn btn-sm btn-danger" title="Borrar" onclick="return confirm('...');"><i class="fa fa-trash"></i></a>

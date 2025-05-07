@@ -16,7 +16,7 @@ class DetalleBonoTeForm(forms.ModelForm):
         model = DetalleBonoTe
         # Campos editables originales (verifica si eran estos)
         fields = ['mes', 'abandono_dias', 'faltas', 'vacacion', 'viajes', 'bajas_medicas', 'pcgh', 'psgh', 'perm_excep', 'asuetos',
-                  'pcgh_embar_enf_base', 'descuentos'] # Excluye personal_externo, id_planilla, calculados
+                  'pcgh_embar_enf_base', 'descuentos', 'observaciones_bono'] # Excluye personal_externo, id_planilla, calculados
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

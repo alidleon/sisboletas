@@ -1,0 +1,46 @@
+{% extends 'index_master.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title_suffix %} - Historial de Cierres{% endblock %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <div class="page-title">
+        <div class="title_left"><h3>{{ titulo_pagina|default:"Historial de Cierres Mensuales" }}</h3></div>
+        <div class="title_right"><div class="pull-right">
+            <a href="{% url 'generar_estado_mensual_form' %}" class="btn btn-success"><i class="fa fa-cogs"></i> Generar Nuevo Estado</a>
+        </div></div>
+    </div>
+    <div class="clearfix"></div>
+    <div class="row"><div class="col-md-12"><div class="x_panel"><div class="x_title">
+        <h2>Listado de Cierres</h2><div class="clearfix"></div></div><div class="x_content">
+        {% if messages %}{% for message in messages %}<div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">{{ message|safe }}<button type="button" class="close" data-dismiss="alert">×</button></div>{% endfor %}{% endif %}
+        <div class="table-responsive"><table class="table table-striped table-bordered jambo_table table-sm">
+            <thead><tr class="headings">
+                <th>Periodo</th><th>Tipo</th><th>Estado Proceso</th><th>Fecha Generación</th><th>Usuario</th><th>Resumen</th><th>Acciones</th>
+            </tr></thead>
+            <tbody>
+            {% for cierre in cierres_mensuales %}
+                <tr>
+                    <td>{{ cierre.mes }}/{{ cierre.anio }}</td>
+                    <td>{{ cierre.get_tipo_planilla_display }}</td>
+                    <td><span class="badge {% if cierre.estado_proceso == 'COMPLETADO' %}bg-success{% elif cierre.estado_proceso == 'COMPLETADO_CON_ADVERTENCIAS' %}bg-warning text-dark{% elif cierre.estado_proceso == 'ERROR' %}bg-danger{% else %}bg-info text-dark{% endif %}">{{ cierre.get_estado_proceso_display }}</span></td>
+                    <td>{{ cierre.fecha_generacion|date:"d/m/Y H:i" }}</td>
+                    <td>{{ cierre.usuario_generacion.username|default:"-" }}</td>
+                    <td title="{{ cierre.resumen_proceso|default:'' }}">{{ cierre.resumen_proceso|truncatewords_html:15|default:"N/A" }}</td>
+                    <td class="text-center text-nowrap">
+                        <a href="{% url 'ver_detalle_cierre' cierre.id %}" class="btn btn-info btn-sm" title="Ver Detalles del Cierre"><i class="fa fa-eye"></i> Detalles</a>
+                        <a href="{% url 'borrar_cierre_mensual' cierre.id %}" class="btn btn-danger btn-sm" title="Borrar Cierre y sus Estados" onclick="return confirm('¿Está seguro de borrar este Cierre Mensual y TODOS sus detalles de estado de empleado?');">
+                            <i class="fa fa-trash"></i> Borrar Cierre
+                        </a>                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="text-center">No hay cierres mensuales generados.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        {% if cierres_mensuales.has_other_pages %}{# ... (Paginación igual que en lista_estado_mensual) ... #}{% endif %}
+    </div></div></div></div>
+</div></div>
+{% endblock %}

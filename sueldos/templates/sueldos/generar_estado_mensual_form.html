@@ -1,0 +1,48 @@
+{% extends 'index_master.html' %}
+{% load static %}
+
+{% block title_suffix %} - Generar Estado Mensual{% endblock %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <div class="">
+        <div class="page-title">
+            <div class="title_left">
+                <h3>{{ titulo_pagina|default:"Generar Estado Mensual" }}</h3>
+            </div>
+        </div>
+        <div class="clearfix"></div>
+        <div class="row">
+            <div class="col-md-6 offset-md-3">
+                <div class="x_panel">
+                    <div class="x_title">
+                        <h2>Seleccionar Periodo y Tipo</h2>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="x_content">
+                         {% if messages %}
+                            {% for message in messages %}
+                            <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                                {{ message|safe }}
+                                <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+
+                        <p>Seleccione el mes, año y tipo de planilla para el cual desea generar el estado consolidado del personal.</p>
+                        <form method="post" novalidate>
+                            {% csrf_token %}
+                            {{ form.as_p }} {# Renderizado simple para este form #}
+                            <div class="ln_solid"></div>
+                            <button type="submit" class="btn btn-success">
+                                 <i class="fa fa-cogs"></i> Generar Estado Mensual
+                            </button>
+                            <a href="{% url 'lista_planillas_sueldo' %}" class="btn btn-secondary">Cancelar</a>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

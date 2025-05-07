@@ -116,6 +116,22 @@
                     </div>
                 </div>
 
+                {% if form.instance.observaciones_asistencia %} {# Mostrar solo si hay algo #}
+                <div class="mb-3">
+                    <label class="form-label">Observaciones de Asistencia (Info):</label>
+                    <textarea class="form-control form-control-sm disabled-look" rows="3" readonly>{{ form.instance.observaciones_asistencia }}</textarea>
+                </div>
+                {% endif %}
+
+                <div class="mb-3">
+                    <label for="{{ form.observaciones_bono.id_for_label }}" class="form-label">{{ form.observaciones_bono.label }}</label>
+                    {{ form.observaciones_bono }} {# Renderiza el Textarea #}
+                    {% if form.observaciones_bono.errors %}
+                        <div class="invalid-feedback d-block">{{ form.observaciones_bono.errors|striptags }}</div>
+                    {% endif %}
+                     <small class="form-text text-muted">{{ form.observaciones_bono.help_text }}</small>
+                </div>
+
                 {# --- Botones --- #}
                 <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i> Guardar Cambios</button>
                 <a href="{% url 'ver_detalles_bono_te' planilla_id=detalle_bono_te.id_planilla.id %}?secretaria={{ request.GET.secretaria|default:'' }}&unidad={{ request.GET.unidad|default:'' }}&q={{ request.GET.q|default:'' }}" class="btn btn-secondary"><i class="fas fa-times me-1"></i> Cancelar</a>

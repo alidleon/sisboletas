@@ -189,3 +189,9 @@ class EditarDetalleSueldoForm(forms.ModelForm):
         return cleaned_data
 
     # Podrías añadir validaciones clean_<campo> si necesitas lógica específica
+
+class GenerarEstadoMensualForm(forms.Form):
+    mes = forms.IntegerField(label="Mes a Procesar", min_value=1, max_value=12, required=True, widget=forms.NumberInput(attrs={'class': 'form-control form-control-sm'}))
+    anio = forms.IntegerField(label="Año a Procesar", min_value=2000, max_value=2100, required=True, widget=forms.NumberInput(attrs={'class': 'form-control form-control-sm'}))
+    tipo_planilla = forms.ChoiceField(label="Tipo de Planilla", choices=PlanillaSueldo.TIPO_CHOICES, required=True, widget=forms.Select(attrs={'class': 'form-select form-select-sm'}))
+    # Podríamos añadir un checkbox tipo "Sobreescribir si ya existe?"

@@ -257,6 +257,7 @@ def crear_planilla(request, tipo):
                                         asuetos=detalle_asistencia_origen.asuetos,
                                         pcgh_embar_enf_base=detalle_asistencia_origen.pcgh_embar_enf_base,
                                         abandono_dias=detalle_asistencia_origen.abandono_dias, # Nombre coincide
+                                        observaciones_asistencia=detalle_asistencia_origen.observaciones,
 
                                         # Campos específicos de Bono TE (inicializar o dejar default)
                                         descuentos=Decimal('0'), # O si tienes otra lógica

@@ -107,6 +107,18 @@ class PrincipalDesignacionExterno(models.Model):
         db_column='Estado', # Nombre EXACTO de la columna externa
         blank=True, null=True
     )
+
+    fecha_conclusion = models.DateField(
+        db_column='Fecha_conclusion', # <-- ¡Poner aquí el NOMBRE EXACTO de la columna en personas_db!
+        null=True, blank=True # Debe permitir nulos si no todos tienen fecha
+    )
+    # -----------------------------------
+
+    # --- Campo Fecha Ingreso (Asegúrate que también exista y esté correcto) ---
+    fecha_ingreso = models.DateField(
+         db_column='Fecha_ingreso', # <-- ¡Verifica este nombre de columna también!
+         null=True, blank=True
+    )
     # Claves Foráneas
     personal = models.ForeignKey(
         PrincipalPersonalExterno,
@@ -232,6 +244,17 @@ class DetalleBonoTe(models.Model):
     rc_iva = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='RC-IVA (¿Aplica al bono?)') # Estaba?
     dias_cancelados = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Días Cancelados') # Estaba?
     otros_descuentos = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Otros Descuentos (Duplicado?)') # Estaba?
+    observaciones_asistencia = models.TextField(
+        blank=True, null=True,
+        verbose_name="Observaciones (Copiado de Asistencia)",
+        help_text="Notas registradas en el detalle de asistencia para este periodo."
+    )
+
+    observaciones_bono = models.TextField(
+        blank=True, null=True,
+        verbose_name="Observaciones (Bono TE)",
+        help_text="Notas específicas sobre este registro de Bono TE o ediciones realizadas."
+    )
 
     class Meta:
         db_table = 'detalle_bono_te' # Mantenemos nombre si ya existía

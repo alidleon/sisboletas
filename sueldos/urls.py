@@ -21,6 +21,15 @@ urlpatterns = [
     path('detalle/<int:detalle_id>/editar/', views.editar_detalle_sueldo, name='editar_detalle_sueldo'), # <-- NUEVA
     path('detalle/<int:detalle_id>/borrar/', views.borrar_detalle_sueldo, name='borrar_detalle_sueldo'), # <-- NUEVA
 
+    path('generar_estado/', views.generar_estado_mensual_form, name='generar_estado_mensual_form'),
+
+    path('cierre/lista/', views.lista_cierres_mensuales, name='lista_cierres_mensuales'), # <-- NUEVA
+    path('cierre/<int:cierre_id>/detalles/', views.ver_detalle_cierre, name='ver_detalle_cierre'), # <-- NUEVA
+    path('cierre/<int:cierre_id>/borrar/', views.borrar_cierre_mensual, name='borrar_cierre_mensual'),
+
+    #path('estado/lista/', views.lista_estado_mensual, name='lista_estado_mensual'), # <-- NUEVA URL para listar
+    #path('estado/<int:estado_id>/borrar/', views.borrar_estado_mensual, name='borrar_estado_mensual'), # <-- NUEVA URL para borrar
+    #path('estado/lista/', views.lista_estado_mensual_simple, name='lista_estado_mensual'),
 
     
 ]
