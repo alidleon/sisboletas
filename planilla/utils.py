@@ -254,7 +254,29 @@ def get_processed_planilla_details(request, planilla_id):
                     print("[DEBUG UTIL] Bucle de enriquecimiento finalizado.") # LOG 13
 
                     # Ordenar (usando los atributos _externo)
-                    # ... (código de ordenamiento sin cambios) ...
+                    # --- Lógica de ordenamiento por ITEM  ---
+                    def get_sort_key_item_bonote(detalle_obj):
+                        item_val_attr = getattr(detalle_obj, 'item_externo', None) # Puede ser int, None, o ''
+                        nombre_completo_val = (getattr(detalle_obj, 'nombre_completo_externo', '') or '').strip().upper()
+                        
+                        item_sort_val = float('inf') # Valor para ítems no válidos, None, o ausentes
+
+                        # Verificar si item_val_attr es None, o un string que (después de strip) está vacío
+                        if item_val_attr is not None and str(item_val_attr).strip():
+                            try:
+                                item_sort_val = int(str(item_val_attr).strip()) # Convertir a int para orden numérico
+                            except ValueError:
+                                # Si no se puede convertir a int (ej. si fuera 'N/A', 'S/I'), va al final.
+                                logger.debug(f"[Util Planilla] Item no numérico '{item_val_attr}' para {nombre_completo_val}, se ordenará al final.")
+                                # Mantiene float('inf')
+                        
+                        # Clave de ordenamiento: primero por ítem numérico, luego por nombre completo
+                        return (item_sort_val, nombre_completo_val)
+
+                    enriched_list_temp.sort(key=get_sort_key_item_bonote)
+                    logger.info(f"[Util Planilla] Lista de detalles Bono TE ordenada por item_externo (asc) y luego por nombre.")
+                    
+
 
                     result['detalles_enriquecidos'] = enriched_list_temp
                     logger.info(f"[Util] Enriquecimiento externo completado para {len(enriched_list_temp)} detalles.")

@@ -5,6 +5,7 @@ from django.contrib.auth.models import User # Asegúrate si usas este o settings
 from django.conf import settings
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from reportes.models import PlanillaAsistencia
 # Create your models here.
 
 # --- Modelos para BD Externa ('personas_db') ---
@@ -184,6 +185,7 @@ class Planilla(models.Model):
     importe_diario = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     # Revertir tipo a max_length y choices originales
     tipo = models.CharField(max_length=40, choices=TIPO_CHOICES, null=True, blank=True)
+    planilla_asistencia_base = models.OneToOneField(PlanillaAsistencia, on_delete=models.PROTECT, related_name='planilla_bono_te_generada', verbose_name="Planilla de Asistencia Base", null=True, blank=True)
     fecha_inicio = models.DateField(null=True, blank=True)
     fecha_fin = models.DateField(null=True, blank=True)
     fecha_baja = models.DateField(null=True, blank=True)
@@ -192,9 +194,28 @@ class Planilla(models.Model):
     def __str__(self):
         return f"Planilla {self.get_tipo_display()} {self.mes}/{self.anio} - {self.get_estado_display()}"
 
-    # Método crear_planilla probablemente no estaba aquí originalmente
-    # @classmethod
-    # def crear_planilla(...):
+    def clean(self):
+        super().clean()
+
+        if self.planilla_asistencia_base:
+            if hasattr(self, 'mes') and self.mes != self.planilla_asistencia_base.mes:
+                raise ValidationError({'mes': f"El mes ({self.mes}) no coincide con el de la Planilla de Asistencia base ({self.planilla_asistencia_base.mes})."})
+            if hasattr(self, 'anio') and self.anio != self.planilla_asistencia_base.anio:
+                raise ValidationError({'anio': f"El año ({self.anio}) no coincide con el de la Planilla de Asistencia base ({self.planilla_asistencia_base.anio})."})
+            if hasattr(self, 'tipo') and self.tipo != self.planilla_asistencia_base.tipo:
+                tipo_base_display = self.planilla_asistencia_base.get_tipo_display() if hasattr(self.planilla_asistencia_base, 'get_tipo_display') else self.planilla_asistencia_base.tipo
+                tipo_actual_display = self.get_tipo_display() if hasattr(self, 'get_tipo_display') else self.tipo
+                raise ValidationError({'tipo': f"El tipo ({tipo_actual_display}) no coincide con el de la Planilla de Asistencia base ({tipo_base_display})."})
+
+        if self.planilla_asistencia_base_id:
+            queryset = Planilla.objects.filter(planilla_asistencia_base_id=self.planilla_asistencia_base_id)
+            if self.pk:
+                queryset = queryset.exclude(pk=self.pk)
+            
+            if queryset.exists():
+                raise ValidationError(
+                    {'planilla_asistencia_base': 'Esta Planilla de Asistencia ya ha sido utilizada como base para otra Planilla de Bono TE.'}
+                )
 
 # --- Modelo DetalleBonoTe ---
 class DetalleBonoTe(models.Model):

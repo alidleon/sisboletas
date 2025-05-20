@@ -251,9 +251,24 @@ def get_processed_sueldo_details(request, planilla_id):
 
             # Ordenar la lista ya enriquecida por nombre completo externo
             try:
-                 # Ordenar por el atributo que acabamos de añadir
-                 detalles_locales_list.sort(key=lambda x: (getattr(x, 'nombre_completo_externo', '') or '').strip().upper())
-                 logger.debug("[Util Sueldos] Lista de detalles ordenada por nombre externo.")
+                def get_sort_key_item_sueldo(detalle_obj_sueldo):
+                    item_val_attr = getattr(detalle_obj_sueldo, 'item_externo', None)
+                    nombre_completo_val = (getattr(detalle_obj_sueldo, 'nombre_completo_externo', '') or '').strip().upper()
+                    
+                    item_sort_val = float('inf') # Valor para ítems no válidos, None, o ausentes
+
+                    if item_val_attr is not None and str(item_val_attr).strip():
+                        try:
+                            item_sort_val = int(str(item_val_attr).strip())
+                        except ValueError:
+                            logger.debug(f"[Util Sueldos] Item no numérico '{item_val_attr}' para {nombre_completo_val}, se ordenará al final.")
+                            # Mantiene float('inf')
+                    
+                    return (item_sort_val, nombre_completo_val)
+
+                detalles_locales_list.sort(key=get_sort_key_item_sueldo)
+                logger.debug("[Util Sueldos] Lista de detalles sueldo ordenada por item_externo (asc) y luego por nombre.")
+
             except Exception as e_sort: logger.error(f"Error ordenando detalles: {e_sort}", exc_info=True)
 
         # --- Asignación final al diccionario result ---

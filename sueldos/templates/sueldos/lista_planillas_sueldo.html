@@ -93,6 +93,13 @@
                                             <a href="{% url 'borrar_planilla_sueldo' planilla.id %}" class="btn btn-danger btn-sm" title="Borrar Planilla">
                                                 <i class="fa fa-trash"></i> Borrar
                                             </a>
+                                            {% if planilla.estado in "cargado,validado,pagado" %} {# Ajusta estados permitidos #}
+                                                <a href="{% url 'generar_pdf_boletas_por_planilla' planilla.id %}"
+                                                class="btn btn-danger btn-xs" target="_blank" {# target="_blank" para abrir en nueva pestaña #}
+                                                title="Generar PDF de Boletas de Pago">
+                                                    <i class="fa fa-file-pdf-o"></i> Generar Boletas
+                                                </a>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                     {% empty %}

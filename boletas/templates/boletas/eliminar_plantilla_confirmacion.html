@@ -1,0 +1,32 @@
+{% extends 'index_master.html' %}
+{% load static %}
+
+{% block title_suffix %} - {{ titulo_pagina }}{% endblock %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <div class="">
+        <div class="page-title">
+            <div class="title_left">
+                <h3>{{ titulo_pagina }}</h3>
+            </div>
+        </div>
+        <div class="clearfix"></div>
+        <div class="row">
+            <div class="col-md-12 col-sm-12 ">
+                <div class="x_panel">
+                    <div class="x_content">
+                        <p>¿Estás seguro de que quieres eliminar la plantilla de boleta "<strong>{{ plantilla.nombre }}</strong>"?</p>
+                        <p>Esta acción no se puede deshacer.</p>
+                        <form method="post">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+                            <a href="{% url 'lista_plantillas_boleta' %}" class="btn btn-default">Cancelar</a>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,60 +1,139 @@
 {% extends 'index_master.html' %}
+{% load static %}
 
 {% block content %}
 <div class="right_col" role="main">
-    <h2>Crear Planilla Bono TE (Tipo: {{ tipo }})</h2>
-
-    <form method="post">
-        {% csrf_token %}
-        {% if planilla_form.errors %}
-            <div class="alert alert-danger">
-                Por favor, corrige los siguientes errores en el formulario de planilla:
-                <ul>
-                    {% for field, errors in planilla_form.errors.items %}
-                        {% for error in errors %}
-                            <li><strong>{{ field|title }}:</strong> {{ error }}</li>
-                        {% endfor %}
-                    {% endfor %}
-                </ul>
-            </div>
-        {% endif %}
-
-        <div class="form-group">
-            <label for="{{ planilla_form.mes.id_for_label }}">Mes:</label>
-            {{ planilla_form.mes }}
+    <div class="page-title">
+        <div class="title_left">
+            <h3>{{ titulo_vista|default:"Crear Nueva Planilla de Bono TE" }}</h3>
         </div>
+    </div>
+    <div class="clearfix"></div>
 
-        <div class="form-group">
-            <label for="{{ planilla_form.anio.id_for_label }}">Año:</label>
-            {{ planilla_form.anio }}
-        </div>
-
-        <div class="form-group">
-            <label for="{{ planilla_form.dias_habiles.id_for_label }}">Días Hábiles:</label>
-            {{ planilla_form.dias_habiles }}
-        </div>
-
-        <div class="form-group">
-            <label for="planilla_base">Copiar registros DetalleBonoTe de:</label>
-            <select class="form-control" id="planilla_base" name="planilla_base">
-                <option value="">--- Ninguna ---</option>
-                {% for planilla in planillas_con_bono_te %}
-                    <option value="{{ planilla.id }}">{{ planilla.mes }}/{{ planilla.anio }} - {{ planilla.get_tipo_display }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <button type="submit" class="btn btn-primary">Crear Planilla</button>
-    </form>
-
+    {# Mensajes generales de Django #}
     {% if messages %}
-        <ul class="messages">
-            {% for message in messages %}
-                <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-            {% endfor %}
-        </ul>
+        <div class="row">
+            <div class="col-md-12 col-sm-12">
+                {% for message in messages %}
+                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
     {% endif %}
 
-    <a href="{% url 'seleccionar_tipo_planilla' %}">Volver a seleccionar tipo</a>
-</div>
+    <div class="row">
+        <div class="col-md-12 col-sm-12">
+            {# --- INICIO PANEL ÚNICO --- #}
+            <div class="x_panel">
+                <div class="x_title">
+                    <h2>Formulario de Creación de Planilla Bono TE</h2>
+                    <ul class="nav navbar-right panel_toolbox">
+                        <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                    </ul>
+                    <div class="clearfix"></div>
+                </div>
+                <div class="x_content">
+
+                    {# --- Mini-Formulario de Filtro por Tipo (Integrado) --- #}
+                    {# Sigue siendo un <form> separado para el GET, pero visualmente dentro del mismo panel #}
+                    <form method="get" action="{% url 'crear_planilla_bono_te' %}" id="tipoFilterForm" class="form-horizontal form-label-left">
+                        <div class="form-group row">
+                            <label for="tipo_filtro_select" class="col-form-label col-md-3 col-sm-3 label-align text-md-right">Paso 1: Filtrar Asistencias por Tipo:</label>
+                            <div class="col-md-6 col-sm-9">
+                                <select name="tipo_filtro" id="tipo_filtro_select" class="form-control"
+                                        onchange="this.form.submit();">
+                                    <option value="">--- Seleccione un Tipo ---</option>
+                                    {% for value, display_name in tipos_planilla_choices %}
+                                        <option value="{{ value }}" {% if value == tipo_filtro_actual %}selected{% endif %}>
+                                            {{ display_name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                    {# Línea divisoria opcional para separar visualmente el filtro del formulario principal #}
+                    <div class="ln_solid"></div>
+
+                    {# Mostrar errores generales del formulario principal #}
+                    {% if planilla_form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            <strong>Por favor, corrija los siguientes errores:</strong>
+                            <ul>
+                            {% for error in planilla_form.non_field_errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+                    {% if planilla_form.errors and not planilla_form.non_field_errors and not messages %}
+                         <div class="alert alert-warning">
+                             Verifique los campos marcados con errores.
+                         </div>
+                    {% endif %}
+
+                    {# --- Formulario Principal para Crear la Planilla de Bono TE --- #}
+                    <form method="post" action="{% url 'crear_planilla_bono_te' %}{% if tipo_filtro_actual %}?tipo_filtro={{ tipo_filtro_actual }}{% endif %}" id="mainCreateForm" class="form-horizontal form-label-left">
+                        {% csrf_token %}
+
+                        {# Campo: Planilla de Asistencia Base Selector #}
+                        <div class="form-group row {% if planilla_form.planilla_asistencia_base_selector.errors %}bad{% endif %}">
+                            <label for="{{ planilla_form.planilla_asistencia_base_selector.id_for_label }}" class="col-form-label col-md-3 col-sm-3 label-align text-md-right">
+                                Paso 2: {{ planilla_form.planilla_asistencia_base_selector.label }} <span class="required">*</span>:
+                            </label>
+                            <div class="col-md-6 col-sm-9">
+                                {{ planilla_form.planilla_asistencia_base_selector }}
+                                {% if planilla_form.planilla_asistencia_base_selector.help_text %}
+                                    <small class="form-text text-muted">{{ planilla_form.planilla_asistencia_base_selector.help_text }}</small>
+                                {% endif %}
+                                {% for error in planilla_form.planilla_asistencia_base_selector.errors %}
+                                    <div class="text-danger" style="font-size: 0.875em;">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        {# Campo: Días Hábiles #}
+                        <div class="form-group row {% if planilla_form.dias_habiles.errors %}bad{% endif %}">
+                            <label for="{{ planilla_form.dias_habiles.id_for_label }}" class="col-form-label col-md-3 col-sm-3 label-align text-md-right">
+                                Paso 3: {{ planilla_form.dias_habiles.label }} <span class="required">*</span>:
+                            </label>
+                            <div class="col-md-6 col-sm-9">
+                                {{ planilla_form.dias_habiles }}
+                                {% if planilla_form.dias_habiles.help_text %}
+                                    <small class="form-text text-muted">{{ planilla_form.dias_habiles.help_text }}</small>
+                                {% endif %}
+                                {% for error in planilla_form.dias_habiles.errors %}
+                                     <div class="text-danger" style="font-size: 0.875em;">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        {# Otros campos del formulario principal si los tienes #}
+
+                        <div class="ln_solid"></div>
+                        <div class="form-group row">
+                            <div class="col-md-6 col-sm-9 offset-md-3">
+                                <button type="submit" id="createPlanillaBtn" class="btn btn-success"
+                                        {% if planilla_form.fields.planilla_asistencia_base_selector.widget.attrs.disabled %}
+                                            disabled title="Complete el Paso 1 y seleccione una asistencia."
+                                        {% endif %}>
+                                    <i class="fa fa-check"></i> Crear Planilla Bono TE
+                                </button>
+                                <a href="{% url 'lista_planillas' %}" class="btn btn-secondary">
+                                    <i class="fa fa-times"></i> Cancelar
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div> {# Fin x_content del panel único #}
+            </div> {# Fin x_panel único #}
+            {# --- FIN PANEL ÚNICO --- #}
+        </div> {# Fin col-md-12 #}
+    </div> {# Fin row #}
+</div> {# Fin right_col #}
 {% endblock %}

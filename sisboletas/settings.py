@@ -35,59 +35,63 @@ ALLOWED_HOSTS = []
 
 LOGGING = {
     'version': 1,
-    'disable_existing_loggers': False, # Importante para no silenciar loggers por defecto
-    'formatters': { # Define cómo se ven los mensajes
+    'disable_existing_loggers': False,  # Mantener los loggers existentes de Django
+    'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'format': '{levelname} {asctime} {module} L{lineno}: {message}',
             'style': '{',
         },
         'simple': {
-            'format': '{levelname} {asctime} [{module}] {message}',
+            'format': '{levelname} {message}',
             'style': '{',
         },
     },
-    'handlers': { # Define dónde van los mensajes
-        'console': {
-            'level': 'DEBUG', # <-- Mostrar DEBUG y superiores en consola
-            'class': 'logging.StreamHandler',
-            'formatter': 'simple', # Puedes usar 'verbose' para más detalle
-        },
-        # Puedes añadir un handler 'file' si quieres guardar logs en un archivo
+    #'handlers': {
+    #    'console': {
+    #        'level': 'DEBUG',  # Nivel mínimo que este handler procesará
+    #        'class': 'logging.StreamHandler', # Envía a la consola (stderr por defecto)
+    #        'formatter': 'verbose', # Usa el formato detallado
+    #    },
+        # Puedes añadir más handlers aquí, como para archivos:
         # 'file': {
         #     'level': 'DEBUG',
         #     'class': 'logging.FileHandler',
-        #     'filename': BASE_DIR / 'django_debug.log', # Asegúrate que BASE_DIR está definido
+        #     'filename': BASE_DIR / 'debug.log', # Asegúrate que BASE_DIR esté definido
         #     'formatter': 'verbose',
         # },
-    },
-    'loggers': { # Define qué loggers usar y a qué handlers enviar
-        'django': { # Logger por defecto de Django
-            'handlers': ['console'], # Enviar a consola
-            'level': 'INFO', # Mostrar INFO y superiores de Django (menos verboso)
-            'propagate': True,
-        },
-        'django.request': { # Logger para peticiones
-             'handlers': ['console'],
-             'level': 'WARNING', # Solo mostrar errores de peticiones
-             'propagate': False,
-         },
-        'reportes': { # Logger específico para tu app 'reportes'
-            'handlers': ['console'], # Enviar a consola
-            'level': 'DEBUG', # <-- Mostrar DEBUG y superiores de tu app
-            'propagate': True, # Permitir que los mensajes también vayan a loggers superiores (root) si es necesario
-        },
-        # Añade aquí loggers para otras apps si lo necesitas
+    #},
+    #'loggers': {
+    #    'django': { # Logger para los mensajes internos de Django
+    #        'handlers': ['console'], # O ['console', 'file']
+    #        'level': 'INFO',       # Solo mostrar INFO y superiores de Django
+    #        'propagate': False,    # No pasar mensajes de Django al logger 'root'
+    #    },
+    #    'django.db.backends': { # Para ver las queries SQL (puede ser muy verboso)
+    #        'handlers': ['console'],
+    #        'level': 'DEBUG',      # Cambia a INFO o WARNING para menos detalle SQL
+    #        'propagate': False,
+    #    },
+        #'boletas': { # Logger específico para tu app 'boletas'
+         #   'handlers': ['console'], # O ['console', 'file']
+          #  'level': 'DEBUG',      # Mostrar todos los mensajes DEBUG de 'boletas'
+           # 'propagate': False,     # Permitir que los mensajes también vayan al root si es necesario
+        #},
+        # Puedes añadir configuraciones para otras de tus apps:
         # 'planilla': {
         #     'handlers': ['console'],
         #     'level': 'DEBUG',
         #     'propagate': True,
         # },
-        # Logger raíz (captura todo lo no capturado específicamente)
-        # '': {
+        # 'sueldos': {
         #     'handlers': ['console'],
-        #     'level': 'INFO',
+        #     'level': 'DEBUG',
+        #     'propagate': True,
         # },
-    },
+    #},
+    #'root': { # Logger raíz, captura todo lo que no es manejado por loggers específicos y tiene propagate=True
+     #   'handlers': ['console'], # O ['console', 'file']
+      #  'level': 'INFO',       # Nivel por defecto para lo que no tiene config específica
+    #},
 }
 
 # ... (resto de settings.py) ...
@@ -108,6 +112,7 @@ INSTALLED_APPS = [
     'reportes',
     'widget_tweaks',
     'sueldos', 
+    'boletas',
 
 ]
 

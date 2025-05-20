@@ -210,8 +210,31 @@ def get_processed_asistencia_details(request, planilla_asistencia_id):
 
             # Ordenar la lista ya enriquecida
             try:
-                 detalles_locales_list.sort(key=lambda x: ( (getattr(x, 'nombre_completo_externo', '') or '').strip().upper().split(' ') + [''] * 3 )[0:3])
-                 logger.debug("[Util Asistencia] Lista de detalles ordenada por nombre.")
+                #detalles_locales_list.sort(key=lambda x: ( (getattr(x, 'nombre_completo_externo', '') or '').strip().upper().split(' ') + [''] * 3 )[0:3])
+                #logger.debug("[Util Asistencia] Lista de detalles ordenada por nombre.")
+                def get_sort_key_item(detalle_obj):
+                    item_val = getattr(detalle_obj, 'item_externo', None)
+                    nombre_completo_val = (getattr(detalle_obj, 'nombre_completo_externo', '') or '').strip().upper()
+
+                    # Si el item es None, un string vacío, o no es convertible a int, lo ponemos al final.
+                    # Usamos un número muy grande para 'item_sort_val'.
+                    # Esto asume que los ítems válidos son positivos y no extremadamente grandes.
+                    item_sort_val = float('inf') # Valor para ítems no válidos o ausentes
+
+                    if item_val is not None and str(item_val).strip(): # Verificar que no sea None o string vacío
+                        try:
+                            item_sort_val = int(str(item_val).strip()) # Convertir a int para orden numérico
+                        except ValueError:
+                            # Si no se puede convertir a int (ej. 'N/A', 'S/I'), también va al final.
+                            # Ya está en float('inf'), pero es bueno loggearlo si ocurre
+                            logger.debug(f"[Util Asistencia] Item no numérico '{item_val}' para {nombre_completo_val}, se ordenará al final.")
+                            pass # Mantiene float('inf')
+                    
+                    # Clave de ordenamiento: primero por ítem numérico, luego por nombre completo
+                    return (item_sort_val, nombre_completo_val)
+
+                detalles_locales_list.sort(key=get_sort_key_item)
+                logger.debug("[Util Asistencia] Lista de detalles ordenada por item_externo (asc) y luego por nombre.")
             except Exception as e_sort: logger.error(f"Error ordenando detalles: {e_sort}", exc_info=True)
 
         # --- Asignación final al diccionario result ---

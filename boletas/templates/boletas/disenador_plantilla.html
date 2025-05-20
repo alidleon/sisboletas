@@ -1,0 +1,260 @@
+{% extends 'index_master.html' %}
+{% load static %}
+
+{% block title_suffix %} - {% if plantilla_form.instance.pk %}Editar Plantilla{% else %}Diseñar Plantilla{% endif %}{% endblock %}
+
+{% block extra_css %}
+    {# Referencia ÚNICA al archivo CSS externo #}
+    <link rel="stylesheet" href="{% static 'boletas/css/disenador_boleta.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <div class="">
+        <div class="page-title">
+            <div class="title_left">
+                <h3>{{ titulo_pagina }}</h3>
+            </div>
+        </div>
+        <div class="clearfix"></div>
+
+        <div class="row">
+            <div class="col-md-12 col-sm-12">
+                <div class="x_panel">
+                    <div class="x_title">
+                        <h2>Diseño de Plantilla</h2>
+                        {# Quitar toolbox del panel si no se usa #}
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="x_content">
+                        {% if messages %} {# Mostrar mensajes #}
+                            {% for message in messages %}
+                            <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible " role="alert">
+                                <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button>
+                                {{ message }}
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+
+                        {# Formulario principal #}
+                        <form method="post" id="formPlantilla">
+                            {% csrf_token %}
+
+                            {# Campos Nombre/Descripción/Predeterminada (fuera del wrapper del diseñador) #}
+                            <div class="row">
+                                <div class="col-md-6">
+                                     <div class="form-group">
+                                         <label for="{{ plantilla_form.nombre.id_for_label }}">Nombre <span class="required">*</span></label>
+                                         {{ plantilla_form.nombre }}
+                                         {% if plantilla_form.nombre.errors %}<ul class="parsley-errors-list filled">{% for error in plantilla_form.nombre.errors %}<li class="parsley-required">{{ error }}</li>{% endfor %}</ul>{% endif %}
+                                     </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="{{ plantilla_form.descripcion.id_for_label }}">Descripción</label>
+                                         {{ plantilla_form.descripcion }}
+                                         {% if plantilla_form.descripcion.errors %}<ul class="parsley-errors-list filled">{% for error in plantilla_form.descripcion.errors %}<li class="parsley-required">{{ error }}</li>{% endfor %}</ul>{% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-12">
+                                    <div class="form-group">
+                                         <div class="checkbox">
+                                             <label>
+                                                 {{ plantilla_form.es_predeterminada }} {{ plantilla_form.es_predeterminada.label }}
+                                             </label>
+                                         </div>
+                                          {% if plantilla_form.es_predeterminada.errors %}<ul class="parsley-errors-list filled">{% for error in plantilla_form.es_predeterminada.errors %}<li class="parsley-required">{{ error }}</li>{% endfor %}</ul>{% endif %}
+                                     </div>
+                                </div>
+                            </div>
+
+                            {# Input hidden para el JSON del diseño #}
+                            <input type="hidden" name="datos_diseno_json_input" id="datos_diseno_json_input">
+
+                            {# Contenedor principal del diseñador con estructura de 3 columnas #}
+                            <div class="designer-wrapper">
+
+                                {# --- COLUMNA IZQUIERDA: HERRAMIENTAS Y PLACEHOLDERS --- #}
+                                <div class="designer-left-column">
+                                    <div class="designer-section">
+                                        <h4><i class="fa fa-wrench fa-fw"></i> Herramientas</h4>
+                                        <div class="btn-group-vertical btn-group-sm w-100" role="group">
+                                            <button type="button" id="addText" class="btn btn-outline-secondary text-left" title="Añadir Texto"><i class="fa fa-font fa-fw mr-1"></i> Texto</button>
+                                            <button type="button" id="addLine" class="btn btn-outline-secondary text-left" title="Añadir Línea"><i class="fa fa-minus fa-fw mr-1"></i> Línea</button>
+                                            <button type="button" id="addRect" class="btn btn-outline-secondary text-left" title="Añadir Rectángulo"><i class="fa fa-square-o fa-fw mr-1"></i> Rectángulo</button>
+                                            <button type="button" id="addImage" class="btn btn-outline-secondary text-left" title="Añadir Imagen"><i class="fa fa-picture-o fa-fw mr-1"></i> Imagen</button>
+                                            <input type="file" id="imageLoader" style="display: none;" accept="image/*">
+                                        </div>
+                                    </div>
+                                     <div class="designer-section">
+                                        <h4><i class="fa fa-database fa-fw"></i> Campos Datos</h4>
+                                        <select id="placeholderSelector" class="form-control form-control-sm mb-2">
+                                            <option value="">-- Seleccionar --</option>
+                                            {# Iterar sobre placeholders pasados desde la vista #}
+                                            {% for ph in placeholders_disponibles %}
+                                            <option value="{{ ph.id }}" data-label="{{ ph.label }}">{{ ph.label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <button type="button" id="addPlaceholder" class="btn btn-sm btn-info w-100">Añadir Campo</button>
+                                    </div>
+                                </div> {# Fin Columna Izquierda #}
+
+                                {# --- ÁREA CENTRAL: LIENZO Y CONTROLES VISTA --- #}
+                                <div class="designer-center-column">
+                                    {# Barra de Controles de Vista #}
+                                    <div class="view-controls-bar">
+                                        <button type="button" class="btn btn-sm btn-secondary" id="zoomIn" title="Acercar"><i class="fa fa-search-plus"></i></button>
+                                        <button type="button" class="btn btn-sm btn-secondary" id="zoomOut" title="Alejar"><i class="fa fa-search-minus"></i></button>
+                                        <button type="button" class="btn btn-sm btn-secondary" id="zoomReset" title="Restaurar Zoom"><i class="fa fa-expand"></i></button>
+                                        <span class="ml-2 mr-2">|</span>
+                                        <button type="button" id="undoCanvas" class="btn btn-sm btn-warning" title="Deshacer (Ctrl+Z)" disabled><i class="fa fa-undo"></i></button>
+                                        <button type="button" id="redoCanvas" class="btn btn-sm btn-warning" title="Rehacer (Ctrl+Y)" disabled><i class="fa fa-repeat"></i></button> {# fa-repeat es el ícono de rehacer en FontAwesome #}
+                                        <span class="ml-2 mr-2">|</span>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" value="" id="toggleGrid">
+                                            <label class="form-check-label" for="toggleGrid">Cuadrícula (<span id="gridSpacingValue">?</span>px)</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" value="" id="toggleSnap">
+                                            <label class="form-check-label" for="toggleSnap">Alinear</label>
+                                        </div>
+                                        <span class="ml-2">Zoom: <span id="zoomLevel">100</span>%</span>
+                                    </div>
+
+                                    {# Lienzo de Diseño #}
+                                    <div class="canvas-container-wrapper">
+                                        <canvas id="boletaCanvas"></canvas> {# El tamaño se controla por CSS/JS #}
+                                    </div>
+                                    <div class="mt-1"><small>Boleta (Tamaño A4 aprox.)</small></div>
+
+                                </div> {# Fin Área Central #}
+
+                                {# --- COLUMNA DERECHA: PROPIEDADES --- #}
+                                <div class="designer-right-column">
+                                     <div class="designer-section">
+                                        <h4><i class="fa fa-edit fa-fw"></i> Propiedades</h4>
+                                        <div id="propertiesPanel">
+                                             {# Propiedades Comunes #}
+                                            <div class="prop-group common-props">
+                                                <label>Posición X:</label> <input type="number" id="propLeft" class="form-control form-control-sm">
+                                                <label>Posición Y:</label> <input type="number" id="propTop" class="form-control form-control-sm">
+                                            </div>
+                                            {# Propiedades Texto #}
+                                            <div class="prop-group text-props" style="display: none;">
+                                                <h5><i class="fa fa-font"></i> Texto</h5>
+                                                <label>Contenido:</label> <input type="text" id="propText" class="form-control form-control-sm">
+                                                <label>Fuente:</label>
+                                                <select id="propFontFamily" class="form-control form-control-sm">
+                                                    <option value="Helvetica" style="font-family: Helvetica, Arial, sans-serif;">Helvetica (Sans-Serif)</option>
+                                                    <option value="Times-Roman" style="font-family: 'Times New Roman', Times, serif;">Times (Serif)</option>
+                                                    <option value="Courier" style="font-family: 'Courier New', Courier, monospace;">Courier (Monospace)</option>
+                                                </select>
+                                                <label>Tamaño:</label> <input type="number" id="propFontSize" value="12" min="1" class="form-control form-control-sm">
+                                                <label>Color Fuente:</label> <input type="color" id="propFillText" value="#000000" class="form-control form-control-sm form-control-color">
+                                                <label>Estilo:</label>
+                                                <div>
+                                                    <button type="button" class="btn btn-xs btn-outline-secondary prop-style-button" data-prop="fontWeight" data-value-on="bold" data-value-off="normal" id="propFontWeight" title="Negrita"><b>B</b></button>
+                                                    <button type="button" class="btn btn-xs btn-outline-secondary prop-style-button" data-prop="fontStyle" data-value-on="italic" data-value-off="normal" id="propFontStyle" title="Cursiva"><i>I</i></button>
+                                                    <button type="button" class="btn btn-xs btn-outline-secondary prop-style-button" data-prop="underline" data-value-on="true" data-value-off="false" id="propUnderline" title="Subrayado"><u>U</u></button>
+                                                </div>
+                                                <label>Alineación:</label>
+                                                <select id="propTextAlign" class="form-control form-control-sm">
+                                                    <option value="left">Izquierda</option>
+                                                    <option value="center">Centro</option>
+                                                    <option value="right">Derecha</option>
+                                                    <option value="justify">Justificado</option>
+                                                </select>
+                                            </div>
+                                             {# Propiedades Línea #}
+                                            <div class="prop-group line-props" style="display: none;">
+                                                <h5><i class="fa fa-minus"></i> Línea</h5>
+                                                <label>Color Línea:</label> <input type="color" id="propStrokeLine" value="#000000" class="form-control form-control-sm form-control-color">
+                                                <label>Grosor (px):</label> <input type="number" id="propStrokeWidthLine" value="1" min="1" class="form-control form-control-sm">
+                                            </div>
+                                            {# Propiedades Rectángulo #}
+                                            <div class="prop-group rect-props" style="display: none;">
+                                                 <h5><i class="fa fa-square-o"></i> Rectángulo</h5>
+                                                 <div class="form-check"><input class="form-check-input" type="checkbox" value="" id="propSolidFillRect"><label class="form-check-label" for="propSolidFillRect">Relleno Sólido</label></div>
+                                                <label for="propFillRect">Color Relleno:</label> <input type="color" id="propFillRect" value="#ffffff" class="form-control form-control-sm form-control-color" disabled>
+                                                <label for="propStrokeRect">Color Borde:</label> <input type="color" id="propStrokeRect" value="#000000" class="form-control form-control-sm form-control-color">
+                                                <label for="propStrokeWidthRect">Grosor Borde (px):</label> <input type="number" id="propStrokeWidthRect" value="1" min="0" class="form-control form-control-sm">
+                                            </div>
+                                             {# Propiedades Imagen #}
+                                            <div class="prop-group image-props" style="display: none;">
+                                                 <h5><i class="fa fa-picture-o"></i> Imagen</h5>
+                                                 <p><small>(Ajusta tamaño directamente en el lienzo)</small></p>
+                                            </div>
+
+                                            <div class="prop-group common-props-extra" style="display: none;"> {# Oculto por defecto, se mostrará si hay objeto activo #}
+                                                <h5><i class="fa fa-layer-group"></i> Orden (Z-Index)</h5>
+                                                <button type="button" id="sendToBack" class="btn btn-sm btn-outline-secondary mb-1 w-100"><i class="fa fa-arrow-down"></i> Enviar al Fondo</button>
+                                                <button type="button" id="bringToFront" class="btn btn-sm btn-outline-secondary mb-1 w-100"><i class="fa fa-arrow-up"></i> Traer al Frente</button>
+                                                <button type="button" id="sendBackwards" class="btn btn-sm btn-outline-secondary mb-1 w-100"><i class="fa fa-chevron-down"></i> Enviar Atrás</button>
+                                                <button type="button" id="bringForwards" class="btn btn-sm btn-outline-secondary mb-1 w-100"><i class="fa fa-chevron-up"></i> Traer Adelante</button>
+                                            </div>
+
+
+
+                                            {# Botón Eliminar #}
+                                            <button type="button" id="deleteSelected" class="btn btn-sm btn-danger mt-2 w-100" style="display: none;">Eliminar Seleccionado</button>
+                                        </div> {# Fin #propertiesPanel #}
+                                    </div> {# Fin designer-section #}
+                                </div> {# Fin Columna Derecha #}
+
+                            </div> {# Fin designer-wrapper #}
+
+                            {# Botones de Acción del Formulario (Guardar/Cancelar) #}
+                            <div class="ln_solid mt-4"></div>
+                            <div class="item form-group">
+                                <div class="col-md-6 col-sm-6 offset-md-3 text-center"> {# Centrar botones #}
+                                    <button type="submit" class="btn btn-success"><i class="fa fa-save"></i> Guardar Plantilla</button>
+                                    <button type="button" class="btn btn-info" id="previewButton"
+                                        data-preview-url="{% url 'preview_plantilla_boleta' %}"> {# <-- URL aquí #}
+                                        <i class="fa fa-eye"></i> Previsualizar
+                                    </button>                                    
+                                    <a href="{% url 'lista_plantillas_boleta' %}" class="btn btn-secondary">Cancelar</a> {# Botón secundario #}
+                                </div>
+                            </div>
+                        </form> {# Fin Formulario Principal #}
+                    </div> {# Fin x_content #}
+                    <div class="modal fade" id="previewModal" tabindex="-1" role="dialog" aria-labelledby="previewModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg" role="document"> {# modal-lg para más espacio #}
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="previewModalLabel">Previsualización de Boleta</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">×</span>
+                              </button>
+                            </div>
+                            <div class="modal-body" id="previewModalBody" style="min-height: 400px; background-color: #eee;">
+                              {# Aquí se cargará el HTML de la previsualización #}
+                              Cargando previsualización...
+                            </div>
+                            <div class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+                            </div>
+                          </div>
+                        </div>
+                    </div>
+                      
+                </div> {# Fin x_panel #}
+            </div> {# Fin col-md-12 #}
+        </div> {# Fin row #}
+    </div> {# Fin container (div vacío inicial) #}
+</div> {# Fin right_col #}
+
+{# Tag script para pasar datos JSON de forma segura #}
+<script id="django-to-js-data" type="application/json">
+    {
+        "plantillaDiseñoJSONString": "{{ datos_diseno_json_actual|escapejs }}",
+        "placeholdersDisponiblesJSONString": "{{ placeholders_disponibles_json|escapejs }}"
+    }
+</script>
+{% endblock %} {# Fin block content #}
+
+{% block extra_js %}
+    {# Cargar Fabric.js (local o CDN) #}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/4.5.0/fabric.min.js"></script>
+    {# Cargar tu script del diseñador #}
+    <script src="{% static 'boletas/js/disenador_boleta.js' %}"></script>
+{% endblock %}

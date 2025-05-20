@@ -2,8 +2,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('seleccionar_tipo/', views.seleccionar_tipo_planilla, name='seleccionar_tipo_planilla'),
-    path('crear/<str:tipo>/', views.crear_planilla, name='crear_planilla'),
+    path('bono_te/crear/', views.crear_planilla_bono_te, name='crear_planilla_bono_te'),
     path('lista/', views.lista_planillas, name='lista_planillas'),
     path('editar/<int:planilla_id>/', views.editar_planilla, name='editar_planilla'),  # Nueva URL para editar
     path('borrar/<int:planilla_id>/', views.borrar_planilla, name='borrar_planilla'),  # Nueva URL para borrar

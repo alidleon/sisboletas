@@ -22,7 +22,8 @@ from calendar import month_name
 from openpyxl.drawing.image import Image
 
 from django.db import transaction, IntegrityError       # Para transacciones y manejo de errores BD
-from django.db.models import Q   
+from django.db.models import Q  
+ 
 
 # --- Importaciones de Modelos Originales ---
 from .models import (
@@ -62,7 +63,7 @@ logger = logging.getLogger(__name__)
 
 
 
-from .forms import DetalleBonoTeForm, PlanillaForm
+from .forms import DetalleBonoTeForm, PlanillaForm, EditarPlanillaForm
 
 # --- ¡IMPORTANTE! Importar Modelos de Reportes ---
 try:
@@ -104,257 +105,173 @@ EXTERNAL_TYPE_MAP = {
         'contrato': 'CONTRATO',
         'consultor': 'CONSULTOR EN LINEA',
     }
+# planilla/views.py
+
+import logging # Asegúrate de tener logging importado
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.db import transaction, IntegrityError
+from django.contrib import messages
+from django.utils import timezone # Para fecha_elaboracion
+from django.core.exceptions import ValidationError # Para capturar del modelo
+
+# Importa tus modelos locales
+from .models import Planilla, DetalleBonoTe
+# (Si usas PrincipalDesignacionExterno directamente aquí, impórtalo también)
+# from .models import PrincipalPersonalExterno, PrincipalDesignacionExterno, ...
+
+# Importa tu formulario modificado
+from .forms import PlanillaForm # ¡Asegúrate de que sea el PlanillaForm modificado!
+
+# Importa modelos de la app 'reportes'
+try:
+    from reportes.models import PlanillaAsistencia, DetalleAsistencia
+    REPORTES_APP_AVAILABLE = True
+except ImportError:
+    PlanillaAsistencia, DetalleAsistencia = None, None
+    REPORTES_APP_AVAILABLE = False
+    # Considera logging.error o un mensaje si esta app es crítica para la funcionalidad
+
+logger = logging.getLogger(__name__)
+
+# Ya no se necesita EXTERNAL_TYPE_MAP aquí si el tipo viene de PlanillaAsistencia
+# EXTERNAL_TYPE_MAP = { ... }
+
+# planilla/views.py
+# ... (importaciones como en el mensaje anterior) ...
+
 @login_required
-def crear_planilla(request, tipo):
-    """
-    Crea la Planilla (Bono TE) y sus Detalles, obteniendo los datos
-    de asistencia desde un Reporte de Asistencia validado.
-    """
-    # Verificar disponibilidad de apps externas
+def crear_planilla_bono_te(request):
     if not REPORTES_APP_AVAILABLE:
-        messages.error(request, "Error interno: La funcionalidad de reportes de asistencia no está disponible.")
-        return redirect('seleccionar_tipo_planilla') # O a un home
+        messages.error(request, "Error crítico: La funcionalidad de reportes de asistencia no está disponible.")
+        return redirect('lista_planillas')
 
-    if tipo not in EXTERNAL_TYPE_MAP:
-        messages.error(request, f"Tipo de planilla '{tipo}' no es válido.")
-        return redirect('seleccionar_tipo_planilla')
-
-    # Consultar planillas para copiar (sin cambios)
-    try:
-        planillas_para_copiar = Planilla.objects.filter(tipo=tipo).order_by('-anio', '-mes')
-    except Exception as e_qs:
-         logger.error(f"Error obteniendo 'planillas_para_copiar' para {tipo}: {e_qs}", exc_info=True)
-         messages.error(request, "Error interno preparando formulario (copia).")
-         return redirect('lista_planillas') # Redirigir a lista principal Bono TE
-
+    # Obtener el tipo_filtro de los parámetros GET de la URL actual
+    tipo_filtro_seleccionado = request.GET.get('tipo_filtro', None)
 
     if request.method == 'POST':
-        planilla_form = PlanillaForm(request.POST)
+        # Al hacer POST, instanciamos el form con los datos POST
+        # y también con el tipo_filtro que se usó para renderizar el form (por si lo necesitamos para re-renderizar con errores)
+        form = PlanillaForm(request.POST, tipo_filtro=tipo_filtro_seleccionado) # tipo_filtro para __init__
+        if form.is_valid():
+            selected_pa_base = form.cleaned_data['planilla_asistencia_base_selector']
+            dias_habiles_ingresados = form.cleaned_data['dias_habiles']
+            
+            mes_derivado = selected_pa_base.mes
+            anio_derivado = selected_pa_base.anio
+            tipo_planilla_derivado = selected_pa_base.tipo # El tipo REAL de la planilla de bono
 
-        if planilla_form.is_valid():
-            mes = planilla_form.cleaned_data['mes']
-            anio = planilla_form.cleaned_data['anio']
-
-            # Validación Duplicados Planilla Bono TE (sin cambios)
-            if Planilla.objects.filter(mes=mes, anio=anio, tipo=tipo).exists():
-                messages.warning(request, f"¡Atención! Ya existe planilla Bono TE '{dict(Planilla.TIPO_CHOICES).get(tipo)}' para {mes}/{anio}.")
-                # ... (renderizar de nuevo el form con error) ...
-                context_duplicado = {
-                    'planilla_form': planilla_form, 'tipo': tipo,
-                    'planillas_para_copiar': planillas_para_copiar, 'error_duplicado': True
+            # --- Comprobación adicional: si el tipo derivado no coincide con el filtro (no debería pasar si el form está bien) ---
+            if tipo_filtro_seleccionado and tipo_planilla_derivado != tipo_filtro_seleccionado:
+                messages.error(request, "Error: El tipo de la planilla de asistencia seleccionada no coincide con el tipo filtrado.")
+                # Re-renderizar con el formulario (que ya tendrá el tipo_filtro de la request.GET)
+                # O podrías forzar de nuevo el tipo_filtro al form aquí:
+                form_con_error = PlanillaForm(request.POST, tipo_filtro=tipo_filtro_seleccionado) # Reinstanciar con el filtro original
+                context_error = {
+                    'planilla_form': form_con_error,
+                    'tipos_planilla_choices': Planilla.TIPO_CHOICES, # Para el selector de filtro
+                    'tipo_filtro_actual': tipo_filtro_seleccionado,
+                    'titulo_vista': f"Crear Planilla Bono TE (Filtrado por: {dict(Planilla.TIPO_CHOICES).get(tipo_filtro_seleccionado,'Todos') if tipo_filtro_seleccionado else 'Todos los Tipos'})"
                 }
-                return render(request, 'planillas/crear_planilla.html', context_duplicado)
+                return render(request, 'planillas/crear_planilla.html', context_error)
+            # --- Fin comprobación ---
 
-            # --- INICIO: Lógica de Integración con Reportes ---
-            plan_asistencia_validada = None
+            # ... (resto de la lógica POST para crear Planilla y DetalleBonoTe, SIN CAMBIOS desde el mensaje anterior) ...
+            # ... (bloque try-except con transaction.atomic, etc.) ...
+            # INICIO LÓGICA POST (copiada y verificada del mensaje anterior)
+            plan_asistencia_validada = selected_pa_base
             detalles_asistencia_dict = {}
-
             try:
-                # 1. Buscar PlanillaAsistencia VALIDADA para el mismo periodo/tipo
-                plan_asistencia_validada = PlanillaAsistencia.objects.get(
-                    mes=mes,
-                    anio=anio,
-                    tipo=tipo,
-                    estado='validado' # ¡Solo usar las validadas!
-                )
-                logger.info(f"Encontrada PlanillaAsistencia validada ID {plan_asistencia_validada.id} para {tipo} {mes}/{anio}.")
-
-                # 2. Cargar sus Detalles de Asistencia en un diccionario para búsqueda rápida
                 detalles_asist_qs = DetalleAsistencia.objects.filter(planilla_asistencia=plan_asistencia_validada)
-                # Usamos personal_externo_id como clave
-                detalles_asistencia_dict = {da.personal_externo_id: da for da in detalles_asist_qs if da.personal_externo_id}
-                logger.info(f"Cargados {len(detalles_asistencia_dict)} detalles de asistencia desde el reporte validado.")
-
-            except PlanillaAsistencia.DoesNotExist:
-                # --- Manejo de Error: Reporte No Encontrado o No Validado ---
-                # Usaremos la Opción A (Estricta): Impedir creación.
-                logger.error(f"No se encontró un Reporte de Asistencia VALIDADO para {tipo} {mes}/{anio}.")
-                messages.error(request, f"¡Error! No se encontró un Reporte de Asistencia 'Validado' para el periodo {mes}/{anio} y tipo '{dict(PlanillaAsistencia.TIPO_CHOICES).get(tipo)}'. "
-                                         f"Por favor, cree y valide el reporte de asistencia antes de generar la planilla de Bono TE.")
-                # Volver a mostrar el formulario de creación de Bono TE
-                context_error_asistencia = {
-                    'planilla_form': planilla_form, 'tipo': tipo,
-                    'planillas_para_copiar': planillas_para_copiar
+                detalles_asistencia_dict = {
+                    da.personal_externo_id: da for da in detalles_asist_qs if da.personal_externo_id is not None
                 }
-                return render(request, 'planillas/crear_planilla.html', context_error_asistencia)
-
+                logger.info(f"Cargados {len(detalles_asistencia_dict)} detalles de asistencia desde la PlanillaAsistencia ID {plan_asistencia_validada.id}.")
             except Exception as e_asist:
-                logger.error(f"Error inesperado buscando/cargando datos de asistencia para {tipo} {mes}/{anio}: {e_asist}", exc_info=True)
-                messages.error(request, f"Ocurrió un error al intentar obtener los datos de asistencia validados: {e_asist}")
-                context_error_asistencia = {
-                    'planilla_form': planilla_form, 'tipo': tipo,
-                    'planillas_para_copiar': planillas_para_copiar
-                }
-                return render(request, 'planillas/crear_planilla.html', context_error_asistencia)
-            # --- FIN: Lógica de Integración con Reportes ---
+                logger.error(f"Error inesperado cargando detalles de asistencia de PA ID {plan_asistencia_validada.id}: {e_asist}", exc_info=True)
+                messages.error(request, f"Ocurrió un error al obtener los detalles de la asistencia seleccionada: {e_asist}")
+                context_error = {'planilla_form': PlanillaForm(request.POST, tipo_filtro=tipo_filtro_seleccionado), 'titulo_vista': "Crear Planilla Bono TE", 'tipos_planilla_choices': Planilla.TIPO_CHOICES, 'tipo_filtro_actual': tipo_filtro_seleccionado}
+                return render(request, 'planillas/crear_planilla.html', context_error)
 
-
-            # Si llegamos aquí, tenemos plan_asistencia_validada y detalles_asistencia_dict listos
-
-            # Iniciar Proceso de Creación Planilla Bono TE
             try:
                 with transaction.atomic(using='default'):
-                    # 1. Crear Planilla (Cabecera Bono TE)
-                    planilla_bonote = planilla_form.save(commit=False)
-                    planilla_bonote.usuario_elaboracion = request.user
-                    planilla_bonote.tipo = tipo
-                    # ¡Importante! Guardar primero la cabecera para tener su PK
+                    planilla_bonote = Planilla(
+                        planilla_asistencia_base=plan_asistencia_validada,
+                        mes=mes_derivado,
+                        anio=anio_derivado,
+                        tipo=tipo_planilla_derivado,
+                        dias_habiles=dias_habiles_ingresados,
+                        estado='pendiente',
+                        usuario_elaboracion=request.user,
+                        fecha_elaboracion=timezone.now().date()
+                    )
+                    planilla_bonote.full_clean()
                     planilla_bonote.save()
-                    logger.info(f"Creada Planilla (Bono TE) ID {planilla_bonote.id} para {tipo} {mes}/{anio}.")
+                    logger.info(f"Creada Planilla (Bono TE) ID {planilla_bonote.id} para PA Base ID {plan_asistencia_validada.id}.")
 
-                    # 2. Consultar Personal Externo (igual que antes)
-                    target_external_type = EXTERNAL_TYPE_MAP.get(tipo)
-                    logger.info(f"Consultando personal externo ACTIVO tipo '{target_external_type}' en 'personas_db'...")
-                    designaciones_externas_filtradas = []
-                    try:
-                        consulta_externa = PrincipalDesignacionExterno.objects.using('personas_db') \
-                            .select_related('personal') \
-                            .filter(
-                                tipo_designacion=target_external_type,
-                                estado='ACTIVO'
-                            ) \
-                            .order_by('personal__apellido_paterno', 'personal__apellido_materno', 'personal__nombre')
-                        designaciones_externas_filtradas = list(consulta_externa)
-                        logger.info(f"Consulta externa Bono TE ejecutada. Encontradas: {len(designaciones_externas_filtradas)}")
-                    except Exception as e_ext:
-                        logger.error(f"Error CRÍTICO consultando 'personas_db' para Bono TE ({tipo} {mes}/{anio}): {e_ext}", exc_info=True)
-                        # Rollback ocurrirá, pero es bueno poner mensaje específico
-                        messages.error(request, f"Se creó cabecera Bono TE (ID:{planilla_bonote.id}), pero ERROR al consultar personal externo: {e_ext}.")
-                        raise e_ext # Re-lanzar para rollback
-
-                    # 3. Crear Detalles Bono TE usando Datos de Asistencia
                     detalles_bonote_a_crear = []
-                    personas_procesadas = set()
-                    personas_sin_asistencia = [] # Para reportar al final
-
-                    if not designaciones_externas_filtradas:
-                        messages.warning(request, f"Planilla Bono TE creada (ID: {planilla_bonote.id}), pero no se encontró personal externo ACTIVO para el tipo '{dict(Planilla.TIPO_CHOICES).get(tipo)}'.")
+                    if not detalles_asistencia_dict:
+                        messages.warning(request, f"Planilla Bono TE creada (ID: {planilla_bonote.id}), pero la Planilla de Asistencia base seleccionada no contenía detalles de personal.")
                     else:
-                        logger.info(f"Preparando {len(designaciones_externas_filtradas)} potenciales registros DetalleBonoTe...")
-                        for designacion in designaciones_externas_filtradas:
-                            if designacion.personal and designacion.personal.id not in personas_procesadas:
-                                personal_id_actual = designacion.personal.id
-                                personas_procesadas.add(personal_id_actual)
-
-                                # --- Buscar datos de asistencia para esta persona ---
-                                detalle_asistencia_origen = detalles_asistencia_dict.get(personal_id_actual)
-
-                                if detalle_asistencia_origen:
-                                    # --- Crear DetalleBonoTe COPIANDO datos ---
-                                    detalle_bt = DetalleBonoTe(
-                                        id_planilla=planilla_bonote,
-                                        personal_externo_id=personal_id_actual,
-                                        mes=planilla_bonote.mes, # Heredar mes de la planilla Bono TE
-
-                                        # Copiar campos de asistencia
-                                        faltas=detalle_asistencia_origen.faltas_dias, # Nombre puede diferir
-                                        vacacion=detalle_asistencia_origen.vacacion,
-                                        viajes=detalle_asistencia_origen.viajes,
-                                        bajas_medicas=detalle_asistencia_origen.bajas_medicas,
-                                        pcgh=detalle_asistencia_origen.pcgh,
-                                        psgh=detalle_asistencia_origen.psgh, # Nombre coincide
-                                        perm_excep=detalle_asistencia_origen.perm_excep,
-                                        asuetos=detalle_asistencia_origen.asuetos,
-                                        pcgh_embar_enf_base=detalle_asistencia_origen.pcgh_embar_enf_base,
-                                        abandono_dias=detalle_asistencia_origen.abandono_dias, # Nombre coincide
-                                        observaciones_asistencia=detalle_asistencia_origen.observaciones,
-
-                                        # Campos específicos de Bono TE (inicializar o dejar default)
-                                        descuentos=Decimal('0'), # O si tienes otra lógica
-                                        # Los campos calculados (dias_no_pagados, etc.) se calcularán después
-                                    )
-                                    detalles_bonote_a_crear.append(detalle_bt)
-                                else:
-                                    # --- Manejo si NO se encontró asistencia para esta persona ---
-                                    logger.warning(f"No se encontró DetalleAsistencia para personal_id {personal_id_actual} en el reporte validado. Se omitirá o creará con ceros para Bono TE.")
-                                    personas_sin_asistencia.append(f"{designacion.personal.nombre_completo} (ID: {personal_id_actual})")
-                                    # DECISIÓN: ¿Qué hacer?
-                                    # Opción 1: Omitir (no añadir a detalles_bonote_a_crear)
-                                    # Opción 2: Crear con ceros (como hacía antes)
-                                    # detalle_bt = DetalleBonoTe(
-                                    #     id_planilla=planilla_bonote,
-                                    #     personal_externo_id=personal_id_actual,
-                                    #     mes=planilla_bonote.mes,
-                                    #     # ... todos los campos de asistencia en 0 ...
-                                    # )
-                                    # detalles_bonote_a_crear.append(detalle_bt)
-                                    # Por ahora, OMITIREMOS para ser consistentes con la obligatoriedad del reporte.
-
-                            elif not designacion.personal:
-                                 logger.warning(f"Designación Externa ID {designacion.id} sin personal. Se omite para Bono TE.")
-
-                        # --- Fin Bucle ---
-
-                        if personas_sin_asistencia:
-                             # Mensaje de advertencia si algunas personas no tenían asistencia
-                             msg_adv = f"Se procesaron {len(detalles_bonote_a_crear)} registros. ADVERTENCIA: No se encontraron datos de asistencia validados para las siguientes personas (no se incluyeron en Bono TE): {', '.join(personas_sin_asistencia[:5])}"
-                             if len(personas_sin_asistencia) > 5:
-                                 msg_adv += f" y {len(personas_sin_asistencia) - 5} más."
-                             messages.warning(request, msg_adv)
+                        logger.info(f"Preparando {len(detalles_asistencia_dict)} registros DetalleBonoTe desde la asistencia base...")
+                        for personal_id_asistencia, detalle_asistencia_origen in detalles_asistencia_dict.items():
+                            detalle_bt = DetalleBonoTe(
+                                id_planilla=planilla_bonote,
+                                personal_externo_id=personal_id_asistencia,
+                                mes=planilla_bonote.mes,
+                                faltas=getattr(detalle_asistencia_origen, 'faltas_dias', 0),
+                                vacacion=getattr(detalle_asistencia_origen, 'vacacion', 0),
+                                viajes=getattr(detalle_asistencia_origen, 'viajes', 0),
+                                bajas_medicas=getattr(detalle_asistencia_origen, 'bajas_medicas', 0),
+                                pcgh=getattr(detalle_asistencia_origen, 'pcgh', 0),
+                                psgh=getattr(detalle_asistencia_origen, 'psgh', 0),
+                                perm_excep=getattr(detalle_asistencia_origen, 'perm_excep', 0),
+                                asuetos=getattr(detalle_asistencia_origen, 'asuetos', 0),
+                                pcgh_embar_enf_base=getattr(detalle_asistencia_origen, 'pcgh_embar_enf_base', 0),
+                                abandono_dias=getattr(detalle_asistencia_origen, 'abandono_dias', 0),
+                                observaciones_asistencia=getattr(detalle_asistencia_origen, 'observaciones', ''),
+                            )
+                            detalles_bonote_a_crear.append(detalle_bt)
 
                         if detalles_bonote_a_crear:
-                            logger.info(f"Intentando crear {len(detalles_bonote_a_crear)} registros DetalleBonoTe en lote...")
-                            try:
-                                # --- Crear en Lote (SIN llamar a save/calcular_valores) ---
-                                DetalleBonoTe.objects.bulk_create(detalles_bonote_a_crear)
-                                logger.info(f"Creados {len(detalles_bonote_a_crear)} registros DetalleBonoTe para Planilla {planilla_bonote.id}.")
-
-                                # --- ¡PASO ADICIONAL IMPORTANTE! ---
-                                # Recalcular valores para los detalles recién creados
-                                logger.info(f"Recalculando valores para {len(detalles_bonote_a_crear)} detalles Bono TE...")
-                                detalles_creados_ids = [d.id for d in detalles_bonote_a_crear] # Obtener IDs si bulk_create no los retorna directamente
-                                # Si bulk_create retorna objetos (depende de BD y versión Django):
-                                # detalles_creados = detalles_bonote_a_crear
-                                # Si no, necesitamos recuperarlos:
-                                detalles_creados = DetalleBonoTe.objects.filter(id_planilla=planilla_bonote) # O filtrar por IDs
-
-                                detalles_a_actualizar = []
-                                for detalle_bt in detalles_creados:
-                                    detalle_bt.calcular_valores() # Calcula los campos
-                                    detalles_a_actualizar.append(detalle_bt)
-
-                                # Actualizar en lote los campos calculados
-                                campos_a_actualizar = ['dias_no_pagados', 'dias_pagados', 'total_ganado', 'liquido_pagable']
-                                DetalleBonoTe.objects.bulk_update(detalles_a_actualizar, campos_a_actualizar)
-                                logger.info(f"Valores recalculados y actualizados para {len(detalles_a_actualizar)} detalles Bono TE.")
-                                # ---------------------------------------
-
-                                messages.success(request, f"Planilla Bono TE {dict(Planilla.TIPO_CHOICES).get(tipo)} {mes}/{anio} creada con {len(detalles_bonote_a_crear)} registros usando datos de asistencia validados.")
-
-                            except IntegrityError as e_bulk:
-                                logger.error(f"Error integridad ({e_bulk}) al crear DetalleBonoTe.", exc_info=True)
-                                messages.error(request, f"Se creó cabecera Bono TE, ERROR al guardar detalles ({e_bulk}).")
-                                raise e_bulk # Rollback
-                            # ... (otros manejos de error para bulk_create/bulk_update) ...
+                            DetalleBonoTe.objects.bulk_create(detalles_bonote_a_crear)
+                            logger.info(f"Creados {len(detalles_bonote_a_crear)} registros DetalleBonoTe para Planilla {planilla_bonote.id}.")
+                            detalles_creados_para_recalculo = DetalleBonoTe.objects.filter(id_planilla=planilla_bonote)
+                            detalles_a_actualizar_con_calculos = []
+                            for detalle_bt_creado in detalles_creados_para_recalculo:
+                                detalle_bt_creado.calcular_valores()
+                                detalles_a_actualizar_con_calculos.append(detalle_bt_creado)
+                            campos_calculados = ['dias_no_pagados', 'dias_pagados', 'total_ganado', 'liquido_pagable']
+                            DetalleBonoTe.objects.bulk_update(detalles_a_actualizar_con_calculos, campos_calculados)
+                            logger.info(f"Valores recalculados y actualizados para {len(detalles_a_actualizar_con_calculos)} detalles Bono TE.")
+                            messages.success(request, f"Planilla Bono TE ({planilla_bonote.get_tipo_display()} {planilla_bonote.mes}/{planilla_bonote.anio}) creada exitosamente con {len(detalles_bonote_a_crear)} registros, basada en la asistencia seleccionada.")
                         else:
-                             logger.warning(f"No se prepararon detalles DetalleBonoTe (posiblemente por falta de asistencia para todos).")
-                             if not personas_sin_asistencia: # Si no hubo advertencia previa
-                                 messages.warning(request, "Planilla Bono TE creada, pero no se preparó ningún detalle individual (verificar logs).")
+                             messages.warning(request, f"Planilla Bono TE creada, pero no se generaron detalles.")
+                return redirect('lista_planillas')
+            except ValidationError as e_model_validation:
+                logger.warning(f"Error de validación del modelo al crear Planilla Bono TE: {e_model_validation.message_dict}")
+                for field, errors in e_model_validation.message_dict.items():
+                    form_field_name = 'planilla_asistencia_base_selector' if field == 'planilla_asistencia_base' else field
+                    for error_msg in errors:
+                        form.add_error(form_field_name, error_msg) # El form aquí es el request.POST
+            except IntegrityError as e_db_integrity:
+                logger.error(f"Error de integridad en la BD al crear Planilla/Detalles Bono TE: {e_db_integrity}", exc_info=True)
+                form.add_error(None, f"Error de base de datos. ({e_db_integrity})")
+            except Exception as e_general_processing:
+                 logger.error(f"Error general procesando la creación: {e_general_processing}", exc_info=True)
+                 form.add_error(None, f"Error inesperado: {e_general_processing}")
+            # Si hubo error, 'form' (el de request.POST) ahora tiene los errores y se re-renderizará abajo.
+    else: # GET request
+        # Instanciar el formulario pasando el tipo_filtro para que __init__ lo use
+        form = PlanillaForm(tipo_filtro=tipo_filtro_seleccionado)
 
-                # Si se llega aquí, la transacción fue exitosa
-                return redirect('lista_planillas') # Redirigir a lista Bono TE
-
-            except Exception as e_proc:
-                 logger.error(f"Error procesando creación planilla Bono TE {tipo} {mes}/{anio} (post-asistencia): {e_proc}", exc_info=True)
-                 if not messages.get_messages(request):
-                      messages.error(request, f"Ocurrió un error inesperado durante la creación del Bono TE: {e_proc}")
-                 # Rollback ocurrió automáticamente
-                 # ¿Redirigir a lista o mostrar form de nuevo? Lista es más seguro.
-                 return redirect('lista_planillas')
-
-        else: # Formulario POST NO válido
-            logger.warning(f"Formulario creación Planilla Bono TE inválido: {planilla_form.errors.as_json()}")
-            messages.error(request, "Formulario contiene errores. Corrígelos.")
-
-    else: # GET
-        planilla_form = PlanillaForm() # Formulario vacío
-
-    context_final = {
-        'planilla_form': planilla_form,
-        'tipo': tipo,
-        'planillas_para_copiar': planillas_para_copiar
+    context = {
+        'planilla_form': form,
+        'tipos_planilla_choices': Planilla.TIPO_CHOICES, # Para el selector de filtro
+        'tipo_filtro_actual': tipo_filtro_seleccionado,  # Para mantener el estado del filtro en el template
+        'titulo_vista': f"Crear Planilla Bono TE (Filtrando por: {dict(Planilla.TIPO_CHOICES).get(tipo_filtro_seleccionado,'Todos los Tipos') if tipo_filtro_seleccionado else 'Todos los Tipos'})"
     }
-    return render(request, 'planillas/crear_planilla.html', context_final)
+    return render(request, 'planillas/crear_planilla.html', context)
 
 
 @login_required
@@ -488,19 +405,65 @@ def borrar_bono_te(request, detalle_id):
 
 @login_required
 def editar_planilla(request, planilla_id):
-    # Sin cambios si solo edita Planilla
-    planilla = get_object_or_404(Planilla, pk=planilla_id)
+    # Obtener la instancia de la planilla que se va a editar
+    planilla_instancia = get_object_or_404(Planilla, pk=planilla_id)
+
+    # Opcional: Lógica para restringir la edición basada en el estado actual
+    # if planilla_instancia.estado == 'aprobado':
+    #     messages.error(request, "No se puede editar una planilla que ya ha sido aprobada.")
+    #     return redirect('lista_planillas')
+
     if request.method == 'POST':
-        form = PlanillaForm(request.POST, instance=planilla)
+        # Crear una instancia del formulario con los datos del POST y la instancia de la planilla
+        form = EditarPlanillaForm(request.POST, instance=planilla_instancia)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Planilla editada correctamente.')
-            return redirect('lista_planillas')
+            try:
+                # Guardar los cambios en la planilla
+                planilla_editada = form.save(commit=False)
+                
+                # Lógica adicional si la edición de 'dias_habiles' debe recalcular detalles:
+                # Esto es CRUCIAL. Si cambias dias_habiles, los DetalleBonoTe deben recalcularse.
+                if 'dias_habiles' in form.changed_data:
+                    logger.info(f"Días hábiles cambiados para Planilla ID {planilla_editada.id}. Se recalcularán los detalles.")
+                    # Necesitas guardar la planilla_editada primero para que los detalles tengan la FK correcta
+                    # y los nuevos días hábiles.
+                    planilla_editada.save() # Guardar cabecera primero
+
+                    detalles_a_recalcular = DetalleBonoTe.objects.filter(id_planilla=planilla_editada)
+                    detalles_a_actualizar_bulk = []
+                    for detalle in detalles_a_recalcular:
+                        detalle.calcular_valores() # Asume que calcular_valores() usa self.id_planilla.dias_habiles
+                        detalles_a_actualizar_bulk.append(detalle)
+                    
+                    if detalles_a_actualizar_bulk:
+                        campos_calculados = ['dias_no_pagados', 'dias_pagados', 'total_ganado', 'liquido_pagable']
+                        DetalleBonoTe.objects.bulk_update(detalles_a_actualizar_bulk, campos_calculados)
+                        logger.info(f"Recalculados {len(detalles_a_actualizar_bulk)} detalles para Planilla ID {planilla_editada.id}.")
+                    
+                    form.save_m2m() # Si tuvieras campos ManyToMany
+                else:
+                    planilla_editada.save() # Guardar si no hubo cambios en dias_habiles que requieran recalcular
+                    form.save_m2m()
+
+                messages.success(request, f'Planilla "{planilla_editada}" actualizada correctamente.')
+                return redirect('lista_planillas') # O a 'ver_detalles_bono_te' para esta planilla
+            except Exception as e:
+                logger.error(f"Error al guardar la planilla editada ID {planilla_instancia.id}: {e}", exc_info=True)
+                messages.error(request, f"Ocurrió un error al guardar los cambios: {e}")
         else:
+            # El formulario no es válido, se re-renderizará con errores
             messages.error(request, 'Por favor, corrige los errores en el formulario.')
-    else:
-        form = PlanillaForm(instance=planilla)
-    return render(request, 'planillas/editar_planilla.html', {'form': form, 'planilla': planilla})
+    else: # Método GET
+        # Crear una instancia del formulario con los datos de la planilla existente
+        form = EditarPlanillaForm(instance=planilla_instancia)
+
+    context = {
+        'form': form,
+        'planilla': planilla_instancia, # Pasar la instancia completa para mostrar datos no editables
+        'titulo_vista': f"Editar Planilla Bono TE: {planilla_instancia.mes}/{planilla_instancia.anio} ({planilla_instancia.get_tipo_display()})"
+    }
+    return render(request, 'planillas/editar_planilla.html', context)
+
 
 @login_required
 def borrar_planilla(request, planilla_id):

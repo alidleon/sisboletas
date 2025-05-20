@@ -85,7 +85,7 @@
 
                   <li><a><i class="fa fa-coffee"></i> Planillas Bono Té <span class="fa fa-chevron-down"></span></a>
                      <ul class="nav child_menu">
-                      <li><a href="{% url 'seleccionar_tipo_planilla' %}">Crear Planilla Bono</a></li>
+                      <li><a href="{% url 'crear_planilla_bono_te' %}">Crear Planilla Bono</a></li>
                       <li><a href="{% url 'lista_planillas' %}">Ver Planillas Bono</a></li>
                     </ul>
                   </li>
@@ -104,9 +104,9 @@
                   </li>
                   <li><a><i class="fa fa-file-text-o"></i> Boletas de Pago <span class="fa fa-chevron-down"></span></a>
                     <ul class="nav child_menu">
-                      <li><a href="#">Diseñar Boleta</a></li>
-                      <li><a href="#">Generar Boletas</a></li>
-                      <li><a href="#">Ver Boletas</a></li>
+                      <li><a href="{% url 'lista_plantillas_boleta' %}">Ver Plantillas</a></li>
+                      <li><a href="{% url 'crear_plantilla_boleta' %}">Diseñar Nueva Plantilla</a></li>
+                      <li><a href="#">Generar Boletas</a></li> {# Futura funcionalidad #}
                     </ul>
                   </li>
                 </ul>

@@ -1,0 +1,80 @@
+{% extends 'index_master.html' %}
+{% load static %}
+
+{% block title_suffix %} - Lista de Plantillas de Boleta{% endblock %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <div class="">
+        <div class="page-title">
+            <div class="title_left">
+                <h3>{{ titulo_pagina }}</h3>
+            </div>
+            <div class="title_right">
+                <div class="col-md-5 col-sm-5   form-group pull-right top_search">
+                    <a href="{% url 'crear_plantilla_boleta' %}" class="btn btn-success pull-right">
+                        <i class="fa fa-plus"></i> Crear Nueva Plantilla
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="clearfix"></div>
+
+        <div class="row">
+            <div class="col-md-12 col-sm-12 ">
+                <div class="x_panel">
+                    <div class="x_title">
+                        <h2>Listado</h2>
+                        <ul class="nav navbar-right panel_toolbox">
+                            <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                            <li><a class="close-link"><i class="fa fa-close"></i></a></li>
+                        </ul>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="x_content">
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible " role="alert">
+                                    <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button>
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+
+                        {% if plantillas %}
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Descripción</th>
+                                        <th>Predeterminada</th>
+                                        <th>Última Modificación</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for plantilla in plantillas %}
+                                    <tr>
+                                        <td>{{ plantilla.nombre }}</td>
+                                        <td>{{ plantilla.descripcion|truncatewords:10 }}</td>
+                                        <td>{% if plantilla.es_predeterminada %}<i class="fa fa-check-square-o text-success"></i> Sí{% else %}<i class="fa fa-square-o text-muted"></i> No{% endif %}</td>
+                                        <td>{{ plantilla.fecha_modificacion|date:"d/m/Y H:i" }}</td>
+                                        <td>
+                                            <a href="{% url 'editar_plantilla_boleta' plantilla.id %}" class="btn btn-info btn-xs"><i class="fa fa-pencil"></i> Editar </a>
+                                            <a href="#" class="btn btn-primary btn-xs"><i class="fa fa-eye"></i> Previsualizar</a> {# A futuro #}
+                                            <a href="{% url 'eliminar_plantilla_boleta' plantilla.id %}" class="btn btn-danger btn-xs"><i class="fa fa-trash-o"></i> Eliminar </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <p>No hay plantillas de boleta creadas todavía.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
