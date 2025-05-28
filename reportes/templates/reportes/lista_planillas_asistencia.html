@@ -1,38 +1,48 @@
-{% extends 'index_master.html' %} {# Ajusta si tu template base es diferente #}
-{% load static %} {# Necesario si usas {% static ... %} para CSS/JS #}
+{% extends 'index_master.html' %}
+{% load static %}
 
-{% block title %}Lista de Reportes de Asistencia{% endblock %}
+{% block title_suffix %} - Lista de Reportes de Asistencia{% endblock %} {# Ajustado para usar title_suffix de tu base #}
 
 {% block content %}
-<div class="right_col" role="main"> {# Manteniendo tu clase original #}
-    <h2>{% firstof titulo_pagina "Reportes de Asistencia" %}</h2>
-    <hr>
+<div class="right_col" role="main">
+    <div class="page-title"> {# Añadiendo estructura similar a tus otros templates #}
+        <div class="title_left">
+            <h3>{% firstof titulo_vista "Reportes de Asistencia" %}</h3> {# Usando titulo_vista si viene del contexto #}
+        </div>
+    </div>
+    <hr class="d-none d-sm-block"> {# Ocultar hr en móviles si page-title ya tiene espacio #}
+    <div class="clearfix"></div>
+
 
     {% if messages %}
         {% for message in messages %}
             <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
                 {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                {# Ajuste para Bootstrap 5 si btn-close es para eso, sino usa el de Gentelella/AdminLTE #}
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">×</span>
+                </button>
             </div>
         {% endfor %}
     {% endif %}
 
     {# Botón para ir a la vista de creación #}
     <div class="mb-3 text-end">
-        {# --- Sin cambios aquí, ya estaba correcto --- #}
+        {% if perms.reportes.add_planillaasistencia or user.is_superuser %}
         <a href="{% url 'crear_planilla_asistencia' %}" class="btn btn-success">
-            <i class="fas fa-plus"></i> Crear Nuevo Reporte
+            <i class="fa fa-plus"></i> Crear Nuevo Reporte {# Cambiado fas fa-plus a fa fa-plus por consistencia con tus otros íconos #}
         </a>
+        {% endif %}
     </div>
 
-    <div class="card">
+    <div class="card"> {# Usando card es un buen estilo moderno #}
         <div class="card-header">
             Lista de Reportes Generados
         </div>
         <div class="card-body">
             {% if planillas_asistencia %}
             <div class="table-responsive">
-                <table class="table table-striped table-hover table-sm">
+                <table class="table table-striped table-hover table-sm table-bordered"> {# Añadido table-bordered #}
                     <thead>
                         <tr>
                             <th>Periodo</th>
@@ -44,33 +54,44 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for planilla in planillas_asistencia %}
+                        {% for planilla_obj in planillas_asistencia %} {# Renombrado 'planilla' a 'planilla_obj' para evitar confusión con la app planilla #}
                         <tr>
-                            <td>{{ planilla.mes }}/{{ planilla.anio }}</td>
-                            <td>{{ planilla.get_tipo_display }}</td>
+                            <td>{{ planilla_obj.mes }}/{{ planilla_obj.anio }}</td>
+                            <td>{{ planilla_obj.get_tipo_display }}</td>
                             <td>
                                 <span class="badge rounded-pill
-                                    {% if planilla.estado == 'borrador' %} bg-secondary
-                                    {% elif planilla.estado == 'completo' %} bg-info text-dark
-                                    {% elif planilla.estado == 'validado' %} bg-success
-                                    {% elif planilla.estado == 'rechazado' %} bg-danger
-                                    {% elif planilla.estado == 'archivado' %} bg-dark
+                                    {% if planilla_obj.estado == 'borrador' %} bg-secondary
+                                    {% elif planilla_obj.estado == 'completo' %} bg-info text-dark
+                                    {% elif planilla_obj.estado == 'validado' %} bg-success
+                                    {% elif planilla_obj.estado == 'rechazado' %} bg-danger
+                                    {% elif planilla_obj.estado == 'archivado' %} bg-dark
                                     {% else %} bg-light text-dark {% endif %}">
-                                    {{ planilla.get_estado_display }}
+                                    {{ planilla_obj.get_estado_display }}
                                 </span>
                             </td>
-                            <td>{{ planilla.fecha_creacion|date:"d/m/Y H:i" }}</td>
-                            <td>{{ planilla.usuario_creacion.username|default:"Sistema" }}</td>
-                            <td>
-                                {# --- CAMBIO AQUÍ --- #}
-                                {# Enlace a la nueva vista ver_detalles_asistencia #}
-                                
-                                <a href="{% url 'ver_detalles_asistencia' planilla.pk %}" class="btn btn-sm btn-info" title="Ver Detalles Bono TE"><i class="fa fa-eye"></i></a>
+                            <td>{{ planilla_obj.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                            <td>{{ planilla_obj.usuario_creacion.username|default:"Sistema" }}</td>
+                            <td class="text-nowrap"> {# Para que los botones no se partan en dos líneas #}
+                                {# Botón Ver Detalles #}
+                                {% if perms.reportes.view_planillaasistencia or user.is_superuser %}
+                                <a href="{% url 'ver_detalles_asistencia' planilla_obj.pk %}" class="btn btn-sm btn-info" title="Ver Detalles del Reporte">
+                                    <i class="fa fa-eye"></i>
+                                </a>
+                                {% endif %}
 
+                                {# Botón Editar Cabecera/Planilla #}
+                                {% if perms.reportes.change_planillaasistencia or user.is_superuser %}
+                                <a href="{% url 'editar_planilla_asistencia' planilla_obj.pk %}" class="btn btn-sm btn-primary" title="Editar Reporte">
+                                    <i class="fa fa-edit"></i>
+                                </a>
+                                {% endif %}
 
-                                {# --- Sin cambios en estos botones --- #}
-                                <a href="{% url 'editar_planilla_asistencia' planilla.pk %}" class="btn btn-sm btn-primary" title="Editar Cabecera"><i class="fa fa-edit"></i></a>
-                                <a href="{% url 'borrar_planilla_asistencia' planilla.pk %}" class="btn btn-sm btn-danger" title="Borrar Planilla"><i class="fa fa-trash"></i></a>
+                                {# Botón Borrar Planilla #}
+                                {% if perms.reportes.delete_planillaasistencia or user.is_superuser %}
+                                <a href="{% url 'borrar_planilla_asistencia' planilla_obj.pk %}" class="btn btn-sm btn-danger" title="Borrar Reporte" onclick="return confirm('¿Está seguro que desea eliminar este reporte de asistencia?');">
+                                    <i class="fa fa-trash"></i>
+                                </a>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}

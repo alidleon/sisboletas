@@ -1,0 +1,113 @@
+{% extends 'index_master.html' %}
+{% load static %} {# Si usas la etiqueta static para la foto, por ejemplo #}
+
+{% block content %}
+<div class="right_col" role="main">
+    <div class="page-title">
+        <div class="title_left">
+            <h3>{{ titulo_vista }}</h3>
+        </div>
+    </div>
+    <div class="clearfix"></div>
+
+    {% if messages %}
+        {# ... (bloque de mensajes) ... #}
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-12 col-sm-12">
+            <div class="x_panel">
+                <div class="x_title">
+                    <h2>Información del Usuario</h2>
+                    <ul class="nav navbar-right panel_toolbox">
+                        <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                    </ul>
+                    <div class="clearfix"></div>
+                </div>
+                <div class="x_content">
+                    <div class="row">
+                        {# Columna para la foto y acciones principales #}
+                        <div class="col-md-3 col-sm-4">
+                            <h4>Foto de Perfil</h4>
+                            {% if perfil_detalle.foto %}
+                                <img src="{{ perfil_detalle.foto.url }}" alt="Foto de {{ usuario_detalle.username }}" class="img-fluid img-thumbnail mb-3" style="max-height: 200px;">
+                            {% else %}
+                                <p>No hay foto de perfil disponible.</p>
+                                {# Puedes poner una imagen placeholder si quieres #}
+                                {# <img src="{% static 'images/default_avatar.png' %}" alt="Avatar por defecto" class="img-fluid img-thumbnail mb-3" style="max-height: 200px;"> #}
+                            {% endif %}
+                            
+                            {% if puede_editar_este_usuario %}
+                                <a href="{% url 'editar_usuario' usuario_detalle.id %}" class="btn btn-info btn-block mb-2">
+                                    <i class="fa fa-pencil"></i> Editar Usuario
+                                </a>
+                            {% endif %}
+
+                            {% if puede_eliminar_este_usuario %}
+                               
+                                <a href="{% url 'eliminar_usuario' usuario_detalle.id %}" class="btn btn-danger btn-block mb-2">
+                                    <i class="fa fa-trash"></i> Eliminar Usuario
+                                </a>
+                            {% endif %}
+
+                            <a href="{% url 'lista_usuarios' %}" class="btn btn-secondary btn-block">
+                                <i class="fa fa-arrow-left"></i> Volver a la Lista
+                            </a>
+                        </div>
+
+                        {# Columna para los detalles del usuario y perfil #}
+                        <div class="col-md-9 col-sm-8">
+                            <h4>Datos de la Cuenta</h4>
+                            <table class="table table-striped">
+                                <tbody>
+                                    <tr><th scope="row" style="width:30%;">Username:</th><td>{{ usuario_detalle.username }}</td></tr>
+                                    <tr><th scope="row">Email:</th><td>{{ usuario_detalle.email|default:"N/A" }}</td></tr>
+                                    <tr><th scope="row">Estado:</th>
+                                        <td>
+                                            {% if usuario_detalle.is_active %}
+                                                <span class="badge badge-success">Activo</span>
+                                            {% else %}
+                                                <span class="badge badge-danger">Inactivo (Dado de Baja)</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr><th scope="row">Staff (Acceso Admin Django):</th>
+                                        <td>{% if usuario_detalle.is_staff %}Sí{% else %}No{% endif %}</td>
+                                    </tr>
+                                    <tr><th scope="row">Superusuario:</th>
+                                        <td>{% if usuario_detalle.is_superuser %}Sí{% else %}No{% endif %}</td>
+                                    </tr>
+                                    <tr><th scope="row">Fecha de Registro:</th><td>{{ usuario_detalle.date_joined|date:"d/m/Y H:i" }}</td></tr>
+                                    <tr><th scope="row">Último Inicio de Sesión:</th><td>{{ usuario_detalle.last_login|date:"d/m/Y H:i"|default:"Nunca" }}</td></tr>
+                                    <tr>
+                                        <th scope="row">Roles/Grupos Asignados:</th>
+                                        <td>
+                                            {% for group in grupos_del_usuario %}
+                                                <span class="badge badge-info">{{ group.name }}</span>
+                                            {% empty %}
+                                                Ninguno
+                                            {% endfor %}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <h4 class="mt-4">Datos Personales (Perfil)</h4>
+                            <table class="table table-striped">
+                                <tbody>
+                                    <tr><th scope="row" style="width:30%;">Nombres Reales:</th><td>{{ usuario_detalle.first_name|default:"N/A" }}</td></tr>
+                                    <tr><th scope="row">Apellidos Reales:</th><td>{{ usuario_detalle.last_name|default:"N/A" }}</td></tr>
+                                    <tr><th scope="row">Cédula de Identidad (CI):</th><td>{{ perfil_detalle.ci|default:"N/A" }}</td></tr>
+                                    <tr><th scope="row">Teléfono:</th><td>{{ perfil_detalle.telefono|default:"N/A" }}</td></tr>
+                                    {# Añade aquí más campos del UserProfile que quieras mostrar #}
+                                    {# Ejemplo: <tr><th scope="row">Puesto:</th><td>{{ perfil_detalle.puesto_laboral|default:"N/A" }}</td></tr> #}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

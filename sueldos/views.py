@@ -2,7 +2,7 @@
 
 import logging
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
 from django.db import transaction, IntegrityError
 from django.utils import timezone
@@ -50,6 +50,7 @@ logger = logging.getLogger(__name__)
 # --- Vistas para la Cabecera (PlanillaSueldo) ---
 # (Estas vistas permanecen igual que antes)
 @login_required
+@permission_required('sueldos.add_planillasueldos', raise_exception=True)
 def crear_planilla_sueldo(request):
     if request.method == 'POST':
         # Usar el nuevo forms.Form
@@ -95,6 +96,7 @@ def crear_planilla_sueldo(request):
 
 
 @login_required
+@permission_required('sueldos.view_planillasueldo', raise_exception=True)
 def lista_planillas_sueldo(request):
     planillas = PlanillaSueldo.objects.all().order_by('-anio', '-mes', 'tipo')
     context = {
@@ -105,6 +107,7 @@ def lista_planillas_sueldo(request):
 
 # --- Vista Principal ACTUALIZADA: Carga y Procesamiento del Excel con Pandas ---
 @login_required
+@permission_required('sueldos.change_planillasueldo', raise_exception=True)
 def subir_excel_sueldos(request, planilla_id):
     planilla = get_object_or_404(PlanillaSueldo, pk=planilla_id)
 
@@ -271,6 +274,7 @@ def subir_excel_sueldos(request, planilla_id):
 # ... (vista crear_planilla_sueldo y lista_planillas_sueldo como antes) ...
 
 @login_required
+@permission_required('sueldos.change_planillasueldo', raise_exception=True)
 def editar_planilla_sueldo(request, planilla_id):
     planilla = get_object_or_404(PlanillaSueldo, pk=planilla_id)
     if request.method == 'POST':
@@ -310,6 +314,7 @@ def editar_planilla_sueldo(request, planilla_id):
 
 
 @login_required
+@permission_required('sueldos.delete_planillasueldo', raise_exception=True)
 def borrar_planilla_sueldo(request, planilla_id):
     """ Permite borrar una PlanillaSueldo (cabecera) y sus detalles asociados. """
     planilla = get_object_or_404(PlanillaSueldo, pk=planilla_id)
@@ -350,6 +355,7 @@ def borrar_planilla_sueldo(request, planilla_id):
 
 
 @login_required
+@permission_required('sueldos.view_detallesueldo', raise_exception=True)
 def ver_detalles_sueldo(request, planilla_id):
     """ Muestra los detalles de sueldo filtrados y enriquecidos para una planilla. """
     logger.debug(f"Vista ver_detalles_sueldo llamada para planilla_id={planilla_id}")
@@ -402,6 +408,7 @@ def ver_detalles_sueldo(request, planilla_id):
 
 
 @login_required
+@permission_required('sueldos.change_detallesueldo', raise_exception=True)
 def editar_detalle_sueldo(request, detalle_id):
     """ Permite editar los campos de un DetalleSueldo existente, preservando filtros al redirigir. """
     detalle = get_object_or_404(
@@ -483,6 +490,7 @@ def editar_detalle_sueldo(request, detalle_id):
 
 
 @login_required
+@permission_required('sueldos.delete_detallesueldo', raise_exception=True)
 def borrar_detalle_sueldo(request, detalle_id):
     """ Permite borrar un registro DetalleSueldo específico, preservando filtros al redirigir. """
     detalle = get_object_or_404(
@@ -560,6 +568,7 @@ EXTERNAL_TYPE_MAP = {
 }
 
 @login_required
+@permission_required('sueldos.add_cierremensualdeestado', raise_exception=True)
 @transaction.atomic
 def generar_estado_mensual_form(request):
     if request.method == 'POST':
@@ -768,6 +777,7 @@ def generar_estado_mensual_form(request):
 #-------------------------------
 
 @login_required
+@permission_required('sueldos.view_cierremensualdeestado', raise_exception=True)
 def lista_estado_mensual(request):
     """ Muestra los registros de EstadoMensualEmpleado generados, filtrados por periodo y tipo. """
     selected_mes = request.GET.get('mes', '')
@@ -850,6 +860,7 @@ def lista_estado_mensual(request):
 
 
 @login_required
+@permission_required('sueldos.delete_cierremensualdeestado', raise_exception=True)
 def borrar_estado_mensual(request, estado_id):
     """ Permite borrar un registro EstadoMensualEmpleado específico. """
     estado = get_object_or_404(EstadoMensualEmpleado, pk=estado_id)
@@ -885,6 +896,7 @@ def borrar_estado_mensual(request, estado_id):
 # ... (código de editar_detalle_sueldo y borrar_detalle_sueldo) ...
 
 @login_required
+@permission_required('sueldos.view_cierremensualdeestado', raise_exception=True)
 def lista_cierres_mensuales(request):
     """ Muestra una lista de todos los Cierres Mensuales generados. """
     # Obtener parámetros de filtro (opcional, podrías añadir más adelante)
@@ -917,6 +929,7 @@ def lista_cierres_mensuales(request):
 
 
 @login_required
+@permission_required('sueldos.delete_cierremensualdeestado', raise_exception=True)
 def borrar_cierre_mensual(request, cierre_id):
     """
     Permite borrar un CierreMensual específico y todos los
@@ -952,6 +965,7 @@ def borrar_cierre_mensual(request, cierre_id):
 
 
 @login_required
+@permission_required('sueldos.delete_cierremensualdeestado', raise_exception=True)
 def ver_detalle_cierre(request, cierre_id):
     cierre = get_object_or_404(CierreMensual, pk=cierre_id)
 

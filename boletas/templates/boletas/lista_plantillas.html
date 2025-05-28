@@ -8,13 +8,15 @@
     <div class="">
         <div class="page-title">
             <div class="title_left">
-                <h3>{{ titulo_pagina }}</h3>
+                <h3>{{ titulo_pagina|default:"Gestión de Plantillas de Boleta" }}</h3> {# Título más descriptivo #}
             </div>
             <div class="title_right">
-                <div class="col-md-5 col-sm-5   form-group pull-right top_search">
+                <div class="col-md-5 col-sm-5 form-group pull-right top_search"> {# Manteniendo tu estructura original para el botón #}
+                    {% if perms.boletas.add_plantillaboleta or user.is_superuser %}
                     <a href="{% url 'crear_plantilla_boleta' %}" class="btn btn-success pull-right">
                         <i class="fa fa-plus"></i> Crear Nueva Plantilla
                     </a>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -24,7 +26,7 @@
             <div class="col-md-12 col-sm-12 ">
                 <div class="x_panel">
                     <div class="x_title">
-                        <h2>Listado</h2>
+                        <h2>Listado de Plantillas</h2>
                         <ul class="nav navbar-right panel_toolbox">
                             <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
                             <li><a class="close-link"><i class="fa fa-close"></i></a></li>
@@ -34,42 +36,72 @@
                     <div class="x_content">
                         {% if messages %}
                             {% for message in messages %}
-                                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible " role="alert">
-                                    <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button>
+                                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert"> {# Añadido fade show #}
                                     {{ message }}
+                                    <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button>
                                 </div>
                             {% endfor %}
                         {% endif %}
 
                         {% if plantillas %}
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Nombre</th>
-                                        <th>Descripción</th>
-                                        <th>Predeterminada</th>
-                                        <th>Última Modificación</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for plantilla in plantillas %}
-                                    <tr>
-                                        <td>{{ plantilla.nombre }}</td>
-                                        <td>{{ plantilla.descripcion|truncatewords:10 }}</td>
-                                        <td>{% if plantilla.es_predeterminada %}<i class="fa fa-check-square-o text-success"></i> Sí{% else %}<i class="fa fa-square-o text-muted"></i> No{% endif %}</td>
-                                        <td>{{ plantilla.fecha_modificacion|date:"d/m/Y H:i" }}</td>
-                                        <td>
-                                            <a href="{% url 'editar_plantilla_boleta' plantilla.id %}" class="btn btn-info btn-xs"><i class="fa fa-pencil"></i> Editar </a>
-                                            <a href="#" class="btn btn-primary btn-xs"><i class="fa fa-eye"></i> Previsualizar</a> {# A futuro #}
-                                            <a href="{% url 'eliminar_plantilla_boleta' plantilla.id %}" class="btn btn-danger btn-xs"><i class="fa fa-trash-o"></i> Eliminar </a>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                            <div class="table-responsive"> {# Envolver en table-responsive #}
+                                <table class="table table-striped table-bordered"> {# Añadido table-bordered #}
+                                    <thead>
+                                        <tr>
+                                            <th>Nombre</th>
+                                            <th>Descripción</th>
+                                            <th class="text-center">Predeterminada</th> {# Centrado #}
+                                            <th>Última Modificación</th>
+                                            <th class="text-center">Acciones</th> {# Centrado #}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for plantilla_obj in plantillas %} {# Renombrado 'plantilla' a 'plantilla_obj' #}
+                                        <tr>
+                                            <td>{{ plantilla_obj.nombre }}</td>
+                                            <td>{{ plantilla_obj.descripcion|truncatewords:10 }}</td>
+                                            <td class="text-center">
+                                                {% if plantilla_obj.es_predeterminada %}
+                                                    <i class="fa fa-check-square-o text-success" title="Sí, es predeterminada"></i>
+                                                {% else %}
+                                                    <i class="fa fa-square-o text-muted" title="No es predeterminada"></i>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ plantilla_obj.fecha_modificacion|date:"d/m/Y H:i" }}</td>
+                                            <td class="text-center text-nowrap"> {# Añadido text-nowrap #}
+                                                {# Botón Editar Plantilla #}
+                                                {% if perms.boletas.change_plantillaboleta or user.is_superuser %}
+                                                <a href="{% url 'editar_plantilla_boleta' plantilla_obj.id %}" class="btn btn-info btn-xs" title="Editar Diseño/Configuración"><i class="fa fa-pencil"></i> Editar </a>
+                                                {% endif %}
+
+                                                {# Botón Previsualizar (Futura funcionalidad - podría depender de view_plantillaboleta) #}
+                                                {% if perms.boletas.view_plantillaboleta or user.is_superuser %}
+                                                <button type="button" 
+                                                        class="btn btn-primary btn-xs btn-preview-plantilla" 
+                                                        data-plantilla-id="{{ plantilla_obj.id }}"
+                                                        data-plantilla-nombre="{{ plantilla_obj.nombre|escapejs }}"
+                                                        title="Previsualizar Plantilla: {{ plantilla_obj.nombre }}">
+                                                    <i class="fa fa-eye"></i> Previsualizar
+                                                </button>
+                                                {% endif %}
+
+                                                {# Botón Eliminar Plantilla #}
+                                                {% if perms.boletas.delete_plantillaboleta or user.is_superuser %}
+                                                    {# Considerar no permitir eliminar la predeterminada fácilmente desde aquí, o manejarlo en la vista #}
+                                                    {% if not plantilla_obj.es_predeterminada or user.is_superuser %} {# Ejemplo: Superadmin puede borrar predeterminada #}
+                                                        <a href="{% url 'eliminar_plantilla_boleta' plantilla_obj.id %}" class="btn btn-danger btn-xs" title="Eliminar Plantilla" onclick="return confirm('¿Está seguro que desea eliminar la plantilla \'{{ plantilla_obj.nombre|escapejs }}\'?');"><i class="fa fa-trash-o"></i> Eliminar </a>
+                                                    {% else %}
+                                                         <span class="btn btn-danger btn-xs disabled" title="No se puede eliminar la plantilla predeterminada."><i class="fa fa-trash-o"></i> Eliminar</span>
+                                                    {% endif %}
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
                         {% else %}
-                            <p>No hay plantillas de boleta creadas todavía.</p>
+                            <p class="text-center">No hay plantillas de boleta creadas todavía.</p> {# Centrado #}
                         {% endif %}
                     </div>
                 </div>
@@ -77,4 +109,134 @@
         </div>
     </div>
 </div>
-{% endblock %}
+{% endblock content %}
+{% block extra_js %}
+    {# El JavaScript irá aquí en un paso posterior #}
+    <script>
+    $(document).ready(function() {
+        // Cuando se hace clic en un botón de previsualizar plantilla
+        $('.btn-preview-plantilla').on('click', function() {
+            var plantillaId = $(this).data('plantilla-id');
+            var plantillaNombre = $(this).data('plantilla-nombre');
+            var previewButton = $(this); // Guardamos referencia al botón clickeado
+            var originalButtonHtml = previewButton.html(); // Guardamos el HTML original del botón
+
+            console.log("Previsualizando plantilla ID:", plantillaId, "Nombre:", plantillaNombre);
+
+            // Actualizar título del modal y mostrar spinner inicial en el cuerpo
+            $('#previewPlantillaModalLabel').text('Previsualización: ' + plantillaNombre);
+            $('#previewPlantillaModalBody').html('<p class="text-center"><i class="fa fa-spinner fa-spin fa-2x"></i><br>Cargando diseño...</p>');
+            
+            // Mostrar el modal
+            $('#previewPlantillaModal').modal('show');
+
+            // Deshabilitar botón y mostrar spinner mientras se carga
+            previewButton.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+
+            // URL para obtener el JSON del diseño de la plantilla (la crearemos en el Paso 4)
+            // El '0' es un placeholder que reemplazaremos con el plantillaId real.
+            var getDesignUrl = "/boletas/plantillas/0/obtener-diseno-json/".replace('0', plantillaId.toString());            
+            // Obtener el token CSRF. Django lo incluye automáticamente en las plantillas
+            // si usas {% csrf_token %} en algún <form>. Si no, necesitas otra forma de pasarlo.
+            // Esta es una forma común si tienes un formulario en la página:
+            // var csrfToken = $('input[name="csrfmiddlewaretoken"]').val();
+            // Si no hay formulario, puedes poner {{ csrf_token }} directamente aquí (¡con comillas si es string!)
+            // o leerlo de un meta tag. Para simplificar, asumimos que Django lo reemplazará.
+            var csrfToken = "{{ csrf_token }}"; // Asegúrate que esto funcione en tu contexto.
+
+            // --- Petición AJAX para OBTENER el diseño JSON de la plantilla ---
+            $.ajax({
+                url: getDesignUrl,
+                method: 'GET',
+                dataType: 'json',
+                success: function(designData) {
+                    console.log("Diseño JSON obtenido:", JSON.stringify(designData).substring(0,200) + "...");
+                    
+                    // Verificar si el diseño es válido (tiene 'objects')
+                    if (typeof designData !== 'object' || designData === null || $.isEmptyObject(designData) || !designData.hasOwnProperty('objects')) {
+                        $('#previewPlantillaModalBody').html('<div class="alert alert-warning text-center">El diseño de esta plantilla está vacío o no tiene un formato válido.</div>');
+                        console.warn("Diseño vacío o inválido recibido de getDesignUrl.");
+                        // Rehabilitar el botón
+                        previewButton.prop('disabled', false).html(originalButtonHtml);
+                        return; // Detener ejecución aquí
+                    }
+
+                    var designJSONString = JSON.stringify(designData);
+
+                    // --- Petición AJAX para ENVIAR el diseño y OBTENER la previsualización HTML ---
+                    var previewRenderUrl = "{% url 'preview_plantilla_boleta' %}"; // URL de la vista que renderiza el HTML
+
+                    $.ajax({
+                        url: previewRenderUrl,
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrfToken // Incluir el token CSRF para POST
+                        },
+                        contentType: 'application/json', // Indicar que estamos enviando JSON
+                        data: designJSONString, // El string JSON del diseño
+                        success: function(htmlResult) {
+                            $('#previewPlantillaModalBody').html(htmlResult);
+                            console.log("Previsualización HTML cargada en el modal.");
+                        },
+                        error: function(xhr, status, error) {
+                            console.error("Error en POST a previewRenderUrl:", status, error, xhr.responseText);
+                            var errorMsg = 'Error al generar la previsualización.';
+                            if (xhr.responseText) {
+                            // Intentar mostrar un mensaje más específico si es posible
+                            errorMsg += '<br><small>' + $('<div>').text(xhr.responseText.substring(0, 200) + "...").html() + '</small>';
+                            }
+                            $('#previewPlantillaModalBody').html('<div class="alert alert-danger text-center">' + errorMsg + '</div>');
+                        },
+                        complete: function() {
+                            // Este 'complete' es para el SEGUNDO AJAX (renderizar previsualización)
+                            // Rehabilitar el botón
+                            previewButton.prop('disabled', false).html(originalButtonHtml);
+                        }
+                    });
+                },
+                error: function(xhr, status, error) {
+                    console.error("Error en GET a getDesignUrl:", status, error, xhr.responseText);
+                    var errorMsg = 'Error al cargar el diseño de la plantilla.';
+                    if (xhr.responseText) {
+                    try {
+                        var respJson = JSON.parse(xhr.responseText);
+                        if (respJson.error) errorMsg += ': ' + respJson.error;
+                    } catch (e) { /* No hacer nada si no es JSON */ }
+                    }
+                    $('#previewPlantillaModalBody').html('<div class="alert alert-danger text-center">' + errorMsg + '</div>');
+                    // Rehabilitar el botón
+                    previewButton.prop('disabled', false).html(originalButtonHtml);
+                    // No necesitamos cerrar el modal aquí, el usuario puede hacerlo
+                }
+            });
+        });
+
+        // Opcional: Limpiar el contenido del modal cuando se cierra,
+        // para que la próxima vez que se abra muestre el spinner de carga.
+        $('#previewPlantillaModal').on('hidden.bs.modal', function (e) {
+            $('#previewPlantillaModalBody').html('<p class="text-center"><i class="fa fa-spinner fa-spin fa-2x"></i><br>Cargando previsualización...</p>');
+            $('#previewPlantillaModalLabel').text('Previsualización de Plantilla'); // Resetear título
+        });
+    });
+    </script>
+
+    {# Bootstrap Modal para la previsualización #}
+    <div class="modal fade" id="previewPlantillaModal" tabindex="-1" role="dialog" aria-labelledby="previewPlantillaModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document"> {# modal-lg para más espacio #}
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="previewPlantillaModalLabel">Previsualización de Plantilla</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                <div class="modal-body" id="previewPlantillaModalBody">
+                    <p class="text-center"><i class="fa fa-spinner fa-spin fa-2x"></i><br>Cargando previsualización...</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock extra_js %}

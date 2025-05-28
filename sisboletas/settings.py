@@ -107,7 +107,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize', 
-    'administracion',
+    'administracion.apps.AdministracionConfig',
     'planilla',
     'reportes',
     'widget_tweaks',
@@ -228,6 +228,31 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 #     messages_constants.ERROR: 'alert-danger',
 # }
 
+# --- CONFIGURACIÓN DE AUTENTICACIÓN Y REDIRECCIÓN ---
+# Añade estas líneas aquí:
+
+LOGIN_URL = 'login'
+# LOGIN_URL: Especifica el 'name' de la URL a la que Django debe redirigir
+# a los usuarios cuando intentan acceder a una vista protegida por @login_required
+# y no están autenticados. Coincide con name='login' que definimos en urls.py.
+
+LOGIN_REDIRECT_URL = 'index' 
+# LOGIN_REDIRECT_URL: Especifica el 'name' de la URL a la que Django debe
+# redirigir a los usuarios DESPUÉS de que inicien sesión exitosamente,
+# si no se especificó un parámetro 'next' en la URL de login.
+# ¡¡DEBES REEMPLAZAR 'nombre_url_dashboard_o_home' con el nombre real
+# de la URL de la página a la que quieres que vayan!!
+# Por ejemplo, si tienes una vista para listar planillas con name='lista_planillas',
+# podrías poner: LOGIN_REDIRECT_URL = 'lista_planillas'
+# O si tienes una vista principal (home) con name='home_page', pones: LOGIN_REDIRECT_URL = 'home_page'
+
+LOGOUT_REDIRECT_URL = 'login'
+# LOGOUT_REDIRECT_URL: Especifica el 'name' de la URL a la que Django debe
+# redirigir a los usuarios DESPUÉS de que cierren sesión exitosamente.
+# Redirigir de nuevo a la página de 'login' es una opción común.
+# Si no la defines, Django por defecto intenta mostrar la página de "logout_confirmation"
+# del admin o una página principal.
+# ----------------------------------------------------
 
 MEDIA_URL = '/media/'
 

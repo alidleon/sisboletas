@@ -2,7 +2,7 @@
 
 import logging
 from django.shortcuts import render, redirect, get_object_or_404, HttpResponse
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 import os
 from django.conf import settings
 
@@ -16,6 +16,7 @@ from .forms import PlanillaForm  # Necesitas crear un formulario para editar la 
 from datetime import datetime
 from django.core.exceptions import ValidationError
 from decimal import Decimal, InvalidOperation
+from django.utils import timezone # Para fecha_elaboracion
 
 
 from calendar import month_name
@@ -75,6 +76,7 @@ except ImportError:
     REPORTES_APP_AVAILABLE = False
     logging.error("ERROR CRÍTICO: No se pueden importar modelos de la app 'reportes'.")
 
+
 # ---------------------------------
 
 @login_required
@@ -107,30 +109,13 @@ EXTERNAL_TYPE_MAP = {
     }
 # planilla/views.py
 
-import logging # Asegúrate de tener logging importado
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.db import transaction, IntegrityError
-from django.contrib import messages
-from django.utils import timezone # Para fecha_elaboracion
-from django.core.exceptions import ValidationError # Para capturar del modelo
 
-# Importa tus modelos locales
-from .models import Planilla, DetalleBonoTe
-# (Si usas PrincipalDesignacionExterno directamente aquí, impórtalo también)
-# from .models import PrincipalPersonalExterno, PrincipalDesignacionExterno, ...
 
-# Importa tu formulario modificado
-from .forms import PlanillaForm # ¡Asegúrate de que sea el PlanillaForm modificado!
 
-# Importa modelos de la app 'reportes'
-try:
-    from reportes.models import PlanillaAsistencia, DetalleAsistencia
-    REPORTES_APP_AVAILABLE = True
-except ImportError:
-    PlanillaAsistencia, DetalleAsistencia = None, None
-    REPORTES_APP_AVAILABLE = False
-    # Considera logging.error o un mensaje si esta app es crítica para la funcionalidad
+
+
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +126,7 @@ logger = logging.getLogger(__name__)
 # ... (importaciones como en el mensaje anterior) ...
 
 @login_required
+@permission_required('planilla.add_planilla', raise_exception=True)
 def crear_planilla_bono_te(request):
     if not REPORTES_APP_AVAILABLE:
         messages.error(request, "Error crítico: La funcionalidad de reportes de asistencia no está disponible.")
@@ -275,6 +261,7 @@ def crear_planilla_bono_te(request):
 
 
 @login_required
+@permission_required('planilla.view_planilla', raise_exception=True)
 def lista_planillas(request):
     # Sin cambios si solo consulta Planilla
     planillas = Planilla.objects.all().order_by('-anio', '-mes', 'tipo')
@@ -286,6 +273,7 @@ def lista_planillas(request):
 #     return render(request, 'planillas/lista_bono_te.html', {'detalles_bono_te': detalles_bono_te})
 # O la versión mejorada si ya la tenías:
 @login_required
+@permission_required('planilla.view_detallebonote', raise_exception=True)
 def lista_bono_te(request):
     # Selecciona relacionados internos, pero necesitará info externa si la muestra
     detalles_bono_te = DetalleBonoTe.objects.select_related('id_planilla').all()
@@ -298,6 +286,7 @@ def lista_bono_te(request):
     return render(request, 'planillas/lista_bono_te.html', {'detalles_bono_te': detalles_bono_te})
 
 @login_required
+@permission_required('planilla.change_detallebonote', raise_exception=True)
 def editar_bono_te(request, detalle_id):
     # Obtener detalle interno
     detalle_bono_te = get_object_or_404(
@@ -379,6 +368,7 @@ def editar_bono_te(request, detalle_id):
     return render(request, 'planillas/editar_bono_te.html', context)
 
 @login_required
+@permission_required('planilla.delete_detallebonote', raise_exception=True)
 def borrar_bono_te(request, detalle_id):
     detalle_bono_te = get_object_or_404(DetalleBonoTe, pk=detalle_id)
     planilla_id = detalle_bono_te.id_planilla_id
@@ -404,6 +394,7 @@ def borrar_bono_te(request, detalle_id):
         })
 
 @login_required
+@permission_required('planilla.change_planilla', raise_exception=True)
 def editar_planilla(request, planilla_id):
     # Obtener la instancia de la planilla que se va a editar
     planilla_instancia = get_object_or_404(Planilla, pk=planilla_id)
@@ -466,6 +457,7 @@ def editar_planilla(request, planilla_id):
 
 
 @login_required
+@permission_required('planilla.delete_planilla', raise_exception=True)
 def borrar_planilla(request, planilla_id):
     # Sin cambios si solo borra Planilla
     planilla = get_object_or_404(Planilla, pk=planilla_id)
@@ -476,6 +468,7 @@ def borrar_planilla(request, planilla_id):
     return render(request, 'planillas/borrar_planilla.html', {'planilla': planilla})
 
 @login_required
+@permission_required('planilla.view_detallebonote', raise_exception=True)
 def ver_detalles_bono_te(request, planilla_id):
     """ Vista que usa utils.get_processed_planilla_details """
     logger.debug(f"Vista ver_detalles_bono_te llamada para planilla_id={planilla_id}")
@@ -507,6 +500,7 @@ def ver_detalles_bono_te(request, planilla_id):
         return redirect('lista_planillas')
 
 @login_required
+@permission_required('planilla.view_planilla', raise_exception=True)
 def exportar_planilla_xlsx(request, planilla_id):
     """
     Genera un archivo XLSX con encabezado institucional (A1:E3), logo (Fila 1),

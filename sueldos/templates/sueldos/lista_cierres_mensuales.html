@@ -2,45 +2,120 @@
 {% load static %}
 {% load humanize %}
 
-{% block title_suffix %} - Historial de Cierres{% endblock %}
+{% block title_suffix %} - Historial de Cierres Mensuales{% endblock %}
 
 {% block content %}
 <div class="right_col" role="main">
     <div class="page-title">
         <div class="title_left"><h3>{{ titulo_pagina|default:"Historial de Cierres Mensuales" }}</h3></div>
-        <div class="title_right"><div class="pull-right">
-            <a href="{% url 'generar_estado_mensual_form' %}" class="btn btn-success"><i class="fa fa-cogs"></i> Generar Nuevo Estado</a>
-        </div></div>
+        <div class="title_right">
+            <div class="pull-right">
+                {# Botón Generar Nuevo Estado - Asumimos que crea un CierreMensual #}
+                {% if perms.sueldos.add_cierremensual or user.is_superuser %}
+                <a href="{% url 'generar_estado_mensual_form' %}" class="btn btn-success">
+                    <i class="fa fa-cogs"></i> Generar Nuevo Estado
+                </a>
+                {% endif %}
+            </div>
+        </div>
     </div>
     <div class="clearfix"></div>
-    <div class="row"><div class="col-md-12"><div class="x_panel"><div class="x_title">
-        <h2>Listado de Cierres</h2><div class="clearfix"></div></div><div class="x_content">
-        {% if messages %}{% for message in messages %}<div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">{{ message|safe }}<button type="button" class="close" data-dismiss="alert">×</button></div>{% endfor %}{% endif %}
-        <div class="table-responsive"><table class="table table-striped table-bordered jambo_table table-sm">
-            <thead><tr class="headings">
-                <th>Periodo</th><th>Tipo</th><th>Estado Proceso</th><th>Fecha Generación</th><th>Usuario</th><th>Resumen</th><th>Acciones</th>
-            </tr></thead>
-            <tbody>
-            {% for cierre in cierres_mensuales %}
-                <tr>
-                    <td>{{ cierre.mes }}/{{ cierre.anio }}</td>
-                    <td>{{ cierre.get_tipo_planilla_display }}</td>
-                    <td><span class="badge {% if cierre.estado_proceso == 'COMPLETADO' %}bg-success{% elif cierre.estado_proceso == 'COMPLETADO_CON_ADVERTENCIAS' %}bg-warning text-dark{% elif cierre.estado_proceso == 'ERROR' %}bg-danger{% else %}bg-info text-dark{% endif %}">{{ cierre.get_estado_proceso_display }}</span></td>
-                    <td>{{ cierre.fecha_generacion|date:"d/m/Y H:i" }}</td>
-                    <td>{{ cierre.usuario_generacion.username|default:"-" }}</td>
-                    <td title="{{ cierre.resumen_proceso|default:'' }}">{{ cierre.resumen_proceso|truncatewords_html:15|default:"N/A" }}</td>
-                    <td class="text-center text-nowrap">
-                        <a href="{% url 'ver_detalle_cierre' cierre.id %}" class="btn btn-info btn-sm" title="Ver Detalles del Cierre"><i class="fa fa-eye"></i> Detalles</a>
-                        <a href="{% url 'borrar_cierre_mensual' cierre.id %}" class="btn btn-danger btn-sm" title="Borrar Cierre y sus Estados" onclick="return confirm('¿Está seguro de borrar este Cierre Mensual y TODOS sus detalles de estado de empleado?');">
-                            <i class="fa fa-trash"></i> Borrar Cierre
-                        </a>                    </td>
-                </tr>
-            {% empty %}
-                <tr><td colspan="7" class="text-center">No hay cierres mensuales generados.</td></tr>
-            {% endfor %}
-            </tbody>
-        </table></div>
-        {% if cierres_mensuales.has_other_pages %}{# ... (Paginación igual que en lista_estado_mensual) ... #}{% endif %}
-    </div></div></div></div>
-</div></div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="x_panel">
+                <div class="x_title">
+                    <h2>Listado de Cierres</h2>
+                    <ul class="nav navbar-right panel_toolbox"> {# Añadido panel_toolbox por consistencia #}
+                        <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                        <li><a class="close-link"><i class="fa fa-close"></i></a></li>
+                    </ul>
+                    <div class="clearfix"></div>
+                </div>
+                <div class="x_content">
+                    {% if messages %}
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message|safe }}
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close"> {# Uso de data-dismiss y span para Bootstrap 4/Gentelella #}
+                                <span aria-hidden="true">×</span>
+                            </button>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered jambo_table table-sm">
+                            <thead>
+                                <tr class="headings">
+                                    <th>Periodo</th>
+                                    <th>Tipo Planilla</th>
+                                    <th>Estado Proceso</th>
+                                    <th>Fecha Generación</th>
+                                    <th>Usuario</th>
+                                    <th>Resumen</th>
+                                    <th class="text-center">Acciones</th> {# Añadido text-center #}
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for cierre_obj in cierres_mensuales %} {# Renombrado 'cierre' a 'cierre_obj' #}
+                                <tr>
+                                    <td>{{ cierre_obj.mes }}/{{ cierre_obj.anio }}</td>
+                                    <td>{{ cierre_obj.get_tipo_planilla_display }}</td>
+                                    <td>
+                                        <span class="badge {% if cierre_obj.estado_proceso == 'COMPLETADO' %}bg-success{% elif cierre_obj.estado_proceso == 'COMPLETADO_CON_ADVERTENCIAS' %}bg-warning text-dark{% elif cierre_obj.estado_proceso == 'ERROR' %}bg-danger{% else %}bg-info text-dark{% endif %}">
+                                            {{ cierre_obj.get_estado_proceso_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ cierre_obj.fecha_generacion|date:"d/m/Y H:i" }}</td>
+                                    <td>{{ cierre_obj.usuario_generacion.username|default:"-" }}</td>
+                                    <td title="{{ cierre_obj.resumen_proceso|default:'' }}">{{ cierre_obj.resumen_proceso|truncatewords_html:15|default:"N/A" }}</td>
+                                    <td class="text-center text-nowrap">
+                                        {# Botón Ver Detalles del Cierre #}
+                                        {% if perms.sueldos.view_cierremensual or user.is_superuser %} {# O view_estadomensualempleado si el detalle es más sobre eso #}
+                                        <a href="{% url 'ver_detalle_cierre' cierre_obj.id %}" class="btn btn-info btn-sm" title="Ver Detalles del Cierre">
+                                            <i class="fa fa-eye"></i> Detalles
+                                        </a>
+                                        {% endif %}
+
+                                        {# Botón Borrar Cierre #}
+                                        {% if perms.sueldos.delete_cierremensual or user.is_superuser %}
+                                            {# Podrías añadir lógica de estado aquí si solo se pueden borrar cierres en ciertos estados #}
+                                            {% if cierre_obj.estado_proceso != 'COMPLETADO' %} {# Ejemplo: no borrar si ya está completado #}
+                                            <a href="{% url 'borrar_cierre_mensual' cierre_obj.id %}" class="btn btn-danger btn-sm" title="Borrar Cierre y sus Estados" onclick="return confirm('¿Está seguro de borrar este Cierre Mensual ({{ cierre_obj.mes }}/{{ cierre_obj.anio }}) y TODOS sus detalles de estado de empleado? Esta acción es irreversible.');">
+                                                <i class="fa fa-trash"></i> Borrar
+                                            </a>
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="7" class="text-center">No hay cierres mensuales generados.</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {# Aquí tu lógica de paginación si la tienes #}
+                    {% if cierres_mensuales.has_other_pages %}
+                        <nav aria-label="Page navigation">
+                            <ul class="pagination justify-content-center">
+                                {% if cierres_mensuales.has_previous %}
+                                    <li class="page-item"><a class="page-link" href="?page=1">« Primero</a></li>
+                                    <li class="page-item"><a class="page-link" href="?page={{ cierres_mensuales.previous_page_number }}">Anterior</a></li>
+                                {% endif %}
+
+                                <li class="page-item disabled"><a class="page-link" href="#">Página {{ cierres_mensuales.number }} de {{ cierres_mensuales.paginator.num_pages }}.</a></li>
+
+                                {% if cierres_mensuales.has_next %}
+                                    <li class="page-item"><a class="page-link" href="?page={{ cierres_mensuales.next_page_number }}">Siguiente</a></li>
+                                    <li class="page-item"><a class="page-link" href="?page={{ cierres_mensuales.paginator.num_pages }}">Último »</a></li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

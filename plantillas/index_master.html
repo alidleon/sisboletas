@@ -49,15 +49,24 @@
             <div class="clearfix"></div>
 
             <!-- menu profile quick info -->
-            {# <div class="profile clearfix">
-              <div class="profile_pic">
-                <img src="{% static 'images/img.jpg' %}" alt="..." class="img-circle profile_img">
-              </div>
-              <div class="profile_info">
-                <span>Bienvenido,</span>
-                <h2>{{ user.get_full_name|default:user.username }}</h2>
-              </div>
-            </div> #}
+            <div class="profile clearfix">
+                <div class="profile_pic">
+                    {# Intentar mostrar la foto del perfil del usuario #}
+                    {% if user.is_authenticated and user.profile and user.profile.foto %}
+                        <img src="{{ user.profile.foto.url }}" alt="Foto de {{ user.username }}" class="img-circle profile_img">
+                    {% else %}
+                        {# Mostrar una imagen por defecto si no hay foto o el usuario no tiene perfil (o no está logueado) #}
+                        <img src="{% static 'img/avatar_por_defecto.png' %}" alt="Avatar por defecto" class="img-circle profile_img">
+                        {# Asegúrate de tener 'default_avatar.png' en tu carpeta static/images/ #}
+                        {# O puedes volver a tu img.jpg: <img src="{% static 'images/img.jpg' %}" alt="..." class="img-circle profile_img"> #}
+                    {% endif %}
+                </div>
+                <div class="profile_info">
+                    <span>Bienvenido,</span>
+                    {# El nombre del usuario se mantiene igual #}
+                    <h2>{{ user.get_full_name|default:user.username }}</h2>
+                </div>
+            </div>
             <!-- /menu profile quick info -->
 
             <br />
@@ -69,46 +78,102 @@
                 <ul class="nav side-menu">
                   <li><a href="{% url 'index' %}"><i class="fa fa-home"></i> Home </a></li>
                   {# Añadir lógica de permisos si es necesario #}
-                  <li><a><i class="fa fa-users"></i> Administración <span class="fa fa-chevron-down"></span></a>
-                    <ul class="nav child_menu">
-                      <li><a href="#">Usuarios</a></li>
-                      <li><a href="#">Grupos y Permisos</a></li>
-                    </ul>
-                  </li>
+                  {% if perms.auth.view_user or perms.auth.view_group or user.is_superuser %}
+                    <li><a><i class="fa fa-users"></i> Administración <span class="fa fa-chevron-down"></span></a>
+                      <ul class="nav child_menu">
+                        {# Sub-opción Usuarios: visible si tiene permiso para ver usuarios o es superusuario #}
+                        {% if perms.auth.view_user or user.is_superuser %}
+                        <li><a href="{% url 'lista_usuarios' %}">Usuarios</a></li>
+                        {% endif %}
 
+                        {# Sub-opción Grupos: visible si tiene permiso para ver grupos o es superusuario #}
+                        {% if perms.auth.view_group or user.is_superuser %}
+                        <li><a href="{% url 'lista_grupos' %}">Grupos</a></li>
+                        {% endif %}
+                      </ul>
+                    </li>
+                  {% endif %}
+
+                  {% if perms.reportes.view_planillaasistencia or perms.reportes.add_planillaasistencia or user.is_superuser %}
                   <li><a><i class="fa fa-calendar-check-o"></i> Reportes Asistencia <span class="fa fa-chevron-down"></span></a>
                     <ul class="nav child_menu">
+                      {# Sub-opción Crear Reporte: visible si tiene permiso para añadir Planillas de Asistencia o es superusuario #}
+                      {% if perms.reportes.add_planillaasistencia or user.is_superuser %}
                       <li><a href="{% url 'crear_planilla_asistencia' %}">Crear Reporte</a></li>
+                      {% endif %}
+
+                      {# Sub-opción Ver Reportes: visible si tiene permiso para ver Planillas de Asistencia o es superusuario #}
+                      {% if perms.reportes.view_planillaasistencia or user.is_superuser %}
                       <li><a href="{% url 'lista_planillas_asistencia' %}">Ver Reportes</a></li>
+                      {% endif %}
                     </ul>
                   </li>
+                  {% endif %}
 
+                  {% if perms.planilla.view_planilla or perms.planilla.add_planilla or user.is_superuser %}
                   <li><a><i class="fa fa-coffee"></i> Planillas Bono Té <span class="fa fa-chevron-down"></span></a>
                      <ul class="nav child_menu">
+                      {# Sub-opción Crear Planilla Bono: visible si tiene permiso para añadir Planillas o es superusuario #}
+                      {% if perms.planilla.add_planilla or user.is_superuser %}
                       <li><a href="{% url 'crear_planilla_bono_te' %}">Crear Planilla Bono</a></li>
+                      {% endif %}
+
+                      {# Sub-opción Ver Planillas Bono: visible si tiene permiso para ver Planillas o es superusuario #}
+                      {% if perms.planilla.view_planilla or user.is_superuser %}
                       <li><a href="{% url 'lista_planillas' %}">Ver Planillas Bono</a></li>
+                      {% endif %}
                     </ul>
                   </li>
+                  {% endif %}
 
+                  {% if perms.sueldos.view_planillasueldo or perms.sueldos.add_planillasueldo or user.is_superuser %}
                   <li><a><i class="fa fa-money"></i> Planillas Sueldos <span class="fa fa-chevron-down"></span></a>
                     <ul class="nav child_menu">
+                      {% if perms.sueldos.add_planillasueldo or user.is_superuser %}
                       <li><a href="{% url 'crear_planilla_sueldo' %}">Crear Planilla Sueldos</a></li>
+                      {% endif %}
+                      {% if perms.sueldos.view_planillasueldo or user.is_superuser %}
                       <li><a href="{% url 'lista_planillas_sueldo' %}">Ver Planillas Sueldos</a></li>
+                      {% endif %}
                     </ul>
                   </li>
+                  {% endif %}
+
+                  
+                  {% if perms.sueldos.view_cierremensual or perms.sueldos.add_cierremensual or user.is_superuser %}
                   <li><a><i class="fa fa-history"></i> Seguimiento Personal <span class="fa fa-chevron-down"></span></a>
                     <ul class="nav child_menu">
+                      {# Asumimos que 'generar_estado_mensual_form' implica 'add_cierremensual' o un permiso similar #}
+                      {% if perms.sueldos.add_cierremensual or user.is_superuser %}
                       <li><a href="{% url 'generar_estado_mensual_form' %}">Generar Estado Mensual</a></li>
+                      {% endif %}
+                      {% if perms.sueldos.view_cierremensual or user.is_superuser %}
                       <li><a href="{% url 'lista_cierres_mensuales' %}">Ver Historial Cierres</a></li>
+                      {% endif %}
                     </ul>
                   </li>
+                  {% endif %}
+
+                  {% if perms.boletas.view_plantillaboleta or perms.boletas.add_plantillaboleta or user.is_superuser %}
                   <li><a><i class="fa fa-file-text-o"></i> Boletas de Pago <span class="fa fa-chevron-down"></span></a>
                     <ul class="nav child_menu">
+                      {# Sub-opción Ver Plantillas: visible si tiene permiso para ver Plantillas de Boleta o es superusuario #}
+                      {% if perms.boletas.view_plantillaboleta or user.is_superuser %}
                       <li><a href="{% url 'lista_plantillas_boleta' %}">Ver Plantillas</a></li>
+                      {% endif %}
+
+                      {# Sub-opción Diseñar Nueva Plantilla: visible si tiene permiso para añadir Plantillas de Boleta o es superusuario #}
+                      {% if perms.boletas.add_plantillaboleta or user.is_superuser %}
                       <li><a href="{% url 'crear_plantilla_boleta' %}">Diseñar Nueva Plantilla</a></li>
-                      <li><a href="#">Generar Boletas</a></li> {# Futura funcionalidad #}
+                      {% endif %}
+
+                      
+                      {% if perms.boletas.view_plantillaboleta or user.is_superuser %} 
+                      <li><a href="{% url 'generar_boleta_individual_buscar' %}">Generar Boletas Individuales</a></li>
+                      {% endif %}
                     </ul>
                   </li>
+                  {% endif %}
                 </ul>
               </div>
               {# Puedes añadir más menu_section si es necesario #}
@@ -155,7 +220,12 @@
                       </a>
                   <a class="dropdown-item"  href="javascript:;">Ayuda</a>
                     {# Enlace real de logout #}
-                    <a class="dropdown-item" href="#"><i class="fa fa-sign-out pull-right"></i> Salir</a> {# url 'logout' ? #}
+                    <form id="logout-form" method="post" action="{% url 'logout' %}" style="display: none;">
+                        {% csrf_token %}
+                    </form>
+                    <a class="dropdown-item" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                        <i class="fa fa-sign-out pull-right"></i> Salir
+                    </a>
                   </div>
                 </li>
 

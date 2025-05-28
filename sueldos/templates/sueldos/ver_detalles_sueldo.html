@@ -1,36 +1,22 @@
 {% extends 'index_master.html' %}
 {% load static %}
-{% load humanize %} {# Para formatear números si quieres: {{ valor|intcomma }} #}
+{% load humanize %}
 
-{% block title_suffix %} - Detalles Sueldos{% endblock %}
+{% block title_suffix %} - Detalles Planilla Sueldos {{ planilla_sueldo.mes }}/{{ planilla_sueldo.anio }}{% endblock %}
 
 {% block content %}
 <div class="right_col" role="main">
-    {# Título e Info Planilla #}
     <div class="page-title">
         <div class="title_left">
              <h3>{{ titulo_pagina|default:"Detalles Planilla de Sueldos" }}</h3>
              {% if planilla_sueldo %}
-                <p>Periodo: <strong>{{ planilla_sueldo.mes }}/{{ planilla_sueldo.anio }}</strong> | Tipo: <strong>{{ planilla_sueldo.get_tipo_display }}</strong> | Estado: <strong>{{ planilla_sueldo.get_estado_display }}</strong></p>
+                <p>Periodo: <strong>{{ planilla_sueldo.mes }}/{{ planilla_sueldo.anio }}</strong> | Tipo: <strong>{{ planilla_sueldo.get_tipo_display }}</strong> | Estado: <span class="badge badge-info">{{ planilla_sueldo.get_estado_display }}</span></p>
              {% endif %}
         </div>
-        <div class="title_right">
-             <div class="pull-right">
-                 <a href="{% url 'lista_planillas_sueldo' %}" class="btn btn-secondary btn-sm">
-                     <i class="fa fa-list"></i> Volver a Lista
-                 </a>
-                 {% if planilla_sueldo %}
-                    {# Botón para cargar/recargar excel #}
-                    <a href="{% url 'subir_excel_sueldos' planilla_sueldo.id %}" class="btn btn-primary btn-sm">
-                        <i class="fa fa-upload"></i> Cargar/Re-cargar Excel
-                    </a>
-                 {% endif %}
-             </div>
-        </div>
+        
     </div>
     <div class="clearfix"></div>
 
-    {# Mensajes #}
     {% if messages %}
         <div style="margin-top: 10px;">
         {% for message in messages %}
@@ -42,7 +28,6 @@
         </div>
     {% endif %}
 
-    {# Panel de Filtros (Adaptado de reportes) #}
     <div class="x_panel">
         <div class="x_title">
             <h2>Filtros de Personal</h2>
@@ -51,12 +36,13 @@
             </ul>
             <div class="clearfix"></div>
         </div>
-        <div class="x_content"> {# Oculto por defecto si no hay búsqueda activa #}
+        <div class="x_content">
             <form method="get" action="{% if planilla_sueldo %}{% url 'ver_detalles_sueldo' planilla_sueldo.id %}{% endif %}" class="form-horizontal">
+                 {# ... tus campos de filtro (secretaria, unidad, search_q) y botones de filtro ... (sin cambios de permisos aquí) ... #}
                  <div class="form-group row mb-3">
                     <label class="control-label col-md-2 col-sm-3 ">Secretaría:</label>
                     <div class="col-md-8 col-sm-9 ">
-                        <select name="secretaria" class="form-select form-select-sm" onchange="this.form.submit()"> {# Usar form-select de Bootstrap 5 #}
+                        <select name="secretaria" class="form-select form-select-sm" onchange="this.form.submit()">
                             <option value="">--- Todas ---</option>
                             {% for sec in all_secretarias %}
                                 <option value="{{ sec.id }}" {% if sec.id == selected_secretaria_id %}selected{% endif %}>
@@ -69,7 +55,7 @@
                 <div class="form-group row mb-3">
                     <label class="control-label col-md-2 col-sm-3 ">Unidad:</label>
                     <div class="col-md-8 col-sm-9 ">
-                         <select name="unidad" class="form-select form-select-sm">
+                         <select name="unidad" class="form-select form-select-sm" onchange="this.form.submit()">
                             {% if selected_secretaria_id %}
                                 <option value="">--- Todas las de esta Secretaría ---</option>
                             {% else %}
@@ -88,50 +74,62 @@
                     <div class="col-md-6 col-sm-9 ">
                         <input type="text" name="q" id="search_q" class="form-control form-control-sm" value="{{ search_term|default:'' }}" placeholder="Ingrese CI o Nro. Item...">
                     </div>
-                    <div class="col-md-2 col-sm-12 mt-2 mt-md-0"> {# Ajustar layout botón #}
-                        <button type="submit" name="buscar" value="true" class="btn btn-primary btn-sm w-100">
+                    <div class="col-md-2 col-sm-12 mt-2 mt-md-0">
+                        <button type="submit" name="buscar_texto" value="true" class="btn btn-primary btn-sm w-100"> {# Renombrado name para claridad #}
                              <i class="fa fa-search"></i> Buscar
                         </button>
                     </div>
                 </div>
                 <div class="ln_solid"></div>
                 <div class="form-group row">
-                    <div class="col-md-10 col-sm-9 offset-md-2 offset-sm-3"> {# Ajustar offset #}
-                        <button type="submit" name="buscar" value="true" class="btn btn-success">
-                            <i class="fa fa-filter"></i> Aplicar Filtros y Búsqueda
+                    <div class="col-md-10 col-sm-9 offset-md-2 offset-sm-3">
+                        <button type="submit" name="aplicar_filtros_general" value="true" class="btn btn-success btn-sm"> {# Renombrado name #}
+                            <i class="fa fa-filter"></i> Aplicar Todos los Filtros
                         </button>
-                         {# Botón Limpiar siempre apunta a la misma vista sin params #}
-                        <a href="{% if planilla_sueldo %}{% url 'ver_detalles_sueldo' planilla_sueldo.id %}{% endif %}" class="btn btn-warning">
+                        <a href="{% if planilla_sueldo %}{% url 'ver_detalles_sueldo' planilla_sueldo.id %}{% endif %}" class="btn btn-warning btn-sm">
                             <i class="fa fa-eraser"></i> Limpiar Filtros
                         </a>
+                        <a href="{% url 'lista_planillas_sueldo' %}" class="btn btn-secondary btn-sm">
+                            <i class="fa fa-list"></i> Volver a Lista
+                        </a>
+                        {% if planilla_sueldo %}
+                            {# Botón para cargar/recargar excel - Modifica la PlanillaSueldo #}
+                            {% if perms.sueldos.change_planillasueldo or user.is_superuser %}
+                                {# Podrías añadir lógica de estado aquí si solo se puede cargar en ciertos estados de planilla_sueldo #}
+                                {% if planilla_sueldo.estado != 'pagado' %} {# Ejemplo: no cargar si ya está pagada #}
+                                <a href="{% url 'subir_excel_sueldos' planilla_sueldo.id %}" class="btn btn-primary btn-sm">
+                                    <i class="fa fa-upload"></i> Cargar/Re-cargar Excel
+                                </a>
+                                {% endif %}
+                            {% endif %}
+                        {% endif %}
                     </div>
                 </div>
             </form>
         </div>
     </div>
 
-    {# Panel de Resultados (Tabla de Sueldos) #}
     {% if detalles_sueldo or not search_active %}
         <div class="x_panel">
             <div class="x_title">
                 <h2>Detalles de Sueldos del Personal {% if search_active %}(Resultados Filtrados){% endif %}</h2>
-                 <div class="navbar-right">Total Registros: {{ detalles_sueldo|length }}</div>
+                 <div class="navbar-right" style="margin-right: 10px;">Total Registros: {{ detalles_sueldo|length }}</div> {# Pequeño ajuste de estilo #}
                 <div class="clearfix"></div>
             </div>
             <div class="x_content">
                 {% if detalles_sueldo %}
                     <div class="table-responsive">
-                        <table class="table table-striped table-bordered table-hover dataTable tabla-sueldos"> {# Clase CSS diferente #}
+                        <table class="table table-striped table-bordered table-hover dataTable tabla-sueldos">
                             <thead>
                                 <tr class="headings">
-                                    {# Cabeceras de la tabla - AJUSTA SEGÚN LOS CAMPOS QUE QUIERAS MOSTRAR #}
                                     <th class="column-title">Nro.</th>
                                     <th class="column-title">Item</th>
                                     <th class="column-title">CI</th>
                                     <th class="column-title">Nombre Completo</th>
                                     <th class="column-title">Cargo</th>
+                                    <th class="column-title">Fecha de Ingreso</th>
                                     <th class="column-title text-center">Días Trab.</th>
-                                    <th class="column-title text-end">H. Básico</th> {# text-end para alinear números #}
+                                    <th class="column-title text-end">H. Básico</th>
                                     <th class="column-title text-end">Categoría</th>
                                     <th class="column-title text-end">T. Ganado</th>
                                     <th class="column-title text-end">RC-IVA Ret.</th>
@@ -147,36 +145,47 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for detalle in detalles_sueldo %}
-                                    <tr id="detalle-row-{{ detalle.pk }}" class="{% cycle 'even' 'odd' %} pointer">
+                                {% for detalle_obj in detalles_sueldo %} {# Renombrado 'detalle' a 'detalle_obj' #}
+                                    <tr id="detalle-row-{{ detalle_obj.pk }}" class="{% cycle 'even' 'odd' %} pointer">
                                         <td>{{ forloop.counter }}</td>
-                                        {# Usar los datos _externo añadidos por la utilidad #}
-                                        <td>{{ detalle.item_externo|default:"" }}</td>
-                                        <td>{{ detalle.ci_externo|default:"N/A" }}</td>
-                                        <td>{{ detalle.nombre_completo_externo|default:"N/A" }}</td>
-                                        <td>{{ detalle.cargo_externo|default:"N/A" }}</td>
-                                        {# Usar los datos del modelo DetalleSueldo (leídos del Excel) #}
-                                        <td class="text-center">{{ detalle.dias_trab|floatformat:0 }}</td> {# 0 decimales para días? #}
-                                        <td class="text-end">{{ detalle.haber_basico|floatformat:2|intcomma }}</td>
-                                        <td class="text-end">{{ detalle.categoria|floatformat:2|intcomma }}</td>
-                                        <td class="text-end">{{ detalle.total_ganado|floatformat:2|intcomma }}</td>
-                                        <td class="text-end">{{ detalle.rc_iva_retenido|floatformat:2|intcomma }}</td>
-                                        <td class="text-end">{{ detalle.gestora_publica|floatformat:2|intcomma }}</td>
-                                        <td class="text-end">{{ detalle.aporte_nac_solidario|floatformat:2|intcomma }}</td>
-                                        <td class="text-end">{{ detalle.cooperativa|floatformat:2|intcomma }}</td>
-                                        <td class="text-end">{{ detalle.faltas|floatformat:2|intcomma }}</td>
-                                        <td class="text-end">{{ detalle.memorandums|floatformat:2|intcomma }}</td>
-                                        <td class="text-end">{{ detalle.otros_descuentos|floatformat:2|intcomma }}</td>
-                                        <td class="text-end">{{ detalle.total_descuentos|floatformat:2|intcomma }}</td>
-                                        <td class="text-end"><strong>{{ detalle.liquido_pagable|floatformat:2|intcomma }}</strong></td>
-                                        {# Acciones (Editar/Borrar detalle - Pendiente) #}
-                                        <td class=" last text-center text-nowrap"> {# Añadir text-nowrap si los botones no caben #}
-                                            <a href="{% url 'editar_detalle_sueldo' detalle.pk %}?secretaria={{ request.GET.secretaria|default:'' }}&unidad={{ request.GET.unidad|default:'' }}&q={{ request.GET.q|default:'' }}{% if request.GET.buscar %}&buscar=true{% endif %}" class="btn btn-primary btn-sm" title="Editar Detalle">
-                                                <i class="fa fa-pencil"></i>
-                                            </a>
-                                            <a href="{% url 'borrar_detalle_sueldo' detalle.pk %}?secretaria={{ request.GET.secretaria|default:'' }}&unidad={{ request.GET.unidad|default:'' }}&q={{ request.GET.q|default:'' }}{% if request.GET.buscar %}&buscar=true{% endif %}&planilla_id={{ planilla_sueldo.pk }}" class="btn btn-danger btn-sm" title="Borrar Detalle" onclick="return confirm('¿Está seguro de que desea borrar este detalle de sueldo para {{ detalle.nombre_completo_externo|default:detalle.personal_externo_id|escapejs }}? Esta acción no se puede deshacer.');">
-                                                <i class="fa fa-trash"></i>
-                                            </a>
+                                        <td>{{ detalle_obj.item_externo|default:"" }}</td>
+                                        <td>{{ detalle_obj.ci_externo|default:"N/A" }}</td>
+                                        <td>{{ detalle_obj.nombre_completo_externo|default:"N/A" }}</td>
+                                        <td>{{ detalle_obj.cargo_externo|default:"N/A" }}</td>
+                                        <td>{{ detalle_obj.fecha_ingreso_referencia|date:"d/m/Y"|default:"N/A" }}</td>
+                                        
+                                        <td class="text-center">{{ detalle_obj.dias_trab|floatformat:0 }}</td>
+                                        <td class="text-end">{{ detalle_obj.haber_basico|floatformat:2|intcomma }}</td>
+                                        <td class="text-end">{{ detalle_obj.categoria|floatformat:2|intcomma }}</td>
+                                        <td class="text-end">{{ detalle_obj.total_ganado|floatformat:2|intcomma }}</td>
+                                        <td class="text-end">{{ detalle_obj.rc_iva_retenido|floatformat:2|intcomma }}</td>
+                                        <td class="text-end">{{ detalle_obj.gestora_publica|floatformat:2|intcomma }}</td>
+                                        <td class="text-end">{{ detalle_obj.aporte_nac_solidario|floatformat:2|intcomma }}</td>
+                                        <td class="text-end">{{ detalle_obj.cooperativa|floatformat:2|intcomma }}</td>
+                                        <td class="text-end">{{ detalle_obj.faltas|floatformat:2|intcomma }}</td>
+                                        <td class="text-end">{{ detalle_obj.memorandums|floatformat:2|intcomma }}</td>
+                                        <td class="text-end">{{ detalle_obj.otros_descuentos|floatformat:2|intcomma }}</td>
+                                        <td class="text-end">{{ detalle_obj.total_descuentos|floatformat:2|intcomma }}</td>
+                                        <td class="text-end"><strong>{{ detalle_obj.liquido_pagable|floatformat:2|intcomma }}</strong></td>
+                                        <td class=" last text-center text-nowrap">
+                                            {# Botón Editar DetalleSueldo #}
+                                            {% if perms.sueldos.change_detallesueldo or user.is_superuser %}
+                                                {# Podrías añadir lógica de estado de planilla_sueldo si la edición de detalles depende de ello #}
+                                                {% if planilla_sueldo.estado != 'pagado' %}
+                                                <a href="{% url 'editar_detalle_sueldo' detalle_obj.pk %}?secretaria={{ request.GET.secretaria|default:'' }}&unidad={{ request.GET.unidad|default:'' }}&q={{ request.GET.q|default:'' }}{% if request.GET.buscar_texto or request.GET.aplicar_filtros_general %}&buscar_activo=true{% endif %}" class="btn btn-primary btn-sm" title="Editar Detalle">
+                                                    <i class="fa fa-pencil"></i>
+                                                </a>
+                                                {% endif %}
+                                            {% endif %}
+
+                                            {# Botón Borrar DetalleSueldo #}
+                                            {% if perms.sueldos.delete_detallesueldo or user.is_superuser %}
+                                                {% if planilla_sueldo.estado != 'pagado' %}
+                                                <a href="{% url 'borrar_detalle_sueldo' detalle_obj.pk %}?secretaria={{ request.GET.secretaria|default:'' }}&unidad={{ request.GET.unidad|default:'' }}&q={{ request.GET.q|default:'' }}{% if request.GET.buscar_texto or request.GET.aplicar_filtros_general %}&buscar_activo=true{% endif %}&planilla_id={{ planilla_sueldo.pk }}" class="btn btn-danger btn-sm" title="Borrar Detalle" onclick="return confirm('¿Está seguro de que desea borrar este detalle de sueldo para {{ detalle_obj.nombre_completo_externo|default:detalle_obj.ci_externo|escapejs }}? Esta acción no se puede deshacer.');">
+                                                    <i class="fa fa-trash"></i>
+                                                </a>
+                                                {% endif %}
+                                            {% endif %}
                                         </td>
                                     </tr>
                                 {% endfor %}
@@ -188,20 +197,28 @@
                          No se encontraron detalles de sueldo que coincidan con los filtros aplicados.
                      </div>
                 {% endif %}
-            </div> {# Fin x_content #}
-        </div> {# Fin x_panel #}
-    {# Mensaje si no hay filtros activos y tampoco detalles #}
+            </div>
+        </div>
     {% elif not detalles_sueldo and not search_active %}
          <div class="alert alert-info text-center">
              Esta planilla aún no tiene detalles de sueldo cargados o no se aplicaron filtros.
-             <br> Puedes <a href="{% if planilla_sueldo %}{% url 'subir_excel_sueldos' planilla_sueldo.id %}{% endif %}" class="alert-link">cargar el archivo Excel</a>
-             o usar los filtros de arriba para buscar personal específico (si ya se cargó).
+             <br>
+             {% if perms.sueldos.change_planillasueldo or user.is_superuser %}
+                 {% if planilla_sueldo and planilla_sueldo.estado != 'pagado' %}
+                 Puedes <a href="{% url 'subir_excel_sueldos' planilla_sueldo.id %}" class="alert-link">cargar el archivo Excel</a>
+                 o usar los filtros de arriba para buscar personal específico (si ya se cargó).
+                 {% else %}
+                     Usa los filtros de arriba para buscar personal específico (si ya se cargó).
+                 {% endif %}
+             {% else %}
+                Usa los filtros de arriba para buscar personal específico (si ya se cargó).
+             {% endif %}
          </div>
     {% endif %}
 
-</div> {# Fin right_col #}
+</div>
 {% endblock %}
 
 {% block extra_js %}
-{# No añadimos JS para edición rápida por ahora #}
+{# No se requiere JS específico para los permisos aquí, pero lo dejo por si lo necesitas para otra cosa #}
 {% endblock %}

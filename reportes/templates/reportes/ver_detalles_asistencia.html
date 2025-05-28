@@ -1,12 +1,13 @@
 {% extends 'index_master.html' %}
-
 {% load static %}
+
+{% block title_suffix %} - Detalles Reporte Asistencia {{ planilla_asistencia.mes }}/{{ planilla_asistencia.anio }}{% endblock %}
 
 {% block content %}
 <div class="right_col" role="main">
     {# Título y Estado #}
     <h2>Reporte Asistencia {{ planilla_asistencia.get_tipo_display }} - {{ planilla_asistencia.mes }}/{{ planilla_asistencia.anio }}</h2>
-    <p>Reporte ID: {{ planilla_asistencia.id }} | Estado: {{ planilla_asistencia.get_estado_display }}</p>
+    <p>Reporte ID: {{ planilla_asistencia.id }} | Estado: <span class="badge bg-info">{{ planilla_asistencia.get_estado_display }}</span></p> {# Mejorado con badge #}
 
     {# Mensajes #}
     {% if messages %}
@@ -22,10 +23,10 @@
         </div>
     {% endif %}
 
-    {# Panel de Filtros #}
+    {# Panel de Filtros y Acciones Globales de la Planilla #}
     <div class="x_panel">
         <div class="x_title">
-            <h2>Filtros de Personal</h2>
+            <h2>Filtros de Personal y Acciones del Reporte</h2>
             <ul class="nav navbar-right panel_toolbox">
                 <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
             </ul>
@@ -33,7 +34,8 @@
         </div>
         <div class="x_content">
             <form method="get" action="{% url 'ver_detalles_asistencia' planilla_asistencia.id %}" class="form-horizontal">
-                 <div class="form-group row">
+                 {# ... tus campos de filtro (secretaria, unidad, search_q) ... (sin cambios aquí) ... #}
+                <div class="form-group row">
                     <label class="control-label col-md-3 col-sm-3 ">Secretaría:</label>
                     <div class="col-md-6 col-sm-6 ">
                         <select name="secretaria" class="form-control" onchange="this.form.submit()">
@@ -75,18 +77,24 @@
                 <div class="ln_solid"></div>
                 <div class="form-group row">
                     <div class="col-md-9 col-sm-9 offset-md-3">
-                        <button type="submit" name="buscar" value="true" class="btn btn-success">
+                        <button type="submit" name="buscar" value="true" class="btn btn-success btn-sm"> {# btn-sm añadido #}
                             <i class="fa fa-filter"></i> Aplicar Filtros
                         </button>
-                        <a href="{% url 'ver_detalles_asistencia' planilla_asistencia.id %}" class="btn btn-warning">
+                        <a href="{% url 'ver_detalles_asistencia' planilla_asistencia.id %}" class="btn btn-warning btn-sm"> {# btn-sm añadido #}
                             <i class="fa fa-eraser"></i> Limpiar Filtros
                         </a>
-                        {% if planilla_asistencia.estado == 'borrador' or planilla_asistencia.estado == 'completo' %}
-                            <a href="{% url 'add_detalle_asistencia' planilla_asistencia.pk %}" class="btn btn-info">
-                                <i class="fa fa-plus"></i> Añadir Registro Manual
-                            </a>
+
+                        {# Botón Añadir Registro Manual a ESTA PlanillaAsistencia #}
+                        {# Requiere permiso para AÑADIR un DetalleAsistencia Y que la planilla esté en un estado editable #}
+                        {% if perms.reportes.add_detalleasistencia or user.is_superuser %}
+                            {% if planilla_asistencia.estado == 'borrador' or planilla_asistencia.estado == 'completo' %}
+                                <a href="{% url 'add_detalle_asistencia' planilla_asistencia.pk %}" class="btn btn-info btn-sm"> {# btn-sm añadido #}
+                                    <i class="fa fa-plus"></i> Añadir Registro Manual
+                                </a>
+                            {% endif %}
                         {% endif %}
-                        <a href="{% url 'lista_planillas_asistencia' %}" class="btn btn-secondary">
+
+                        <a href="{% url 'lista_planillas_asistencia' %}" class="btn btn-secondary btn-sm"> {# btn-sm añadido #}
                             <i class="fa fa-list"></i> Volver a Lista
                         </a>
                     </div>
@@ -95,8 +103,16 @@
         </div>
     </div>
 
-    {# Panel de Edición Rápida Fijo #}
+    {# Panel de Edición Rápida Fijo - Se mostrará/ocultará con JS, pero su capacidad de GUARDAR dependerá de los permisos #}
+    {# No necesitamos un if perms aquí porque el panel en sí es solo una estructura. La acción de guardar es lo importante. #}
     <div class="x_panel" id="quick-edit-panel" style="display: none; border-top: 3px solid #1ABB9C; margin-top: 20px;">
+        {# ... contenido del panel de edición rápida (sin cambios en su estructura HTML) ... #}
+        {# La lógica de si el botón "Guardar Cambios" dentro de este panel funciona
+           debería estar en el JavaScript (quick_edit_asistencia.js) que podría verificar
+           un atributo de datos en el botón o un permiso global pasado a JS, o, más robustamente,
+           el backend (la vista que maneja el guardado) debe verificar el permiso 'reportes.change_detalleasistencia'.
+           Por ahora, asumimos que el backend lo valida.
+        #}
         <div class="x_title">
             <h2><i class="fa fa-pencil-square-o"></i> Edición Rápida: <span id="quick-edit-person-name" class="text-info"></span></h2>
             <ul class="nav navbar-right panel_toolbox">
@@ -114,11 +130,9 @@
                     <div class="row">
                         {% for field in form_edit %}
                             <div class="col-md-3 col-sm-6 col-xs-12 mb-3 form-group">
-                                <label for="{{ field.id_for_label }}" class="control-label">{{ field.label }}:</label> {# Usar field.id_for_label que genera id_NOMBRECAMPO #}
-                                {# Renderizado BÁSICO de Django - Genera name="X" e id="id_X" #}
+                                <label for="{{ field.id_for_label }}" class="control-label">{{ field.label }}:</label>
                                 {{ field }}
-                                {# Las clases se añadirán con JS ahora #}
-                                <div class="invalid-feedback text-danger" id="error_{{ field.id_for_label }}"></div> {# Usar id_for_label para el error #}
+                                <div class="invalid-feedback text-danger" id="error_{{ field.id_for_label }}"></div>
                                 {% if field.help_text %}
                                     <small class="form-text text-muted">{{ field.help_text }}</small>
                                 {% endif %}
@@ -129,6 +143,7 @@
                 <div class="ln_solid"></div>
                 <div class="form-group row">
                     <div class="col-md-9 col-sm-9 offset-md-3">
+                        {# El guardado de este formulario es manejado por JS. El backend debe validar el permiso 'change_detalleasistencia'. #}
                         <button type="submit" class="btn btn-success btn-sm" id="quick-edit-save-btn">
                             <i class="fa fa-save"></i> Guardar Cambios
                         </button>
@@ -144,9 +159,8 @@
         </div>
     </div>
 
-    {# Estilos CSS #}
+    {# ... Tu CSS para sticky columns (sin cambios) ... #}
     <style>
-        /* Tu CSS existente para sticky columns */
         .table-responsive { overflow-x: auto; position: relative; }
         .tabla-asistencia th.sticky-col,
         .tabla-asistencia td.sticky-col {
@@ -156,15 +170,15 @@
         .tabla-asistencia thead th.sticky-col { background-color: #f8f9fa; }
         .tabla-asistencia th.sticky-col-last,
         .tabla-asistencia td.sticky-col-last {
-            right: 0; z-index: 2; min-width: 120px;
+            right: 0; z-index: 2; min-width: 120px; /* Ajusta min-width según tus botones */
             text-align: center;
         }
          .tabla-asistencia td.sticky-col-last .btn {
-             margin-left: 2px; margin-right: 2px;
+             margin-left: 2px; margin-right: 2px; margin-bottom: 2px; /* Añadido margen inferior */
          }
-        .tabla-asistencia th.sticky-col-second-last,
+        .tabla-asistencia th.sticky-col-second-last, /* No usado en este ejemplo, pero lo dejo por si lo necesitas */
         .tabla-asistencia td.sticky-col-second-last {
-            right: 120px;
+            right: 120px; /* Ajustar si la columna de acciones cambia de tamaño */
         }
         tr.table-info td {
              background-color: #d1ecf1 !important;
@@ -172,8 +186,8 @@
         }
     </style>
 
-    {# Panel de Resultados (Tabla) #}
-    {% if detalles_asistencia or not search_active %}
+    {# Panel de Resultados (Tabla de DetalleAsistencia) #}
+    {% if detalles_asistencia or not search_active %} {# Lógica para mostrar el panel #}
         <div class="x_panel">
             <div class="x_title">
                 <h2>Registros de Asistencia del Personal</h2>
@@ -186,6 +200,7 @@
                             <thead>
                                 <tr>
                                     <th>Nro.</th> <th>Item</th> <th>CI</th> <th>Nombre Completo</th> <th>Cargo</th>
+                                    {# ... todas tus otras columnas de datos (Omis. Cant, etc.) ... #}
                                     <th>Omis. Cant</th> <th>Omis. Sanc</th> <th>Aban. Días</th> <th>Aban. Sanc</th>
                                     <th>Faltas Días</th> <th>Faltas Sanc</th> <th>Atr. Min</th> <th>Atr. Sanc</th>
                                     <th>Vacac.</th> <th>Viajes</th> <th>B.Médicas</th> <th>PCGH</th> <th>Perm.Exc</th>
@@ -195,76 +210,76 @@
                                 </tr>
                             </thead>
                             <tbody id="asistencia-table-body">
-                                {% for detalle in detalles_asistencia %}
-                                    <tr id="detalle-row-{{ detalle.pk }}">
+                                {% for detalle_obj in detalles_asistencia %} {# Renombrado 'detalle' a 'detalle_obj' #}
+                                    <tr id="detalle-row-{{ detalle_obj.pk }}">
                                         <td>{{ forloop.counter }}</td>
-                                        <td>{{ detalle.item_externo|default:"N/A" }}</td>
-                                        <td>{{ detalle.ci_externo|default:"N/A" }}</td>
-                                        <td>{{ detalle.nombre_completo_externo|default:"N/A" }}</td>
-                                        <td>{{ detalle.cargo_externo|default:"N/A" }}</td>
-                                        <td data-field="omision_cant">{{ detalle.omision_cant|default:"0" }}</td>
-                                        <td data-field="omision_sancion">{{ detalle.omision_sancion|floatformat:2|default:"0.00" }}</td>
-                                        <td data-field="abandono_dias">{{ detalle.abandono_dias|floatformat:2|default:"0.00" }}</td>
-                                        <td data-field="abandono_sancion">{{ detalle.abandono_sancion|floatformat:2|default:"0.00" }}</td>
-                                        <td data-field="faltas_dias">{{ detalle.faltas_dias|floatformat:2|default:"0.00" }}</td>
-                                        <td data-field="faltas_sancion">{{ detalle.faltas_sancion|floatformat:2|default:"0.00" }}</td>
-                                        <td data-field="atrasos_minutos">{{ detalle.atrasos_minutos|default:"0" }}</td>
-                                        <td data-field="atrasos_sancion">{{ detalle.atrasos_sancion|floatformat:2|default:"0.00" }}</td>
-                                        <td data-field="vacacion">{{ detalle.vacacion|floatformat:2|default:"0.00" }}</td>
-                                        <td data-field="viajes">{{ detalle.viajes|floatformat:2|default:"0.00" }}</td>
-                                        <td data-field="bajas_medicas">{{ detalle.bajas_medicas|floatformat:2|default:"0.00" }}</td>
-                                        <td data-field="pcgh">{{ detalle.pcgh|floatformat:2|default:"0.00" }}</td>
-                                        <td data-field="perm_excep">{{ detalle.perm_excep|floatformat:2|default:"0.00" }}</td>
-                                        <td data-field="asuetos">{{ detalle.asuetos|floatformat:2|default:"0.00" }}</td>
-                                        <td data-field="psgh">{{ detalle.psgh|floatformat:2|default:"0.00" }}</td>
-                                        <td data-field="pcgh_embar_enf_base">{{ detalle.pcgh_embar_enf_base|floatformat:2|default:"0.00" }}</td>
-                                        <td data-field="actividad_navidad">{{ detalle.actividad_navidad|floatformat:2|default:"0.00" }}</td>
-                                        <td data-field="iza_bandera">{{ detalle.iza_bandera|floatformat:2|default:"0.00" }}</td>
-                                        <td data-field="observaciones" title="{{ detalle.observaciones|default:'' }}">{{ detalle.observaciones|truncatechars:20|default:"" }}</td>
+                                        <td>{{ detalle_obj.item_externo|default:"N/A" }}</td>
+                                        <td>{{ detalle_obj.ci_externo|default:"N/A" }}</td>
+                                        <td>{{ detalle_obj.nombre_completo_externo|default:"N/A" }}</td>
+                                        <td>{{ detalle_obj.cargo_externo|default:"N/A" }}</td>
+                                        {# ... celdas para todos tus datos ... #}
+                                        <td data-field="omision_cant">{{ detalle_obj.omision_cant|default:"0" }}</td>
+                                        <td data-field="omision_sancion">{{ detalle_obj.omision_sancion|floatformat:2|default:"0.00" }}</td>
+                                        <td data-field="abandono_dias">{{ detalle_obj.abandono_dias|floatformat:2|default:"0.00" }}</td>
+                                        <td data-field="abandono_sancion">{{ detalle_obj.abandono_sancion|floatformat:2|default:"0.00" }}</td>
+                                        <td data-field="faltas_dias">{{ detalle_obj.faltas_dias|floatformat:2|default:"0.00" }}</td>
+                                        <td data-field="faltas_sancion">{{ detalle_obj.faltas_sancion|floatformat:2|default:"0.00" }}</td>
+                                        <td data-field="atrasos_minutos">{{ detalle_obj.atrasos_minutos|default:"0" }}</td>
+                                        <td data-field="atrasos_sancion">{{ detalle_obj.atrasos_sancion|floatformat:2|default:"0.00" }}</td>
+                                        <td data-field="vacacion">{{ detalle_obj.vacacion|floatformat:2|default:"0.00" }}</td>
+                                        <td data-field="viajes">{{ detalle_obj.viajes|floatformat:2|default:"0.00" }}</td>
+                                        <td data-field="bajas_medicas">{{ detalle_obj.bajas_medicas|floatformat:2|default:"0.00" }}</td>
+                                        <td data-field="pcgh">{{ detalle_obj.pcgh|floatformat:2|default:"0.00" }}</td>
+                                        <td data-field="perm_excep">{{ detalle_obj.perm_excep|floatformat:2|default:"0.00" }}</td>
+                                        <td data-field="asuetos">{{ detalle_obj.asuetos|floatformat:2|default:"0.00" }}</td>
+                                        <td data-field="psgh">{{ detalle_obj.psgh|floatformat:2|default:"0.00" }}</td>
+                                        <td data-field="pcgh_embar_enf_base">{{ detalle_obj.pcgh_embar_enf_base|floatformat:2|default:"0.00" }}</td>
+                                        <td data-field="actividad_navidad">{{ detalle_obj.actividad_navidad|floatformat:2|default:"0.00" }}</td>
+                                        <td data-field="iza_bandera">{{ detalle_obj.iza_bandera|floatformat:2|default:"0.00" }}</td>
+                                        <td data-field="observaciones" title="{{ detalle_obj.observaciones|default:'' }}">{{ detalle_obj.observaciones|truncatechars:20|default:"" }}</td>
+                                        
                                         <td class="sticky-col sticky-col-last text-nowrap">
-                                            <button type="button" class="btn btn-sm btn-info quick-edit-btn" data-detalle-id="{{ detalle.pk }}" title="Edición Rápida">
+                                            {# Botón Edición Rápida para DetalleAsistencia #}
+                                            {% if perms.reportes.change_detalleasistencia or user.is_superuser %}
+                                            <button type="button" class="btn btn-sm btn-info quick-edit-btn" data-detalle-id="{{ detalle_obj.pk }}" title="Edición Rápida">
                                                 <i class="fa fa-pencil-square-o"></i>
                                             </button>
-                                            <a href="{% url 'editar_detalle_asistencia' detalle.pk %}?secretaria={{ request.GET.secretaria|default:'' }}&unidad={{ request.GET.unidad|default:'' }}&q={{ request.GET.q|default:'' }}" class="btn btn-sm btn-primary" title="Editar (Página Completa)"><i class="fa fa-pencil"></i></a>
-                                            <a href="{% url 'borrar_detalle_asistencia' detalle.pk %}" class="btn btn-sm btn-danger" title="Borrar Registro" onclick="return confirm('¿Está seguro de que desea borrar este registro de asistencia para {{ detalle.nombre_completo_externo|default:detalle.personal_externo_id|escapejs }}? Esta acción no se puede deshacer.');">
+                                            {% endif %}
+
+                                            {# Botón Editar (Página Completa) para DetalleAsistencia #}
+                                            {% if perms.reportes.change_detalleasistencia or user.is_superuser %}
+                                            <a href="{% url 'editar_detalle_asistencia' detalle_obj.pk %}?secretaria={{ request.GET.secretaria|default:'' }}&unidad={{ request.GET.unidad|default:'' }}&q={{ request.GET.q|default:'' }}" class="btn btn-sm btn-primary" title="Editar (Página Completa)"><i class="fa fa-pencil"></i></a>
+                                            {% endif %}
+
+                                            {# Botón Borrar Registro para DetalleAsistencia #}
+                                            {% if perms.reportes.delete_detalleasistencia or user.is_superuser %}
+                                            <a href="{% url 'borrar_detalle_asistencia' detalle_obj.pk %}" class="btn btn-sm btn-danger" title="Borrar Registro" onclick="return confirm('¿Está seguro de que desea borrar este registro de asistencia para {{ detalle_obj.nombre_completo_externo|default:detalle_obj.personal_externo_id|escapejs }}? Esta acción no se puede deshacer.');">
                                                 <i class="fa fa-trash"></i>
                                             </a>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
-
-                    {# --- Pasar datos a JS (CORREGIDO) --- #}
-                    {# Genera un script JSON con los IDs visibles. Asegúrate de que 'visible_ids_list' se pase desde la vista. #}
+                    {# ... tu script para pasar datos a JS (sin cambios aquí, asumiendo que visible_ids_list se pasa correctamente) ... #}
                     {{ visible_ids_list|json_script:"visible-ids-data" }}
-
                     <script>
-                        // Recuperar los IDs desde el script JSON generado por Django
-                        let visibleDetailIds = []; // Inicializar como array vacío por defecto
+                        let visibleDetailIds = [];
                         try {
                            const jsonDataElement = document.getElementById('visible-ids-data');
                            if (jsonDataElement) {
                                visibleDetailIds = JSON.parse(jsonDataElement.textContent);
                            } else {
-                               console.error("TEMPLATE ERROR: Elemento 'visible-ids-data' no encontrado. ¿Pasaste 'visible_ids_list' desde la vista?");
+                               console.warn("Elemento 'visible-ids-data' no encontrado.");
                            }
                         } catch (e) {
-                           console.error("TEMPLATE ERROR: Error parseando JSON de visibleDetailIds:", e);
+                           console.error("Error parseando JSON de visibleDetailIds:", e);
                         }
-
-                        // URLs base (CORREGIDO: usar replace para quitar ID y barra)
-                        // Se usa un ID falso (ej: 99999) que se reemplaza junto con las barras
                         const getDetalleJsonUrlBase = "{% url 'get_detalle_asistencia_json' 99999 %}".replace('/99999/', '/');
-                        const saveDetalleUrlBase = "{% url 'editar_detalle_asistencia' 99999 %}".replace('/99999/', '/');
-
-                        // Imprimir en consola para verificar durante el desarrollo
-                        console.log("Visible Detail IDs:", visibleDetailIds);
-                        console.log("Get JSON URL Base (Corregida):", getDetalleJsonUrlBase);
-                        console.log("Save URL Base (Corregida):", saveDetalleUrlBase);
+                        const saveDetalleUrlBase = "{% url 'editar_detalle_asistencia' 99999 %}".replace('/99999/', '/'); // Esta URL es para la vista que GUARDA, ¿es la misma que la de editar completo?
                     </script>
-                    {# --- FIN: Pasar datos a JS --- #}
 
                 {% else %}
                      <div class="alert alert-warning">
@@ -283,30 +298,21 @@
          </div>
     {% endif %}
 
-</div> {# Fin right_col #}
+</div>
 {% endblock %}
 
-
 {% block extra_js %}
-    {# Asegúrate de que jQuery esté cargado previamente (normalmente en index_master.html) #}
     <script src="{% static 'reportes/js/quick_edit_asistencia.js' %}"></script>
-
-    {# Script para aplicar clases de Bootstrap a los campos del formulario de edición rápida #}
-    {# Se puede llamar desde quick_edit_asistencia.js después de poblar el formulario #}
     <script>
         function applyBootstrapClassesToQuickEditForm() {
             const formControls = document.querySelectorAll('#quick-edit-form input[type="number"], #quick-edit-form input[type="text"], #quick-edit-form textarea, #quick-edit-form select');
             formControls.forEach(function(control) {
-                if (!control.classList.contains('form-control-sm')) {
-                    control.classList.add('form-control-sm');
-                }
-                if (!control.classList.contains('form-control')) {
-                    control.classList.add('form-control');
-                }
-                if (control.tagName === 'SELECT' && !control.classList.contains('form-select-sm')) {
-                     control.classList.add('form-select-sm');
-                }
+                if (!control.classList.contains('form-control-sm')) { control.classList.add('form-control-sm'); }
+                if (!control.classList.contains('form-control')) { control.classList.add('form-control'); }
+                if (control.tagName === 'SELECT' && !control.classList.contains('form-select-sm')) { control.classList.add('form-select-sm');}
             });
         }
+        // Podrías llamar applyBootstrapClassesToQuickEditForm() desde tu quick_edit_asistencia.js
+        // cuando el formulario de edición rápida se puebla con datos.
     </script>
 {% endblock %}

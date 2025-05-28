@@ -1,0 +1,117 @@
+{% extends 'index_master.html' %}
+{% block content %}
+<div class="right_col" role="main">
+    <div class="page-title">
+        <div class="title_left">
+            <h3>{{ titulo_vista }}</h3>
+        </div>
+    </div>
+    <div class="clearfix"></div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">×</span>
+                </button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-12 col-sm-12">
+            <div class="x_panel">
+                <div class="x_title">
+                    <h2>Listado de Grupos (Roles)</h2>
+                    <ul class="nav navbar-right panel_toolbox">
+                        <li>
+                            {# Botón para Crear Nuevo Grupo #}
+                            {% if perms.auth.add_group or user.is_superuser %}
+                            <a href="{% url 'crear_grupo' %}" class="btn btn-success btn-sm">
+                                <i class="fa fa-plus"></i> Crear Nuevo Grupo
+                            </a>
+                            {% endif %}
+                        </li>
+                        <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                    </ul>
+                    <div class="clearfix"></div>
+                </div>
+                <div class="x_content">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Nombre del Grupo</th>
+                                    <th>Permisos Asignados (muestra)</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for grupo_actual in grupos %}
+                                <tr>
+                                    <td>{{ grupo_actual.name }}</td>
+                                    <td>
+                                        {% for perm in grupo_actual.permissions.all|slice:":5" %}
+                                            <span class="badge badge-info" title="{{ perm.name }}">{{ perm.content_type.app_label }}.{{ perm.codename }}</span>
+                                        {% endfor %}
+                                        {% if grupo_actual.permissions.count > 5 %}
+                                            <span class="badge badge-light">... y {{ grupo_actual.permissions.count|add:"-5" }} más</span>
+                                        {% elif grupo_actual.permissions.count == 0 %}
+                                            <span class="badge badge-warning">Sin permisos asignados</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-nowrap">
+                                        {# Botón Editar Grupo #}
+                                        {% if perms.auth.change_group or user.is_superuser %}
+                                        <a href="{% url 'editar_grupo' grupo_actual.id %}" class="btn btn-sm btn-info" title="Editar Grupo">
+                                            <i class="fa fa-pencil"></i> Editar
+                                        </a>
+                                        {% endif %}
+
+                                        {# Botón Eliminar Grupo #}
+                                        {% if perms.auth.delete_group or user.is_superuser %}
+                                            {# Ejemplo de protección extra en UI para grupos críticos.
+                                               La lógica principal de si un grupo se puede eliminar (ej. si tiene usuarios)
+                                               debe estar en la vista 'eliminar_grupo_view'.
+                                               Reemplaza "Administradores" y "NombreGrupoCriticoProtegido"
+                                               con nombres reales de grupos que quieras proteger en la UI, o elimina esta lógica interna
+                                               si la vista ya se encarga de todo.
+                                            #}
+                                            {% if grupo_actual.name != "Administradores" and grupo_actual.name != "NombreGrupoCriticoProtegido" %}
+                                                <a href="{% url 'eliminar_grupo' grupo_actual.id %}"
+                                                   class="btn btn-sm btn-danger"
+                                                   title="Eliminar Grupo"
+                                                   onclick="return confirm('¿Está seguro que desea eliminar el grupo \'{{ grupo_actual.name|escapejs }}\'? Esta acción no se puede deshacer.');">
+                                                    <i class="fa fa-trash"></i> Eliminar
+                                                </a>
+                                            {% else %}
+                                                {# Este grupo está "protegido" por su nombre en esta lógica de UI #}
+                                                {% if user.is_superuser %}
+                                                     <a href="{% url 'eliminar_grupo' grupo_actual.id %}"
+                                                        class="btn btn-sm btn-danger"
+                                                        title="Eliminar Grupo (Acción de Superadmin)"
+                                                        onclick="return confirm('ADVERTENCIA (Superadmin): ¿Está seguro que desea eliminar el grupo protegido \'{{ grupo_actual.name|escapejs }}\'? Esta acción no se puede deshacer.');">
+                                                        <i class="fa fa-trash"></i> Eliminar
+                                                    </a>
+                                                {% else %}
+                                                    <span class="badge badge-secondary" title="Este grupo tiene protección especial y no puede ser eliminado desde aquí por su rol. Contacte a un superadministrador si es necesario."><i class="fa fa-lock"></i> Protegido</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center">No hay grupos definidos.</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

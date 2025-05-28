@@ -1,0 +1,171 @@
+{% extends 'index_master.html' %}
+{% block content %}
+<div class="right_col" role="main">
+    <div class="page-title">
+        <div class="title_left">
+            <h3>{{ titulo_vista }}</h3>
+        </div>
+    </div>
+    <div class="clearfix"></div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">×</span>
+                </button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-12 col-sm-12">
+            <div class="x_panel">
+                <div class="x_title">
+                    <h2>Listado de Usuarios</h2>
+                    <ul class="nav navbar-right panel_toolbox">
+                        <li>
+                            {# Botón para Registrar Nuevo Usuario #}
+                            {% if perms.auth.add_user or user.is_superuser %}
+                            <a href="{% url 'crear_usuario' %}" class="btn btn-success btn-sm">
+                                <i class="fa fa-plus"></i> Registrar Nuevo Usuario
+                            </a>
+                            {% endif %}
+                        </li>
+                        <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                    </ul>
+                    <div class="clearfix"></div>
+                </div>
+                <div class="x_content">
+                    <div class="table-responsive"> {# Añadido para mejor visualización en móviles #}
+                        <table class="table table-striped table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Nombre Completo</th>
+                                    <th>Email</th>
+                                    <th>CI</th>
+                                    <th>Roles/Grupos</th>
+                                    <th>Activo</th>
+                                    <th>Staff</th>
+                                    <th>Superusuario</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for usuario_actual in usuarios %}
+                                <tr>
+                                    <td>{{ usuario_actual.username }}</td>
+                                    <td>{{ usuario_actual.get_full_name|default:"N/A" }}</td>
+                                    <td>{{ usuario_actual.email|default:"N/A" }}</td>
+                                    <td>
+                                        {% if usuario_actual.profile %}
+                                            {{ usuario_actual.profile.ci|default:"N/A" }}
+                                        {% else %}
+                                            Sin Perfil
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% for group in usuario_actual.groups.all %}
+                                            <span class="badge badge-secondary">{{ group.name }}</span>
+                                        {% empty %}
+                                            Sin roles
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        {% if usuario_actual.is_active %}
+                                            <i class="fa fa-check-circle text-success" title="Activo"></i>
+                                        {% else %}
+                                            <i class="fa fa-times-circle text-danger" title="Inactivo"></i>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if usuario_actual.is_staff %}
+                                            <i class="fa fa-check-circle text-success" title="Sí"></i>
+                                        {% else %}
+                                            <i class="fa fa-times-circle text-danger" title="No"></i>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if usuario_actual.is_superuser %}
+                                            <i class="fa fa-star text-warning" title="Sí"></i>
+                                        {% else %}
+                                            <i class="fa fa-user text-info" title="No"></i>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-nowrap">
+                                        {# Botón Ver Detalles #}
+                                        
+                                        {% if perms.auth.view_user or user.is_superuser %}
+                                        <a href="{% url 'ver_detalle_usuario' usuario_actual.id %}" class="btn btn-secondary btn-sm" title="Ver Detalles">
+                                            <i class="fa fa-eye"></i>
+                                        </a>
+                                        {% endif %}
+
+                                        {# Botón Editar #}
+                                        
+                                        {% if perms.auth.change_user or user.is_superuser %}
+                                            
+                                            {% comment %}
+                                            Si quieres la lógica fina aquí también (redundante pero puede mejorar UI):
+                                            {% if user.is_superuser or not usuario_actual.is_superuser %}
+                                            <a href="{% url 'editar_usuario' usuario_actual.id %}" class="btn btn-info btn-sm" title="Editar">
+                                                <i class="fa fa-pencil"></i>
+                                            </a>
+                                            {% endif %}
+                                            {% endcomment %}
+                                            {# Versión más simple para la UI, dejando la lógica fina a la vista: #}
+                                             <a href="{% url 'editar_usuario' usuario_actual.id %}" class="btn btn-info btn-sm" title="Editar">
+                                                <i class="fa fa-pencil"></i>
+                                            </a>
+                                        {% endif %}
+
+                                        {# Botones Activar/Desactivar #}
+                                        
+                                        {% if perms.auth.change_user or user.is_superuser %}
+                                            {% if request.user.id != usuario_actual.id %} {# Condición básica para no mostrar para el usuario actual #}
+                                                {% if usuario_actual.is_active %}
+                                                    <form action="{% url 'desactivar_usuario' usuario_actual.id %}" method="post" style="display: inline;" onsubmit="return confirm('¿Está seguro de que desea desactivar (dar de baja) a {{ usuario_actual.username }}? No podrá iniciar sesión.');">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-warning btn-sm" title="Dar de Baja (Desactivar)">
+                                                            <i class="fa fa-user-times"></i>
+                                                        </button>
+                                                    </form>
+                                                {% else %}
+                                                    <form action="{% url 'activar_usuario' usuario_actual.id %}" method="post" style="display: inline;" onsubmit="return confirm('¿Está seguro de que desea activar a {{ usuario_actual.username }}?');">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-success btn-sm" title="Activar Usuario">
+                                                            <i class="fa fa-user-plus"></i>
+                                                        </button>
+                                                    </form>
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endif %}
+
+                                        {# Botón Eliminar #}
+                                        {# La vista 'eliminar_usuario_view' tiene la lógica fina. #}
+                                        {% if perms.auth.delete_user or user.is_superuser %}
+                                            {% if request.user.id != usuario_actual.id %} {# No permitir que un usuario se elimine a sí mismo desde aquí #}
+                                                
+                                                <a href="{% url 'eliminar_usuario' usuario_actual.id %}" class="btn btn-danger btn-sm" title="Eliminar" onclick="return confirm('¿Está seguro que desea eliminar PERMANENTEMENTE a {{ usuario_actual.username }}? Esta acción no se puede deshacer.');">
+                                                    <i class="fa fa-trash"></i>
+                                                </a>
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="9" class="text-center">No hay usuarios registrados.</td> {# Mejor centrado #}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

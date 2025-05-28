@@ -1,0 +1,92 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta http_equiv="Content-Type" content="text/html; charset=UTF-8">
+    <!-- Meta, title, CSS, favicons, etc. -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>{% block page_title %}Autenticación - Mi Sistema{% endblock %}</title>
+
+    <!-- Bootstrap -->
+    <link href="{% static 'FrWork/admin_lte/vendors/bootstrap/dist/css/bootstrap.min.css' %}" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="{% static 'FrWork/admin_lte/vendors/font-awesome/css/font-awesome.min.css' %}" rel="stylesheet">
+    <!-- NProgress -->
+    <link href="{% static 'FrWork/admin_lte/vendors/nprogress/nprogress.css' %}" rel="stylesheet">
+    <!-- Animate.css -->
+    <link href="{% static 'FrWork/admin_lte/vendors/animate.css/animate.min.css' %}" rel="stylesheet">
+
+    <!-- Estilos personalizados para la página de autenticación -->
+    <style>
+        body {
+            background: #F7F7F7; /* Color de fondo similar al de Gentelella login */
+            display: flex;
+            align-items: center; /* Centrar verticalmente */
+            justify-content: center; /* Centrar horizontalmente */
+            min-height: 100vh;
+        }
+        .login_wrapper {
+            position: relative;
+            margin: 0 auto;
+            max-width: 380px; /* Ancho similar al login de Gentelella */
+        }
+        .login_form {
+            position: relative;
+            background: #fff;
+            padding: 20px 30px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .login_form h1 {
+            font-size: 24px;
+            text-align: center;
+            margin-bottom: 25px;
+            font-weight: 500;
+        }
+         .login_form .separator {
+             border-top: 1px solid #D8D8D8;
+             margin-top: 20px;
+             padding-top: 20px;
+             text-align: center;
+         }
+         .login_form .separator p {
+             color: #666;
+         }
+         .login_form .btn-primary {
+             width: 100%;
+         }
+         /* Puedes añadir el logo si tienes uno */
+         .login_form .logo-container {
+             text-align: center;
+             margin-bottom: 20px;
+         }
+         .login_form .logo-container img {
+             max-width: 150px; /* Ajusta según tu logo */
+         }
+    </style>
+    {% block extra_head_auth %}{% endblock %}
+</head>
+
+<body class="login"> {# Clase 'login' si tu CSS la usa #}
+    <div>
+        <a class="hiddenanchor" id="signup"></a>
+        <a class="hiddenanchor" id="signin"></a>
+
+        <div class="login_wrapper">
+            <div class="animate form login_form">
+                <section class="login_content">
+                    {% block auth_form_content %}
+                    {# El contenido específico del formulario (login, registro, etc.) irá aquí #}
+                    {% endblock %}
+                </section>
+            </div>
+
+            {% block other_auth_forms %}{% endblock %}
+        </div>
+    </div>
+    {% block extra_js_auth %}{% endblock %}
+</body>
+</html>

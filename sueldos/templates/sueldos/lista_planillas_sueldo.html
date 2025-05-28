@@ -12,10 +12,11 @@
             </div>
              <div class="title_right">
                 <div class="pull-right">
-                     {# Botón para ir a la vista de creación #}
+                    {% if perms.sueldos.add_planillasueldo or user.is_superuser %}
                     <a href="{% url 'crear_planilla_sueldo' %}" class="btn btn-success">
                         <i class="fa fa-plus"></i> Crear Nueva Planilla
                     </a>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -26,10 +27,14 @@
                 <div class="x_panel">
                     <div class="x_title">
                         <h2>Listado de Planillas</h2>
+                        {# Podrías añadir aquí botones de panel_toolbox si los necesitas #}
+                        <ul class="nav navbar-right panel_toolbox">
+                            <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                            <li><a class="close-link"><i class="fa fa-close"></i></a></li>
+                        </ul>
                         <div class="clearfix"></div>
                     </div>
                     <div class="x_content">
-                        {# Mostrar mensajes de Django #}
                         {% if messages %}
                             {% for message in messages %}
                                 <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
@@ -54,51 +59,75 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for planilla in planillas_sueldo %}
+                                    {% for planilla_obj in planillas_sueldo %} {# Renombrado 'planilla' a 'planilla_obj' #}
                                     <tr class="{% cycle 'even' 'odd' %} pointer">
-                                        <td>{{ planilla.mes }}/{{ planilla.anio }}</td>
-                                        <td>{{ planilla.get_tipo_display }}</td>
+                                        <td>{{ planilla_obj.mes }}/{{ planilla_obj.anio }}</td>
+                                        <td>{{ planilla_obj.get_tipo_display }}</td>
                                         <td>
-                                            {# Puedes añadir clases CSS basadas en el estado #}
-                                            <span class="badge badge-{% if planilla.estado == 'cargado' %}info{% elif planilla.estado == 'validado' %}success{% elif planilla.estado == 'error_carga' %}danger{% else %}secondary{% endif %}">
-                                                {{ planilla.get_estado_display }}
+                                            <span class="badge badge-{% if planilla_obj.estado == 'cargado' %}info{% elif planilla_obj.estado == 'validado' %}success{% elif planilla_obj.estado == 'error_carga' %}danger{% elif planilla_obj.estado == 'pagado' %}primary{% else %}secondary{% endif %}">
+                                                {{ planilla_obj.get_estado_display }}
                                             </span>
                                         </td>
-                                        <td>{{ planilla.fecha_creacion|date:"d/m/Y H:i" }}</td>
-                                        <td>{{ planilla.usuario_creacion.username|default:"-" }}</td>
+                                        <td>{{ planilla_obj.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                                        <td>{{ planilla_obj.usuario_creacion.username|default:"-" }}</td>
                                         <td>
-                                            {% if planilla.archivo_excel_cargado %}
-                                                <a href="{{ planilla.archivo_excel_cargado.url }}" target="_blank" title="Descargar archivo">
-                                                    <i class="fa fa-file-excel-o"></i> {{ planilla.filename }}
+                                            {% if planilla_obj.archivo_excel_cargado %}
+                                                <a href="{{ planilla_obj.archivo_excel_cargado.url }}" target="_blank" title="Descargar archivo {{ planilla_obj.filename }}">
+                                                    <i class="fa fa-file-excel-o"></i> {{ planilla_obj.filename|truncatechars:20 }}
                                                 </a>
                                             {% else %}
                                                 -
                                             {% endif %}
                                         </td>
-                                        <td>{{ planilla.fecha_carga_excel|date:"d/m/Y H:i"|default:"-" }}</td>
-                                        <td class=" last">
-                                            {# Enlace para Cargar/Re-cargar Excel #}
-                                            <a href="{% url 'subir_excel_sueldos' planilla.id %}" class="btn btn-primary btn-sm" title="Cargar/Re-cargar Excel">
-                                                <i class="fa fa-upload"></i> Cargar Excel
-                                            </a>
-                                            {# Enlace para Ver Detalles (Cuando lo implementes) #}
-                                            <a href="{% url 'ver_detalles_sueldo' planilla.id %}" class="btn btn-info btn-sm" title="Ver Detalles">
-                                                <i class="fa fa-eye"></i> Ver Detalles
-                                            </a>
-                                            {# Enlace para Editar Cabecera (Cuando lo implementes) #}
-                                            <a href="{% url 'editar_planilla_sueldo' planilla.id %}" class="btn btn-warning btn-sm" title="Editar Cabecera">
-                                                <i class="fa fa-pencil"></i> Editar
-                                            </a>
-                                             {# Enlace para Borrar (Cuando lo implementes) #}
-                                            <a href="{% url 'borrar_planilla_sueldo' planilla.id %}" class="btn btn-danger btn-sm" title="Borrar Planilla">
-                                                <i class="fa fa-trash"></i> Borrar
-                                            </a>
-                                            {% if planilla.estado in "cargado,validado,pagado" %} {# Ajusta estados permitidos #}
-                                                <a href="{% url 'generar_pdf_boletas_por_planilla' planilla.id %}"
-                                                class="btn btn-danger btn-xs" target="_blank" {# target="_blank" para abrir en nueva pestaña #}
-                                                title="Generar PDF de Boletas de Pago">
-                                                    <i class="fa fa-file-pdf-o"></i> Generar Boletas
+                                        <td>{{ planilla_obj.fecha_carga_excel|date:"d/m/Y H:i"|default:"-" }}</td>
+                                        <td class="last text-nowrap"> {# Añadido text-nowrap #}
+                                            {# Botón Cargar/Re-cargar Excel - Asumimos que esto es una modificación de la planilla #}
+                                            {% if perms.sueldos.change_planillasueldo or user.is_superuser %}
+                                                {# Podrías añadir lógica de estado aquí si solo se puede cargar en ciertos estados #}
+                                                {% if planilla_obj.estado != 'pagado' %} {# Ejemplo: no cargar si ya está pagada #}
+                                                <a href="{% url 'subir_excel_sueldos' planilla_obj.id %}" class="btn btn-primary btn-sm" title="Cargar/Re-cargar Excel">
+                                                    <i class="fa fa-upload"></i>
                                                 </a>
+                                                {% endif %}
+                                            {% endif %}
+
+                                            {# Botón Ver Detalles #}
+                                            {% if perms.sueldos.view_planillasueldo or user.is_superuser %}
+                                            <a href="{% url 'ver_detalles_sueldo' planilla_obj.id %}" class="btn btn-info btn-sm" title="Ver Detalles">
+                                                <i class="fa fa-eye"></i>
+                                            </a>
+                                            {% endif %}
+
+                                            {# Botón Editar Cabecera #}
+                                            {% if perms.sueldos.change_planillasueldo or user.is_superuser %}
+                                                {# Podrías añadir lógica de estado, ej. solo editar si es 'borrador' o no 'pagado' #}
+                                                {% if planilla_obj.estado != 'pagado' %}
+                                                <a href="{% url 'editar_planilla_sueldo' planilla_obj.id %}" class="btn btn-warning btn-sm" title="Editar Cabecera">
+                                                    <i class="fa fa-pencil"></i>
+                                                </a>
+                                                {% endif %}
+                                            {% endif %}
+
+                                            {# Botón Borrar Planilla #}
+                                            {% if perms.sueldos.delete_planillasueldo or user.is_superuser %}
+                                                {# Podrías añadir lógica de estado, ej. solo borrar si es 'borrador' o no 'pagado' #}
+                                                {% if planilla_obj.estado != 'pagado' %}
+                                                <a href="{% url 'borrar_planilla_sueldo' planilla_obj.id %}" class="btn btn-danger btn-sm" title="Borrar Planilla" onclick="return confirm('¿Está seguro que desea eliminar la planilla de sueldos {{ planilla_obj.mes }}/{{ planilla_obj.anio }}?');">
+                                                    <i class="fa fa-trash"></i>
+                                                </a>
+                                                {% endif %}
+                                            {% endif %}
+
+                                            {# Botón Generar Boletas PDF #}
+                                            
+                                            {% if perms.sueldos.change_planillasueldo or perms.boletas.add_boletapago or user.is_superuser %} {# AJUSTA ESTE PERMISO #}
+                                                {% if planilla_obj.estado in "cargado,validado,pagado" %}
+                                                    <a href="{% url 'generar_pdf_boletas_por_planilla' planilla_obj.id %}"
+                                                    class="btn btn-danger btn-sm" target="_blank" {# btn-xs es muy pequeño, usando btn-sm #}
+                                                    title="Generar PDF de Boletas de Pago">
+                                                        <i class="fa fa-file-pdf-o"></i>
+                                                    </a>
+                                                {% endif %}
                                             {% endif %}
                                         </td>
                                     </tr>
@@ -110,13 +139,10 @@
                                 </tbody>
                             </table>
                         </div>
-
-                        {# Aquí podrías añadir paginación si esperas muchas planillas #}
-
-                    </div> {# Fin x_content #}
-                </div> {# Fin x_panel #}
-            </div> {# Fin col #}
-        </div> {# Fin row #}
-    </div> {# Fin container #}
-</div> {# Fin right_col #}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

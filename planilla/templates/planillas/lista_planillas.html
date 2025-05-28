@@ -1,21 +1,26 @@
 {% extends 'index_master.html' %}
+{% load static %} {# Asumo que lo tienes en index_master, si no, añádelo aquí si usas {% static %} #}
+
+{% block title_suffix %} - Lista de Planillas Bono Té{% endblock %}
 
 {% block content %}
 <div class="right_col" role="main">
-    <div class="page-title"> {# Añadir título de página si tu plantilla base lo usa #}
+    <div class="page-title">
         <div class="title_left">
             <h3>Lista de Planillas Generadas</h3>
         </div>
         <div class="title_right">
              <div class="pull-right">
+                {% if perms.planilla.add_planilla or user.is_superuser %} {# PERMISO PARA CREAR #}
                  <a href="{% url 'crear_planilla_bono_te' %}" class="btn btn-success"><i class="fa fa-plus"></i> Crear Nueva Planilla</a>
+                {% endif %}
              </div>
         </div>
     </div>
     <div class="clearfix"></div>
 
     <div class="row">
-        <div class="col-md-12 col-sm-12 "> {# Envolver tabla en estructura de panel/tarjeta #}
+        <div class="col-md-12 col-sm-12 ">
             <div class="x_panel">
                 <div class="x_title">
                     <h2>Planillas Registradas</h2>
@@ -26,88 +31,105 @@
                     <div class="clearfix"></div>
                 </div>
                 <div class="x_content">
-                    {# Mensajes Flash #}
                     {% if messages %}
                         <div class="mt-3">
                             {% for message in messages %}
-                                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %}" role="alert">
+                                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
                                     {{ message }}
+                                    <button type="button" class="close" data-dismiss="alert" aria-label="Close"> {# Asumiendo Bootstrap 4/Gentelella close button #}
+                                        <span aria-hidden="true">×</span>
+                                    </button>
                                 </div>
                             {% endfor %}
                         </div>
                     {% endif %}
 
-                    <table class="table table-striped table-bordered" id="datatable-planillas"> {# Añadir clases y posible ID para DataTables #}
-                        <thead>
-                            <tr>
-                                <th>Mes/Año</th>
-                                <th>Tipo</th> {# Movido para agrupar con Mes/Año #}
-                                <th>Estado</th>
-                                <th>Días Háb.</th> {# Añadido Días Hábiles #}
-                                <th>Elaborada por</th>
-                                <th>Fecha Elaboración</th>
-                                {# Quitado Fecha Inicio/Fin si no son relevantes en la lista #}
-                                {# <th>Fecha Inicio</th> #}
-                                {# <th>Fecha Fin</th> #}
-                                <th class="text-center">Acciones</th> {# Centrar acciones #}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for planilla in planillas %}
-                            <tr>
-                                <td>{{ planilla.mes }}/{{ planilla.anio }}</td>
-                                <td>{{ planilla.get_tipo_display }}</td> {# Correcto #}
-                                <td>
-                                    {# Mostrar estado con badges de Bootstrap #}
-                                    <span class="badge
-                                        {% if planilla.estado == 'aprobado' %}badge-success
-                                        {% elif planilla.estado == 'rechazado' %}badge-danger
-                                        {% else %}badge-warning{% endif %}">
-                                        {{ planilla.get_estado_display }} {# Usar display #}
-                                    </span>
-                                </td>
-                                <td>{{ planilla.dias_habiles|default:"N/A" }}</td> {# Mostrar días hábiles #}
-                                <td>{{ planilla.usuario_elaboracion.username|default:"-" }}</td> {# Manejar si no hay usuario #}
-                                <td>{{ planilla.fecha_elaboracion|date:"d/m/Y" }}</td> {# Formatear fecha #}
-                                {# <td>{{ planilla.fecha_inicio|date:"d/m/Y"|default:"-" }}</td> #}
-                                {# <td>{{ planilla.fecha_fin|date:"d/m/Y"|default:"-" }}</td> #}
-                                <td class="text-center"> {# Añadir clase para centrar #}
-                                    {# Enlaces de acciones con iconos #}
-                                    <a href="{% url 'ver_detalles_bono_te' planilla_id=planilla.id %}" class="btn btn-sm btn-info" title="Ver Detalles Bono TE"><i class="fa fa-eye"></i></a>
-                                    {# Botón Llenar deshabilitado/comentado si no existe la vista #}
-                                    {# <a href="#" class="btn btn-sm btn-success" title="Llenar Detalles"><i class="fa fa-pencil-square-o"></i></a> #}
-                                    <a href="{% url 'editar_planilla' planilla_id=planilla.id %}" class="btn btn-sm btn-primary" title="Editar Cabecera"><i class="fa fa-edit"></i></a>
-                                    <a href="{% url 'borrar_planilla' planilla_id=planilla.id %}" class="btn btn-sm btn-danger" title="Borrar Planilla"><i class="fa fa-trash"></i></a>
-                                    {# Añadir enlace a Exportar Excel #}
-                                    <a href="{% url 'exportar_planilla_xlsx' planilla_id=planilla.id %}" class="btn btn-sm btn-success" title="Exportar a Excel"><i class="fa fa-file-excel-o"></i></a>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="7">No hay planillas creadas.</td> {# Ajustar colspan #}
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                    <div class="table-responsive"> {# Añadido para mejor visualización en móviles #}
+                        <table class="table table-striped table-bordered" id="datatable-planillas">
+                            <thead>
+                                <tr>
+                                    <th>Mes/Año</th>
+                                    <th>Tipo</th>
+                                    <th>Estado</th>
+                                    <th>Días Háb.</th>
+                                    <th>Elaborada por</th>
+                                    <th>Fecha Elaboración</th>
+                                    <th class="text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for planilla_obj in planillas %} {# Renombrado 'planilla' a 'planilla_obj' #}
+                                <tr>
+                                    <td>{{ planilla_obj.mes }}/{{ planilla_obj.anio }}</td>
+                                    <td>{{ planilla_obj.get_tipo_display }}</td>
+                                    <td>
+                                        <span class="badge
+                                            {% if planilla_obj.estado == 'aprobado' %}badge-success
+                                            {% elif planilla_obj.estado == 'rechazado' %}badge-danger
+                                            {% elif planilla_obj.estado == 'borrador' %}badge-warning  {# Ajuste para borrador #}
+                                            {% else %}badge-secondary{% endif %}"> {# Un default por si hay otros estados #}
+                                            {{ planilla_obj.get_estado_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ planilla_obj.dias_habiles|default:"N/A" }}</td>
+                                    <td>{{ planilla_obj.usuario_elaboracion.username|default:"-" }}</td>
+                                    <td>{{ planilla_obj.fecha_elaboracion|date:"d/m/Y" }}</td>
+                                    <td class="text-center text-nowrap"> {# Añadido text-nowrap #}
+                                        {# Botón Ver Detalles #}
+                                        {% if perms.planilla.view_planilla or user.is_superuser %}
+                                        <a href="{% url 'ver_detalles_bono_te' planilla_id=planilla_obj.id %}" class="btn btn-sm btn-info" title="Ver Detalles Bono TE"><i class="fa fa-eye"></i></a>
+                                        {% endif %}
 
-                    {# Mover el botón de crear fuera de la tabla, ya está en el título #}
-                    {# <a href="{% url 'seleccionar_tipo_planilla' %}" class="btn btn-primary">Crear Nueva Planilla</a> #}
-                </div> {# Fin x_content #}
-            </div> {# Fin x_panel #}
-        </div> {# Fin col #}
-    </div> {# Fin row #}
+                                        {# Botón Editar Cabecera/Planilla #}
+                                        {% if perms.planilla.change_planilla or user.is_superuser %}
+                                            
+                                            <a href="{% url 'editar_planilla' planilla_id=planilla_obj.id %}" class="btn btn-sm btn-primary" title="Editar Cabecera"><i class="fa fa-edit"></i></a>
+                                        {% endif %}
+
+                                        {# Botón Borrar Planilla #}
+                                        {% if perms.planilla.delete_planilla or user.is_superuser %}
+                                            {# Similarmente, podrías condicionar por estado si solo se borra en borrador #}
+                                            <a href="{% url 'borrar_planilla' planilla_id=planilla_obj.id %}" class="btn btn-sm btn-danger" title="Borrar Planilla" onclick="return confirm('¿Está seguro que desea eliminar la planilla {{ planilla_obj.mes }}/{{ planilla_obj.anio }}?');">
+                                                <i class="fa fa-trash"></i>
+                                            </a>
+                                        {% endif %}
+
+                                        {# Botón Exportar a Excel #}
+                                        {# Asumimos un permiso 'view_planilla' para exportar, o podrías crear uno personalizado 'export_planilla' #}
+                                        {% if perms.planilla.view_planilla or user.is_superuser %} {# O 'perms.planilla.export_planilla' #}
+                                        <a href="{% url 'exportar_planilla_xlsx' planilla_id=planilla_obj.id %}" class="btn btn-sm btn-success" title="Exportar a Excel"><i class="fa fa-file-excel-o"></i></a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center">No hay planillas creadas.</td> {# Ajustar colspan #}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
-{% block extra_scripts %}
-{# Incluir scripts para DataTables si se usa #}
+{% block extra_scripts %} {# Renombrado a extra_scripts por consistencia si usas ese nombre en tu base #}
+{# Asegúrate de que jQuery y DataTables estén cargados antes (normalmente en index_master.html o aquí) #}
+{# <script src="{% static 'vendors/datatables.net/js/jquery.dataTables.min.js' %}"></script> #}
+{# <script src="{% static 'vendors/datatables.net-bs/js/dataTables.bootstrap.min.js' %}"></script> #}
 <script>
 $(document).ready(function() {
     $('#datatable-planillas').DataTable({
         "language": {
-            "url": "//cdn.datatables.net/plug-ins/1.10.21/i18n/Spanish.json" // Traducción
+            // "url": "//cdn.datatables.net/plug-ins/1.10.21/i18n/Spanish.json" // Si no lo tienes local
+            "url": "{% static 'vendors/datatables.net/i18n/Spanish.json' %}" // Asumiendo que tienes el archivo Spanish.json localmente
         },
-        "order": [[ 0, "desc" ]] // Ordenar por Mes/Año descendente por defecto
+        "order": [[ 0, "desc" ]], // Ordenar por la primera columna (Mes/Año) descendente
+        // Puedes añadir más configuraciones de DataTables aquí
+        responsive: true // Ejemplo
     });
 });
 </script>

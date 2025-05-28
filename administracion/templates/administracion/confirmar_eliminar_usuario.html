@@ -1,0 +1,17 @@
+{% extends 'index_master.html' %}
+{% block content %}
+<div class="right_col" role="main">
+    <h3>{{ titulo_vista }}</h3>
+    <div class="x_panel">
+        <div class="x_content">
+            <p>¿Está seguro de que desea eliminar permanentemente al usuario <strong>"{{ usuario_a_eliminar.username }}"</strong> ({{ usuario_a_eliminar.get_full_name }})?</p>
+            <p class="text-danger">Esta acción no se puede deshacer y también eliminará su perfil asociado.</p>
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Sí, Eliminar Usuario</button>
+                <a href="{% url 'lista_usuarios' %}" class="btn btn-secondary">Cancelar</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

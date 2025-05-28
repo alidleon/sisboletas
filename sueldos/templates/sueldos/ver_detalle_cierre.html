@@ -1,14 +1,11 @@
-{% extends 'index_master.html' %} {# Ajusta si tu base es diferente #}
+{% extends 'index_master.html' %}
 {% load static %}
-{% load humanize %} {# Asegúrate que humanize esté en INSTALLED_APPS #}
+{% load humanize %}
 
 {% block title_suffix %} - Detalle Cierre {{ cierre_mensual.mes }}/{{ cierre_mensual.anio }}{% endblock %}
 
 {% block content %}
-{# El div class="right_col" y su cierre están en index_master.html #}
-{# Por lo tanto, el contenido del bloque empieza directamente dentro de él. #}
-
-<div class="right_col" role="main"> {# Div contenedor general para el contenido de la página dentro de right_col #}
+<div class="right_col" role="main">
         <div class="page-title">
             <div class="title_left">
                 <h3>{{ titulo_pagina|default:"Detalle del Cierre Mensual" }}</h3>
@@ -18,15 +15,21 @@
                     <a href="{% url 'lista_cierres_mensuales' %}" class="btn btn-secondary btn-sm">
                         <i class="fa fa-list"></i> Volver a Lista Cierres
                     </a>
-                    <a href="{% url 'generar_estado_mensual_form' %}?mes={{ cierre_mensual.mes }}&anio={{ cierre_mensual.anio }}&tipo_planilla={{ cierre_mensual.tipo_planilla }}" class="btn btn-warning btn-sm" title="Re-generar este estado (borrará el actual y sus detalles)">
-                        <i class="fa fa-refresh"></i> Re-Generar Estado
-                    </a>
+                    {# Botón Re-Generar Estado #}
+                    {# Asumimos que re-generar implica modificar el CierreMensual o sus Estados #}
+                    {% if perms.sueldos.change_cierremensual or perms.sueldos.add_cierremensual or user.is_superuser %}
+                        {# Podrías añadir lógica de estado de cierre_mensual aquí si la re-generación solo es posible en ciertos estados #}
+                        {% if cierre_mensual.estado_proceso != 'VALIDADO_FINAL' %} {# Ejemplo: No re-generar si ya está validado final #}
+                        <a href="{% url 'generar_estado_mensual_form' %}?mes={{ cierre_mensual.mes }}&anio={{ cierre_mensual.anio }}&tipo_planilla={{ cierre_mensual.tipo_planilla }}" class="btn btn-warning btn-sm" title="Re-generar este estado (borrará el actual y sus detalles)">
+                            <i class="fa fa-refresh"></i> Re-Generar Estado
+                        </a>
+                        {% endif %}
+                    {% endif %}
                 </div>
             </div>
         </div>
         <div class="clearfix"></div>
 
-        {# Panel de Información del Cierre #}
         <div class="row">
             <div class="col-md-12 col-sm-12 ">
                 <div class="x_panel">
@@ -55,21 +58,20 @@
             </div>
         </div>
 
-        {# Panel con la Tabla de Estados de Empleados #}
         <div class="row">
             <div class="col-md-12 col-sm-12 ">
                 <div class="x_panel">
                     <div class="x_title">
                         <h2>Estados de Empleados para este Cierre</h2>
                         <div class="navbar-right" style="margin-top: 5px;">
-                            {% if estados_empleados_page_obj %} {# Usar el objeto Page para el conteo total #}
+                            {% if estados_empleados_page_obj %}
                                 <span class="badge bg-light text-dark">Total Registros: {{ estados_empleados_page_obj.paginator.count }}</span>
                             {% endif %}
                         </div>
                         <div class="clearfix"></div>
                     </div>
                     <div class="x_content">
-                        {% if messages %} {# Mover mensajes aquí por si hay alguno específico de esta sección #}
+                        {% if messages %}
                            {% for message in messages %}
                                 <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
                                     {{ message|safe }}
@@ -92,29 +94,35 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                {% for estado in estados_empleados_lista %} {# Iterar sobre la lista Python enriquecida #}
+                                {% for estado_obj in estados_empleados_lista %} {# Renombrado 'estado' a 'estado_obj' #}
                                     <tr>
-                                        <td>{{ estado.ci_externo|default:"N/A" }}</td>
-                                        <td>{{ estado.nombre_completo_externo|default:"Error" }}</td>
-                                        <td>{{ estado.item|default:"" }}</td>
-                                        <td>{{ estado.cargo|default:"" }}</td>
+                                        <td>{{ estado_obj.ci_externo|default:"N/A" }}</td>
+                                        <td>{{ estado_obj.nombre_completo_externo|default:"Error" }}</td>
+                                        <td>{{ estado_obj.item|default:"" }}</td>
+                                        <td>{{ estado_obj.cargo|default:"" }}</td>
                                         <td class="text-center">
-                                            <span class="badge {% if estado.estado_final_mes == 'ACTIVO' or estado.estado_final_mes == 'NUEVO_INGRESO' %}bg-success{% elif estado.estado_final_mes == 'CAMBIO_PUESTO' %}bg-info text-dark{% elif estado.estado_final_mes == 'RETIRO_DETECTADO' %}bg-secondary{% elif estado.estado_final_mes == 'INCONSISTENTE_BD' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
-                                                {{ estado.get_estado_final_mes_display }}
+                                            <span class="badge {% if estado_obj.estado_final_mes == 'ACTIVO' or estado_obj.estado_final_mes == 'NUEVO_INGRESO' %}bg-success{% elif estado_obj.estado_final_mes == 'CAMBIO_PUESTO' %}bg-info text-dark{% elif estado_obj.estado_final_mes == 'RETIRO_DETECTADO' %}bg-secondary{% elif estado_obj.estado_final_mes == 'INCONSISTENTE_BD' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                                                {{ estado_obj.get_estado_final_mes_display }}
                                             </span>
                                         </td>
-                                        <td data-toggle="tooltip" data-placement="top" title="{{ estado.notas_proceso|default:'' }}">
-                                            {{ estado.notas_proceso|truncatewords_html:10|default:"" }} {# Usar truncatewords_html si la nota puede tener HTML simple #}
+                                        <td data-toggle="tooltip" data-placement="top" title="{{ estado_obj.notas_proceso|default:'' }}">
+                                            {{ estado_obj.notas_proceso|truncatewords_html:10|default:"" }}
                                         </td>
                                         <td class="text-center text-nowrap">
-                                            {% if estado.detalle_sueldo_id %}
-                                            <a href="{% url 'editar_detalle_sueldo' estado.detalle_sueldo_id %}" class="btn btn-outline-info btn-sm" title="Ver/Editar Detalle Sueldo de este periodo">
-                                                 <i class="fa fa-money"></i> Sueldo
-                                            </a>
+                                            {# Enlace a Editar Detalle Sueldo - El permiso se aplica en la vista de Detalle Sueldo #}
+                                            {% if estado_obj.detalle_sueldo_id %}
+                                                {% if perms.sueldos.change_detallesueldo or user.is_superuser %} {# Opcional: verificar permiso para el enlace #}
+                                                <a href="{% url 'editar_detalle_sueldo' estado_obj.detalle_sueldo_id %}" class="btn btn-outline-info btn-sm" title="Ver/Editar Detalle Sueldo de este periodo">
+                                                     <i class="fa fa-money"></i> Sueldo
+                                                </a>
+                                                {% else %}
+                                                    <span class="text-muted" title="No tiene permiso para editar detalles de sueldo">-</span>
+                                                {% endif %}
                                             {% else %}
                                                 <span class="text-muted">-</span>
                                             {% endif %}
-                                            {# Aquí podrías añadir un botón para editar el EstadoMensualEmpleado si creas esa funcionalidad #}
+
+                                            
                                         </td>
                                     </tr>
                                 {% empty %}
@@ -125,8 +133,7 @@
                                 </tbody>
                             </table>
                         </div>
-
-                        {# Paginación usando el objeto Page 'estados_empleados_page_obj' #}
+                        {# ... tu paginación (sin cambios de permisos aquí) ... #}
                         {% if estados_empleados_page_obj.has_other_pages %}
                         <nav aria-label="Page navigation">
                             <ul class="pagination justify-content-center">
@@ -148,19 +155,17 @@
                             </ul>
                         </nav>
                         {% endif %}
-                        {# -------------------------------------- #}
-                    </div> {# Fin x_content #}
-                </div> {# Fin x_panel #}
-            </div> {# Fin col-md-12 #}
-        </div> {# Fin row #}
-    </div> {# Cierre del div class="" que está dentro de right_col #}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock content %}
 
 {% block extra_js %}
-{# Inicializar tooltips de Bootstrap #}
 <script>
 $(document).ready(function(){
-  $('[data-toggle="tooltip"]').tooltip();
+  $('[data-toggle="tooltip"]').tooltip(); // Para tus tooltips en las notas
 });
 </script>
 {% endblock %}

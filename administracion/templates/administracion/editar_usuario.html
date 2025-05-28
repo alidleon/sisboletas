@@ -1,0 +1,244 @@
+{% extends 'index_master.html' %}
+{% load static %} {# Asegúrate de que 'static' esté cargado si usas {% static %} en index_master.html o aquí #}
+
+{% block title_suffix %}- Editar Usuario: {{ user_form.instance.username }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Estilos para el botón de mostrar/ocultar contraseña */
+    .input-group-append .btn {
+        border-left-width: 0; /* Evita doble borde si el input tiene borde */
+        cursor: pointer;
+    }
+    .input-group-append .btn:hover {
+        background-color: #e9ecef; /* Un ligero hover para el botón */
+    }
+    .input-group-append .btn i {
+        margin-left: 2px;
+        margin-right: 2px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <div class="page-title">
+        <div class="title_left">
+            {# Usar el título de la vista o uno por defecto si no se pasa #}
+            <h3>{{ titulo_vista|default:"Editar Usuario" }}</h3>
+        </div>
+    </div>
+    <div class="clearfix"></div>
+
+    {# Mostrar Mensajes de Django (éxito, error, info, warning) #}
+    {% if messages %}
+        <div class="row">
+            <div class="col-md-12 col-sm-12">
+                {% for message in messages %}
+                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-12 col-sm-12"> {# Asegúrate que esta columna cubra el x_panel #}
+            <div class="x_panel">
+                <div class="x_title">
+                    <h2>Datos del Usuario: {{ user_form.instance.username }}</h2>
+                    <ul class="nav navbar-right panel_toolbox">
+                        <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                        {# Puedes añadir otros botones aquí si los tenías #}
+                    </ul>
+                    <div class="clearfix"></div>
+                </div>
+                <div class="x_content">
+                    <form method="post" enctype="multipart/form-data" class="form-horizontal form-label-left" novalidate>
+                        {% csrf_token %}
+                        
+                        {# Mostrar errores NON-FIELD (generales del formulario) #}
+                        {% if user_form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                <strong>Errores en datos de cuenta/rol:</strong>
+                                <ul>
+                                {% for error in user_form.non_field_errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+                        {% if profile_form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                <strong>Errores en datos personales:</strong>
+                                <ul>
+                                {% for error in profile_form.non_field_errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+
+                        {# Mensaje genérico para errores DE CAMPO, si no hay mensajes de Django y no hay errores non-field #}
+                        {% if not messages and not user_form.non_field_errors and not profile_form.non_field_errors %}
+                            {# Ahora, verificar si alguno de los formularios tiene CUALQUIER tipo de error (esto incluye errores de campo) #}
+                            {% if user_form.errors or profile_form.errors %}
+                                <div class="alert alert-warning">
+                                    Verifique los campos marcados con errores.
+                                </div>
+                            {% endif %}
+                        {% endif %}
+
+                        <h4>Datos de Cuenta y Rol</h4>
+                        <div class="ln_solid my-2"></div>
+                        
+                        {# Username (readonly) #}
+                        <div class="form-group row">
+                            <label class="col-form-label col-md-3 col-sm-3 label-align text-md-right">Username:</label>
+                            <div class="col-md-6 col-sm-9">
+                                <input type="text" value="{{ user_form.instance.username }}" class="form-control" readonly>
+                                <small class="form-text text-muted">El nombre de usuario no se puede modificar.</small>
+                            </div>
+                        </div>
+
+                        {# Iterar sobre otros campos visibles de user_form (excluyendo username y los de contraseña) #}
+                        {% for field in user_form %}
+                            {% if field.name != 'username' and field.name != 'password_new1' and field.name != 'password_new2' %}
+                            <div class="form-group row {% if field.errors %}bad{% endif %}">
+                                <label class="col-form-label col-md-3 col-sm-3 label-align text-md-right" for="{{ field.id_for_label }}">
+                                    {{ field.label }} {% if field.field.required %}<span class="required">*</span>{% endif %}:
+                                </label>
+                                <div class="col-md-6 col-sm-9">
+                                    {{ field }}
+                                    {% for error in field.errors %}<div class="text-danger" style="font-size: 0.875em;">{{ error }}</div>{% endfor %}
+                                    {% if field.help_text %}<small class="form-text text-muted">{{ field.help_text|safe }}</small>{% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+
+                        {# --- Sección para Cambiar Contraseña --- #}
+                        <h4 class="mt-4">Cambiar Contraseña (Opcional)</h4>
+                        <div class="ln_solid my-2"></div>
+
+                        {# Nueva Contraseña (password_new1 del user_form) #}
+                        <div class="form-group row {% if user_form.password_new1.errors %}bad{% endif %}">
+                            <label class="col-form-label col-md-3 col-sm-3 label-align text-md-right" for="{{ user_form.password_new1.id_for_label }}">
+                                {{ user_form.password_new1.label }}:
+                            </label>
+                            <div class="col-md-6 col-sm-9">
+                                <div class="input-group">
+                                    {{ user_form.password_new1 }}
+                                    <div class="input-group-append">
+                                        <button class="btn btn-outline-secondary" type="button" id="togglePasswordNew1" title="Mostrar contraseña">
+                                            <i class="fa fa-eye" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                {% for error in user_form.password_new1.errors %}<div class="text-danger mt-1" style="font-size: 0.875em;">{{ error }}</div>{% endfor %}
+                                {% if user_form.password_new1.help_text %}<small class="form-text text-muted">{{ user_form.password_new1.help_text|safe }}</small>{% endif %}
+                            </div>
+                        </div>
+
+                        {# Confirmar Nueva Contraseña (password_new2 del user_form) #}
+                        <div class="form-group row {% if user_form.password_new2.errors %}bad{% endif %}">
+                            <label class="col-form-label col-md-3 col-sm-3 label-align text-md-right" for="{{ user_form.password_new2.id_for_label }}">
+                                {{ user_form.password_new2.label }}:
+                            </label>
+                            <div class="col-md-6 col-sm-9">
+                                <div class="input-group">
+                                    {{ user_form.password_new2 }}
+                                    <div class="input-group-append">
+                                        <button class="btn btn-outline-secondary" type="button" id="togglePasswordNew2" title="Mostrar contraseña">
+                                            <i class="fa fa-eye" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                {% for error in user_form.password_new2.errors %}<div class="text-danger mt-1" style="font-size: 0.875em;">{{ error }}</div>{% endfor %}
+                                {% if user_form.password_new2.help_text %}<small class="form-text text-muted">{{ user_form.password_new2.help_text|safe }}</small>{% endif %}
+                            </div>
+                        </div>
+
+                        <h4 class="mt-4">Datos Personales (Perfil)</h4>
+                        <div class="ln_solid my-2"></div>
+                        {# Renderizar campos de profile_form #}
+                        {% for field in profile_form %}
+                            <div class="form-group row {% if field.errors %}bad{% endif %}">
+                                <label class="col-form-label col-md-3 col-sm-3 label-align text-md-right" for="{{ field.id_for_label }}">
+                                    {{ field.label }} {% if field.field.required %}<span class="required">*</span>{% endif %}:
+                                </label>
+                                <div class="col-md-6 col-sm-9">
+                                    {{ field }}
+                                    {% if field.name == 'foto' and profile_form.instance.foto and profile_form.instance.foto.url %}
+                                        <p class="mt-2"> {# Cambiado mt-1 a mt-2 para un poco más de espacio #}
+                                            Foto actual: <br>
+                                            <a href="{{ profile_form.instance.foto.url }}" target="_blank">
+                                                <img src="{{ profile_form.instance.foto.url }}" alt="Foto de {{ user_form.instance.username }}" style="max-height: 100px; border-radius: 4px; margin-top: 5px;">
+                                            </a>
+                                        </p>
+                                    {% endif %}
+                                    {% for error in field.errors %}<div class="text-danger" style="font-size: 0.875em;">{{ error }}</div>{% endfor %}
+                                    {% if field.help_text %}<small class="form-text text-muted">{{ field.help_text|safe }}</small>{% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+
+                        <div class="ln_solid"></div>
+                        <div class="form-group row">
+                            <div class="col-md-6 col-sm-9 offset-md-3">
+                                <button type="submit" class="btn btn-success"><i class="fa fa-save"></i> Guardar Cambios</button>
+                                <a href="{% url 'lista_usuarios' %}" class="btn btn-secondary"><i class="fa fa-times"></i> Cancelar</a>
+                            </div>
+                        </div>
+                    </form>
+                </div> {# Cierre de x_content #}
+            </div> {# Cierre de x_panel #}
+        </div> {# Cierre de col-md-12 #}
+    </div> {# Cierre de row #}
+</div> {# Cierre de right_col #}
+{% endblock %} {# Cierre de block content #}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function setupPasswordToggle(inputId, buttonId) {
+        const passwordInput = document.getElementById(inputId);
+        const toggleButton = document.getElementById(buttonId);
+        
+        // Salir si los elementos no se encuentran para evitar errores en consola
+        if (!passwordInput || !toggleButton) {
+            // console.warn('Elementos para toggle de contraseña no encontrados:', inputId, buttonId);
+            return;
+        }
+        
+        const toggleIcon = toggleButton.querySelector('i');
+        if (!toggleIcon) {
+            // console.warn('Icono para toggle de contraseña no encontrado en botón:', buttonId);
+            return;
+        }
+
+        toggleButton.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            if (type === 'text') {
+                toggleIcon.classList.remove('fa-eye');
+                toggleIcon.classList.add('fa-eye-slash');
+                toggleButton.setAttribute('title', 'Ocultar contraseña');
+            } else {
+                toggleIcon.classList.remove('fa-eye-slash');
+                toggleIcon.classList.add('fa-eye');
+                toggleButton.setAttribute('title', 'Mostrar contraseña');
+            }
+        });
+    }
+
+    // Configurar para los campos de nueva contraseña del user_form
+    setupPasswordToggle('{{ user_form.password_new1.id_for_label }}', 'togglePasswordNew1');
+    setupPasswordToggle('{{ user_form.password_new2.id_for_label }}', 'togglePasswordNew2');
+});
+</script>
+{% endblock %} {# Cierre de block extra_js #}

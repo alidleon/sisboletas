@@ -3,7 +3,7 @@
 import logging
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.db import transaction, IntegrityError
 from django.urls import reverse_lazy # Usaremos reverse_lazy para el redirect
 from .forms import EditarPlanillaAsistenciaForm 
@@ -47,6 +47,7 @@ EXTERNAL_TYPE_MAP = {
 }
 
 @login_required
+@permission_required('reportes.add_planillaasistencia', raise_exception=True)
 # transaction.atomic asegura que la creación de la cabecera y los detalles
 # se realice como una sola operación en la base de datos 'default'.
 @transaction.atomic(using='default')
@@ -192,6 +193,7 @@ def crear_planilla_asistencia(request):
 
 
 @login_required
+@permission_required('reportes.view_planillaasistencia', raise_exception=True)
 def lista_planillas_asistencia(request):
     """
     Muestra una lista de todas las Planillas de Asistencia creadas.
@@ -206,6 +208,7 @@ def lista_planillas_asistencia(request):
     return render(request, 'reportes/lista_planillas_asistencia.html', context)
 
 @login_required
+@permission_required('reportes.change_planillaasistencia', raise_exception=True)
 def editar_planilla_asistencia(request, pk): # Usamos 'pk' como en Django admin/generic views
     """
     Permite editar los campos de la cabecera de una PlanillaAsistencia existente.
@@ -247,6 +250,7 @@ def editar_planilla_asistencia(request, pk): # Usamos 'pk' como en Django admin/
 # ... (modelos, formularios, otras vistas) ...
 
 @login_required
+@permission_required('reportes.delete_planillaasistencia', raise_exception=True)
 def borrar_planilla_asistencia(request, pk):
     """
     Permite borrar una PlanillaAsistencia existente y todos sus detalles asociados.
@@ -291,6 +295,7 @@ def borrar_planilla_asistencia(request, pk):
 # ... (tus imports y otras vistas) ...
 
 @login_required
+@permission_required('reportes.view_detalleasistencia', raise_exception=True)
 def ver_detalles_asistencia(request, pk):
     """
     Muestra los detalles de asistencia filtrados y enriquecidos, pasando la
@@ -395,6 +400,7 @@ EXTERNAL_TYPE_MAP = {
 from urllib.parse import urlencode # <-- Asegúrate de tener esta importación
 
 @login_required
+@permission_required('reportes.change_detalleasistencia', raise_exception=True)
 def editar_detalle_asistencia(request, detalle_id):
     """
     Permite editar los campos de un registro DetalleAsistencia específico.
@@ -542,6 +548,7 @@ def editar_detalle_asistencia(request, detalle_id):
 # ... (modelos, formularios, otras vistas) ...
 
 @login_required
+@permission_required('reportes.delete_detalleasistencia', raise_exception=True)
 def borrar_detalle_asistencia(request, detalle_id):
     """
     Permite borrar un registro DetalleAsistencia específico.
@@ -596,6 +603,7 @@ def borrar_detalle_asistencia(request, detalle_id):
 
 
 @login_required
+@permission_required('reportes.add_detalleasistencia', raise_exception=True)
 def add_detalle_asistencia(request, planilla_asistencia_id):
     """
     Añade manualmente un nuevo registro DetalleAsistencia a una
@@ -709,6 +717,7 @@ def add_detalle_asistencia(request, planilla_asistencia_id):
 # ... (después de tus otras vistas) ...
 
 @login_required
+@permission_required('reportes.change_detalleasistencia', raise_exception=True)
 def get_detalle_asistencia_json(request, detalle_id):
     """
     Devuelve los datos de un DetalleAsistencia específico en formato JSON

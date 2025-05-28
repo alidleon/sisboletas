@@ -1,0 +1,183 @@
+{% extends 'index_master.html' %}
+{% load static %} 
+
+{% block content %}
+<div class="right_col" role="main">
+    <div class="page-title">
+        <div class="title_left">
+            <h3>{{ titulo_vista|default:"Formulario de Grupo" }}</h3>
+        </div>
+    </div>
+    <div class="clearfix"></div>
+
+    {% if messages %}
+        <div class="row">
+            <div class="col-md-12 col-sm-12">
+                {% for message in messages %}
+                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-12 col-sm-12">
+            <div class="x_panel">
+                <div class="x_title">
+                    <h2>Datos del Grupo (Rol)</h2>
+                    <ul class="nav navbar-right panel_toolbox">
+                        <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                    </ul>
+                    <div class="clearfix"></div>
+                </div>
+                <div class="x_content">
+                    <form method="post" class="form-horizontal form-label-left">
+                        {% csrf_token %}
+                        
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                <strong>Por favor, corrija los siguientes errores:</strong>
+                                <ul>
+                                {% for error in form.non_field_errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+                        {% if form.errors and not form.non_field_errors and not messages %}
+                             <div class="alert alert-warning">
+                                 Verifique los campos marcados con errores.
+                             </div>
+                        {% endif %}
+
+                        {# Campo Nombre del Grupo #}
+                        <div class="form-group row {% if form.name.errors %}bad{% endif %}">
+                            <label class="col-form-label col-md-3 col-sm-3 label-align text-md-right" for="{{ form.name.id_for_label }}">
+                                {{ form.name.label }} {% if form.name.field.required %}<span class="required">*</span>{% endif %}:
+                            </label>
+                            <div class="col-md-6 col-sm-9">
+                                {{ form.name }}
+                                {% for error in form.name.errors %}<div class="text-danger" style="font-size: 0.875em;">{{ error }}</div>{% endfor %}
+                                {% if form.name.help_text %}<small class="form-text text-muted">{{ form.name.help_text }}</small>{% endif %}
+                            </div>
+                        </div>
+
+                        {# --- CAMPO PERMISOS CON AGRUPACIÓN PERSONALIZADA --- #}
+                        <div class="form-group row {% if form.permissions.errors %}bad{% endif %}">
+                            <label class="col-form-label col-md-3 col-sm-3 label-align text-md-right">
+                                {{ form.permissions.label }} {% if form.permissions.field.required %}<span class="required">*</span>{% endif %}:
+                            </label>
+                            <div class="col-md-9 col-sm-9">
+                                <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px;">
+                                    
+                                    {% regroup todos_los_permisos_para_template by content_type.app_label as permisos_por_app %}
+                                    
+                                    {% for app_data in permisos_por_app %}
+                                        <div class="app-permissions-group mb-3">
+                                            <h5 style="cursor: pointer; font-weight: bold;" onclick="togglePermissions(this)">
+                                                <i class="fa fa-plus-square-o"></i> {{ app_data.grouper|capfirst }}
+                                                <small class="ml-2">
+                                                    (<input type="checkbox" class="select-all-app" data-app="{{ app_data.grouper|slugify }}"> Seleccionar/Deseleccionar todo)
+                                                </small>
+                                            </h5>
+                                            <ul class="list-unstyled permissions-list" style="display: none; padding-left: 20px;">
+                                                {% regroup app_data.list by content_type.model as permisos_por_modelo %}
+                                                {% for modelo_data in permisos_por_modelo %}
+                                                    <li>
+                                                        <strong>Modelo: {{ modelo_data.grouper|capfirst }}</strong>
+                                                        <ul class="list-unstyled" style="padding-left: 20px;">
+                                                            {% for permiso_obj in modelo_data.list %}
+                                                                <li>
+                                                                    <label>
+                                                                        <input type="checkbox" 
+                                                                               name="{{ form.permissions.html_name }}" 
+                                                                               value="{{ permiso_obj.pk }}" 
+                                                                               class="permission-checkbox app-{{ app_data.grouper|slugify }}"
+                                                                               {% if permiso_obj in form.permissions.initial %}checked{% endif %}>
+                                                                        {{ permiso_obj.name }} 
+                                                                        <small class="text-muted">({{ permiso_obj.codename }})</small>
+                                                                    </label>
+                                                                </li>
+                                                            {% endfor %}
+                                                        </ul>
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                {% for error in form.permissions.errors %}<div class="text-danger" style="font-size: 0.875em;">{{ error }}</div>{% endfor %}
+                                {% if form.permissions.help_text %}<small class="form-text text-muted">{{ form.permissions.help_text }}</small>{% endif %}
+                            </div>
+                        </div>
+                        {# --- FIN CAMPO PERMISOS --- #}
+
+                        <div class="ln_solid"></div>
+                        <div class="form-group row">
+                            <div class="col-md-6 col-sm-9 offset-md-3">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fa fa-save"></i> {% if grupo %}Actualizar Grupo{% else %}Crear Grupo{% endif %}
+                                </button>
+                                <a href="{% url 'lista_grupos' %}" class="btn btn-secondary">Cancelar</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function togglePermissions(headerElement) {
+    const list = headerElement.nextElementSibling;
+    const icon = headerElement.querySelector('i.fa');
+    if (list.style.display === "none") {
+        list.style.display = "block";
+        icon.classList.remove('fa-plus-square-o');
+        icon.classList.add('fa-minus-square-o');
+    } else {
+        list.style.display = "none";
+        icon.classList.remove('fa-minus-square-o');
+        icon.classList.add('fa-plus-square-o');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.select-all-app').forEach(function(checkbox) {
+        checkbox.addEventListener('change', function() {
+            const appSlug = this.dataset.app;
+            const isChecked = this.checked;
+            const appGroupDiv = this.closest('.app-permissions-group');
+            if (appGroupDiv) {
+                appGroupDiv.querySelectorAll('.permission-checkbox.app-' + appSlug).forEach(function(permCheckbox) {
+                    permCheckbox.checked = isChecked;
+                });
+            }
+        });
+    });
+
+    document.querySelectorAll('.app-permissions-group').forEach(function(appGroupDiv) {
+        const selectAllCheckbox = appGroupDiv.querySelector('.select-all-app');
+        if (selectAllCheckbox) {
+            const appSlug = selectAllCheckbox.dataset.app;
+            const permCheckboxes = appGroupDiv.querySelectorAll('.permission-checkbox.app-' + appSlug);
+            let allCheckedInApp = permCheckboxes.length > 0;
+            permCheckboxes.forEach(function(permCheckbox) {
+                if (!permCheckbox.checked) {
+                    allCheckedInApp = false;
+                }
+            });
+            selectAllCheckbox.checked = allCheckedInApp;
+        }
+    });
+});
+</script>
+{% endblock %}
