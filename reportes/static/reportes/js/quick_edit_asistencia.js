@@ -335,10 +335,36 @@ $(document).ready(function() {
                     showFormErrors(response.errors || {'_error': 'Error desconocido del servidor.'});
                 }
             },
-            error: function(jqXHR, textStatus, errorThrown) {
-                 console.error(`FUNC saveDetail: Error en AJAX POST para ID ${detalleId}. Status: ${textStatus}, Error: ${errorThrown}`, jqXHR.responseText);
-                 const errorMsg = jqXHR.responseJSON?.message || jqXHR.statusText || errorThrown || 'Error desconocido';
-                 quickEditErrorMessage.html(`<strong>Error al guardar (${jqXHR.status}):</strong> ${errorMsg}`).show();
+            error: function(jqXHR, textStatus, errorThrown) { // <--- ESTA ES LA SECCIÓN A MODIFICAR/ASEGURAR
+                 console.error(`FUNC saveDetail: Error en AJAX POST para ID ${detalleId}. Status Code: ${jqXHR.status}, TextStatus: ${textStatus}, ErrorThrown: ${errorThrown}`, jqXHR.responseText);
+                 
+                 let errorMessage = "Ocurrió un error inesperado al intentar guardar.";
+                 // Intentar obtener el mensaje de la respuesta JSON del servidor
+                 if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
+                     errorMessage = jqXHR.responseJSON.message;
+                 } else if (jqXHR.statusText && jqXHR.status !== 0) { 
+                     errorMessage = `Error ${jqXHR.status}: ${jqXHR.statusText}`;
+                 }
+
+                 // --- MANEJO ESPECÍFICO PARA ERROR DE ESTADO (403) ---
+                 if (jqXHR.status === 403) { // 403 Forbidden (nuestro caso para control de estado)
+                     // Mostrar el mensaje de error en el panel de edición rápida
+                     quickEditErrorMessage.html(`<strong>Acción no permitida:</strong> ${errorMessage}`).show();
+                     // Opcional: usar un alert si prefieres
+                     // alert(`Acción no permitida: ${errorMessage}`);
+                     
+                     // Opcional: cerrar el panel y limpiar, ya que la edición no es posible
+                     // quickEditPanel.slideUp(); 
+                     // highlightTableRow(null); 
+                     // currentEditingId = null;
+                     // clearFormErrors(); 
+                 } else if (jqXHR.responseJSON && jqXHR.responseJSON.errors) {
+                     // Si el backend devuelve errores de formulario estructurados en un error HTTP (ej. 400)
+                     showFormErrors(jqXHR.responseJSON.errors);
+                 } else {
+                     // Error genérico de red o servidor
+                     quickEditErrorMessage.html(`<strong>Error de Red/Servidor:</strong> ${errorMessage}`).show();
+                 }
             },
             complete: function() {
                 console.log(`FUNC saveDetail: Petición AJAX POST para ID ${detalleId} completada.`);

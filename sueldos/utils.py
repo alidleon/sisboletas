@@ -2,6 +2,7 @@
 import logging
 from django.shortcuts import get_object_or_404
 from .models import PlanillaSueldo, DetalleSueldo # Modelos locales
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 try:
     # Modelos externos necesarios para filtros y enriquecimiento
@@ -21,7 +22,7 @@ from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
-def get_processed_sueldo_details(request, planilla_id):
+def get_processed_sueldo_details(request, planilla_id, items_por_pagina=25):
     """
     Obtiene PlanillaSueldo, filtros externos, y detalles de sueldo
     filtrados y enriquecidos con datos externos.
@@ -32,8 +33,9 @@ def get_processed_sueldo_details(request, planilla_id):
         'unidades_for_select': PrincipalUnidadExterna.objects.none() if PLANILLA_APP_AVAILABLE else [],
         'selected_secretaria_id': None,
         'selected_unidad_id': None,
-        'detalles_sueldo': [], # Lista de objetos DetalleSueldo enriquecidos
+        #'detalles_sueldo': [], # Lista de objetos DetalleSueldo enriquecidos
         # 'detalle_ids_order': [], # Podríamos añadir si implementamos edición rápida
+        'page_obj': None,
         'search_active': False,
         'error_message': None,
         'search_term': '',
@@ -72,7 +74,7 @@ def get_processed_sueldo_details(request, planilla_id):
     search_term = request.GET.get('q', '').strip()
     result['search_term'] = search_term
     # Determinar si se activó la búsqueda/filtro
-    result['search_active'] = bool(request.GET.get('buscar') or filter_secretaria_str or filter_unidad_str or search_term)
+    result['search_active'] = bool(filter_secretaria_str or filter_unidad_str or search_term)
     logger.debug(f"[Util Sueldos] GET Params: sec='{filter_secretaria_str}', un='{filter_unidad_str}', q='{search_term}' | Search Active: {result['search_active']}")
 
     # --- 3. Cargar Unidades si se seleccionó Secretaría ---
@@ -166,6 +168,7 @@ def get_processed_sueldo_details(request, planilla_id):
     try:
         # Query base: detalles de la planilla actual
         detalles_locales_qs = DetalleSueldo.objects.filter(planilla_sueldo=planilla)
+        logger.debug(f"[Util Sueldos] Queryset inicial: {detalles_locales_qs.count()} detalles.") # LOG AÑADIDO
 
         # Aplicar filtro por IDs externos si es necesario
         if apply_external_id_filter:
@@ -175,6 +178,7 @@ def get_processed_sueldo_details(request, planilla_id):
                 detalles_locales_qs = detalles_locales_qs.filter(
                     personal_externo_id__in=personal_ids_to_filter_local
                 )
+                logger.debug(f"[Util Sueldos] Queryset TRAS FILTRO IDs: {detalles_locales_qs.count()} detalles.") # LOG AÑADIDO
             else:
                 # Si se debía filtrar pero no hay IDs, forzar vacío
                 logger.info("[Util Sueldos] Filtro por IDs activo pero sin IDs válidos, forzando resultado vacío.")
@@ -196,6 +200,7 @@ def get_processed_sueldo_details(request, planilla_id):
         if detalles_locales_list and PLANILLA_APP_AVAILABLE:
             # Obtener los IDs externos necesarios
             ids_needed = {d.personal_externo_id for d in detalles_locales_list if d.personal_externo_id}
+            logger.debug(f"[Util Sueldos] IDs para enriquecer: {len(ids_needed)} - {list(ids_needed)[:10]}") # LOG AÑADIDO
             personal_info_ext = {}
             designaciones_info_ext = {}
 
@@ -207,7 +212,8 @@ def get_processed_sueldo_details(request, planilla_id):
                         .filter(id__in=ids_needed) \
                         .only('id', 'nombre', 'apellido_paterno', 'apellido_materno', 'ci')
                     personal_info_ext = {p.id: p for p in personas_externas}
-                    logger.debug(f"[Util Sueldos] Info Personal Externo obtenida para {len(personal_info_ext)} IDs.")
+                    #logger.debug(f"[Util Sueldos] Info Personal Externo obtenida para {len(personal_info_ext)} IDs.")
+                    logger.debug(f"[Util Sueldos] ENRIQUECIMIENTO: Obtenidos {len(personal_info_ext)} perfiles de personal.") # LOG AÑADIDO
                 except Exception as e_pers_f: logger.error(f"Error consulta personal externo: {e_pers_f}")
 
                 # Obtener info designaciones externas (Item, Cargo) - Solo ACTIVAS
@@ -272,7 +278,29 @@ def get_processed_sueldo_details(request, planilla_id):
             except Exception as e_sort: logger.error(f"Error ordenando detalles: {e_sort}", exc_info=True)
 
         # --- Asignación final al diccionario result ---
-        result['detalles_sueldo'] = detalles_locales_list # Asignar lista (puede estar vacía)
+        # --- APLICAR PAGINACIÓN a la lista ya filtrada, enriquecida y ordenada ---
+        page_number_str = request.GET.get('page', '1')
+        paginator = Paginator(detalles_locales_list, items_por_pagina)
+        logger.debug(f"[Util Sueldos] Paginator: count={paginator.count}, num_pages={paginator.num_pages}, items_por_pagina={items_por_pagina}")
+
+        try:
+            page_obj_resultado = paginator.page(page_number_str)
+        except PageNotAnInteger:
+            page_obj_resultado = paginator.page(1)
+            logger.warning(f"[Util Sueldos] Número de página inválido ('{page_number_str}'). Mostrando página 1.")
+        except EmptyPage:
+            page_obj_resultado = paginator.page(paginator.num_pages)
+            logger.warning(f"[Util Sueldos] Página '{page_number_str}' fuera de rango. Mostrando última página {paginator.num_pages}.")
+
+        # --- Asignación final al diccionario result ---
+        result['page_obj'] = page_obj_resultado # <-- Guardamos el objeto Page en el resultado
+
+        # Generar lista de IDs de la página actual para JS (si lo usas)
+        if page_obj_resultado:
+            result['detalle_ids_order'] = [d.id for d in page_obj_resultado.object_list]
+            logger.debug(f"[Util Sueldos] Página actual: {page_obj_resultado.number}, Items en página: {len(page_obj_resultado.object_list)}")
+        else:
+            result['detalle_ids_order'] = []
 
         # Generar lista de IDs si implementaremos edición rápida
         # result['detalle_ids_order'] = [d.id for d in detalles_locales_list]

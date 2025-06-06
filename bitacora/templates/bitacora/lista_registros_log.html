@@ -1,0 +1,253 @@
+{# sisboletas/bitacora/templates/bitacora/lista_registros_log.html #}
+{% extends 'index_master.html' %}
+{% load static %}
+{% load i18n %} 
+
+{% block title_suffix %}- {{ titulo_vista|default:"Bitácora del Sistema" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filters-form .form-control, .filters-form .btn, .filters-form label {
+        margin-bottom: 10px; /* Espacio vertical */
+        margin-right: 5px;   /* Espacio horizontal entre elementos inline */
+    }
+    .log-table th, .log-table td {
+        font-size: 0.85em; /* Texto un poco más pequeño en la tabla */
+        vertical-align: top; /* Alineación vertical superior para celdas */
+    }
+    .log-table .col-changes {
+        max-width: 350px;      /* Limitar ancho de la columna de detalles */
+        min-width: 200px;      /* Ancho mínimo para la columna de detalles */
+        word-break: break-word; /* Romper palabras largas para evitar desbordamiento */
+    }
+    .filters-form .form-group {
+        margin-right: 15px; /* Espacio entre grupos de filtros (label + input) */
+        margin-left: 0; /* Resetear margen izquierdo por si acaso */
+    }
+    .filters-form .form-row { /* Para que los botones no se envuelvan tan rápido */
+        display: flex;
+        flex-wrap: wrap; 
+    }
+    .filters-form .btn-sm { /* Para que los botones de acción no sean demasiado grandes */
+        padding: .25rem .5rem;
+        font-size: .875rem;
+        line-height: 1.5;
+        border-radius: .2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <div class="page-title">
+        <div class="title_left">
+            <h3>{{ titulo_vista|default:"Bitácora del Sistema" }}</h3>
+        </div>
+    </div>
+    <div class="clearfix"></div>
+
+    <div class="row">
+        <div class="col-md-12 col-sm-12">
+            <div class="x_panel">
+                <div class="x_title">
+                    <h2>Filtros y Búsqueda</h2>
+                    <ul class="nav navbar-right panel_toolbox"><li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li></ul>
+                    <div class="clearfix"></div>
+                </div>
+                <div class="x_content">
+                    <form method="get" action="{% url 'lista_registros_log' %}" class="filters-form" id="logFilterForm">
+                        <div class="form-row align-items-center"> {# Usar align-items-center para mejor alineación vertical #}
+                            <div class="form-group col-auto">
+                                <label for="actor_filter" class="mr-1">Usuario:</label>
+                                <select name="actor" id="actor_filter" class="form-control form-control-sm">
+                                    <option value="">-- Todos --</option>
+                                    {% for actor in actors_for_filter %}
+                                    <option value="{{ actor.pk }}" {% if selected_actor_id == actor.pk %}selected{% endif %}>
+                                        {{ actor.username }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-auto">
+                                <label for="action_filter" class="mr-1">Acción:</label>
+                                <select name="action" id="action_filter" class="form-control form-control-sm">
+                                    <option value="">-- Todas --</option>
+                                    {% for value, label in action_choices_for_filter %}
+                                    <option value="{{ value }}" {% if selected_action == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-auto">
+                                <label for="content_type_filter" class="mr-1">Tipo Recurso:</label>
+                                <select name="content_type" id="content_type_filter" class="form-control form-control-sm">
+                                    <option value="">-- Todos --</option>
+                                    {% for ct in content_types_for_filter %}
+                                    <option value="{{ ct.pk }}" {% if selected_content_type_id == ct.pk %}selected{% endif %}>
+                                        {{ ct.app_label|capfirst }}.{{ ct.model|capfirst }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-auto">
+                                <label for="fecha_desde_filter" class="mr-1">Desde:</label>
+                                <input type="date" name="fecha_desde" id="fecha_desde_filter" value="{{ fecha_desde_str|default:'' }}" class="form-control form-control-sm">
+                            </div>
+                            <div class="form-group col-auto">
+                                <label for="fecha_hasta_filter" class="mr-1">Hasta:</label>
+                                <input type="date" name="fecha_hasta" id="fecha_hasta_filter" value="{{ fecha_hasta_str|default:'' }}" class="form-control form-control-sm">
+                            </div>
+                            <div class="form-group col-auto">
+                                <label for="search_filter" class="mr-1">Buscar:</label>
+                                <input type="text" name="q" id="search_filter" value="{{ search_query|default:'' }}" placeholder="Texto a buscar..." class="form-control form-control-sm">
+                            </div>
+                            <div class="form-group col-auto">
+                                <button type="submit" class="btn btn-primary btn-sm"><i class="fa fa-filter"></i> Filtrar</button>
+                                <a href="{% url 'lista_registros_log' %}" class="btn btn-secondary btn-sm"><i class="fa fa-eraser"></i> Limpiar</a>
+                                <button type="button" class="btn btn-success btn-sm export-btn" data-export-type="csv">
+                                    <i class="fa fa-file-text-o"></i> CSV {# Icono cambiado para CSV #}
+                                </button>
+                                 
+                                <button type="button" class="btn btn-info btn-sm export-btn" data-export-type="excel">
+                                    <i class="fa fa-file-excel-o"></i> Excel
+                                </button>
+                                
+                                
+                                <button type="button" class="btn btn-danger btn-sm export-btn" data-export-type="pdf">
+                                    <i class="fa fa-file-pdf-o"></i> PDF
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12 col-sm-12">
+            <div class="x_panel">
+                <div class="x_title">
+                    <h2>Resultados <small>({{ log_entries_page.paginator.count }} registros encontrados)</small></h2>
+                    <div class="clearfix"></div>
+                </div>
+                <div class="x_content">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered table-sm log-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Usuario</th>
+                                    <th>Acción</th>
+                                    <th>Recurso Afectado</th>
+                                    <th class="col-changes">Detalles / Descripción</th>
+                                    <th>IP Remota</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log_entry in log_entries_page %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'detalle_registro_log' log_id=log_entry.pk %}">
+                                            {{ log_entry.timestamp|date:"d/m/Y H:i:s" }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        {% if log_entry.actor %}
+                                            {{ log_entry.actor.username }}
+                                        {% else %}<span class="text-muted">Sistema</span>{% endif %}
+                                    </td>
+                                    <td><span class="badge badge-pill badge-info">{{ log_entry.get_action_display }}</span></td>
+                                    <td>
+                                        {% if log_entry.content_type %}
+                                        <small class="text-muted">({{ log_entry.content_type.app_label }}.{{ log_entry.content_type.model }})</small><br>
+                                        {% endif %}
+                                        {{ log_entry.object_repr|truncatechars:60 }}
+                                        {% if log_entry.object_pk %}<small>(ID: {{ log_entry.object_pk }})</small>{% endif %}
+                                    </td>
+                                    <td class="col-changes">
+                                        {% if log_entry.action == 1 and log_entry.changes_dict %} {# UPDATE y tiene changes_dict #}
+                                            <ul class="list-unstyled mb-0">
+                                            {% for field, values in log_entry.changes_dict.items %}
+                                                <li>
+                                                    <strong>{{ field }}:</strong>
+                                                    <span class="text-muted" style="text-decoration: line-through;">{{ values.0|default:"(vacío)"|truncatechars:25 }}</span> →
+                                                    <span class="text-success">{{ values.1|default:"(vacío)"|truncatechars:25 }}</span>
+                                                </li>
+                                            {% empty %}
+                                                <li>Sin cambios detallados.</li>
+                                            {% endfor %}
+                                            </ul>
+                                        {% elif log_entry.changes %} {# Para ACCESS, CREATE, DELETE o si changes_dict no está disponible #}
+                                            {{ log_entry.changes|truncatewords_html:25|linebreaksbr }}
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ log_entry.remote_addr|default:"-" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center">No se encontraron registros que coincidan con su búsqueda o filtros.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {# Asumiendo que tienes templates/partials/paginacion.html o ajusta la ruta #}
+                    {% include "partials/paginacion.html" with page_obj=log_entries_page %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const filterForm = document.getElementById('logFilterForm');
+    const exportButtons = document.querySelectorAll('.export-btn'); 
+
+    if (filterForm && exportButtons.length > 0) {
+        exportButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const exportType = this.dataset.exportType; 
+                let formActionPath = filterForm.getAttribute('action');
+
+                if (typeof formActionPath !== 'string' || !formActionPath.startsWith('/')) {
+                    console.warn("[Bitacora JS] formActionPath inválido, usando fallback.");
+                    formActionPath = "{% url 'lista_registros_log' %}";
+                }
+
+                const exportParams = new URLSearchParams();
+                
+                function addParamIfValue(paramName, elementId) {
+                    const element = document.getElementById(elementId);
+                    if (element && element.value && typeof element.value === 'string') {
+                        exportParams.set(paramName, element.value);
+                    }
+                }
+
+                addParamIfValue('actor', 'actor_filter');
+                addParamIfValue('action', 'action_filter');
+                addParamIfValue('content_type', 'content_type_filter');
+                addParamIfValue('fecha_desde', 'fecha_desde_filter');
+                addParamIfValue('fecha_hasta', 'fecha_hasta_filter');
+                addParamIfValue('q', 'search_filter');
+                
+                exportParams.set('export_type', exportType); 
+
+                const targetUrl = formActionPath + '?' + exportParams.toString();
+                console.log(`URL de redirección para exportar (${exportType}):`, targetUrl);
+                window.location.href = targetUrl;
+            });
+        });
+    } else {
+        if (!filterForm) console.error("Formulario de filtros (id='logFilterForm') no encontrado.");
+        if (exportButtons.length === 0) console.warn("Botones de exportar (clase='export-btn') no encontrados.");
+    }
+});
+</script>
+{% endblock %}

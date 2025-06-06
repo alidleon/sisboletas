@@ -12,6 +12,8 @@ urlpatterns = [
     path('asistencia/detalles/<int:pk>/', views.ver_detalles_asistencia, name='ver_detalles_asistencia'),
     path('asistencia/<int:planilla_asistencia_id>/detalle/add/', views.add_detalle_asistencia, name='add_detalle_asistencia'),
 
+    path('asistencia/exportar/pdf/<int:pk>/', views.exportar_planilla_asistencia_pdf, name='exportar_planilla_asistencia_pdf'),
+    path('asistencia/detalles/exportar/pdf/<int:pk>/', views.exportar_detalles_filtrados_pdf, name='exportar_detalles_filtrados_pdf'),
     # --- URLs para Edición Rápida ---
     # Para editar/guardar (GET/POST normal y AJAX POST)
     path('asistencia/detalle/editar/<int:detalle_id>/', views.editar_detalle_asistencia, name='editar_detalle_asistencia'),

@@ -1,0 +1,147 @@
+{# sisboletas/bitacora/templates/bitacora/detalle_registro_log.html #}
+{% extends 'index_master.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title_suffix %}- {{ titulo_vista|default:"Detalle de Bitácora" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .log-detail-table th {
+        width: 25%; /* Ancho para las etiquetas de la tabla de detalles */
+        font-weight: bold;
+    }
+    .log-detail-table td {
+        word-break: break-word; /* Para que el texto largo no rompa el layout */
+    }
+    .changes-list {
+        list-style-type: none;
+        padding-left: 0;
+    }
+    .changes-list li {
+        padding: 5px 0;
+        border-bottom: 1px solid #eee;
+    }
+    .changes-list li:last-child {
+        border-bottom: none;
+    }
+    .old-value {
+        color: #dc3545; /* Rojo para valor antiguo */
+        text-decoration: line-through;
+    }
+    .new-value {
+        color: #28a745; /* Verde para valor nuevo */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="right_col" role="main">
+    <div class="page-title">
+        <div class="title_left">
+            <h3>{{ titulo_vista }}</h3>
+        </div>
+        <div class="title_right">
+            <div class="pull-right">
+                <a href="{% url 'lista_registros_log' %}" class="btn btn-info btn-sm"><i class="fa fa-list"></i> Volver a la Lista</a>
+            </div>
+        </div>
+    </div>
+    <div class="clearfix"></div>
+
+    <div class="row">
+        <div class="col-md-12 col-sm-12">
+            <div class="x_panel">
+                <div class="x_title">
+                    <h2>Información del Registro</h2>
+                    <div class="clearfix"></div>
+                </div>
+                <div class="x_content">
+                    <table class="table table-bordered log-detail-table">
+                        <tbody>
+                            <tr>
+                                <th>Timestamp:</th>
+                                <td>{{ log_entry.timestamp|date:"d/m/Y H:i:s P" }}</td> {# P para zona horaria #}
+                            </tr>
+                            <tr>
+                                <th>Usuario (Actor):</th>
+                                <td>
+                                    {% if log_entry.actor %}
+                                        {{ log_entry.actor.get_full_name|default:log_entry.actor.username }} 
+                                        ({{ log_entry.actor.username }})
+                                    {% else %}
+                                        <span class="text-muted">Sistema/Desconocido</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Acción:</th>
+                                <td><span class="badge badge-primary">{{ log_entry.get_action_display }}</span></td>
+                            </tr>
+                            <tr>
+                                <th>Tipo de Recurso:</th>
+                                <td>
+                                    {% if log_entry.content_type %}
+                                        {{ log_entry.content_type.app_label|capfirst }}.{{ log_entry.content_type.model|capfirst }}
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Objeto Afectado:</th>
+                                <td>
+                                    {{ log_entry.object_repr }}
+                                    {% if log_entry.object_pk %}(ID: {{ log_entry.object_pk }}){% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>IP Remota:</th>
+                                <td>{{ log_entry.remote_addr|default:"N/A" }}</td>
+                            </tr>
+                            {% if log_entry.additional_data %}
+                            <tr>
+                                <th>Datos Adicionales:</th>
+                                <td><pre>{{ log_entry.additional_data|pprint }}</pre></td> {# pprint para diccionarios #}
+                            </tr>
+                            {% endif %}
+                            <tr>
+                                <th>Detalles / Descripción (Changes):</th>
+                                <td>
+                                    {% if log_entry.action == 1 and changes_dict %} {# UPDATE y tenemos un diccionario parseado #}
+                                        <ul class="changes-list">
+                                        {% for field, values in changes_dict.items %}
+                                            <li>
+                                                <strong>{{ field }}:</strong>
+                                                <span class="old-value">{{ values.0|default:"(vacío)" }}</span> → 
+                                                <span class="new-value">{{ values.1|default:"(vacío)" }}</span>
+                                            </li>
+                                        {% empty %}
+                                            <li>No se registraron cambios de campo detallados.</li>
+                                        {% endfor %}
+                                        </ul>
+                                    {% elif log_entry.action == 0 and changes_dict %} {# CREATE y tenemos un diccionario parseado #}
+                                        <p><strong>Valores iniciales del objeto creado:</strong></p>
+                                        <ul class="changes-list">
+                                        {% for field, value in changes_dict.items %}
+                                            <li><strong>{{ field }}:</strong> {{ value }}</li>
+                                        {% empty %}
+                                            <li>No se registraron valores iniciales detallados.</li>
+                                        {% endfor %}
+                                        </ul>
+                                    {% elif log_entry.changes %} {# Para ACCESS o si changes no es un dict parseable #}
+                                        <div style="white-space: pre-wrap;">{{ log_entry.changes }}</div>
+                                    {% else %}
+                                        <span class="text-muted">N/A</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

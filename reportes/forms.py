@@ -6,48 +6,187 @@ from .models import DetalleAsistencia, PlanillaAsistencia
 from decimal import Decimal # Necesario para asignar Decimal('0.00')
 from decimal import Decimal, InvalidOperation
 from django.core.exceptions import FieldDoesNotExist
+from datetime import date
 
 logger = logging.getLogger(__name__)
 
 class PlanillaAsistenciaForm(forms.Form):
     """
     Formulario para seleccionar los parámetros para crear
-    una nueva Planilla de Asistencia. (Lo incluyo por contexto, sin cambios)
+    una nueva Planilla de Asistencia.
     """
-    # ... (tu código para PlanillaAsistenciaForm) ...
-    mes = forms.IntegerField(
-        label="Mes",
-        min_value=1,
-        max_value=12,
-        required=True,
-        widget=forms.NumberInput(attrs={'placeholder': 'Ej: 4'})
-    )
+    
+    # --- CAMPO AÑO ---
+    ANIO_ACTUAL = date.today().year
+    ANIO_MINIMO_PERMITIDO = 2020 # O el año que consideres como inicio válido
+    ANIO_MAXIMO_PERMITIDO = ANIO_ACTUAL + 100 # Permitir hasta 2 años en el futuro
+
     anio = forms.IntegerField(
         label="Año",
-        # min_value=date.today().year - 10, # Puedes ajustar rangos si quieres
-        # max_value=date.today().year + 1,
-        # initial=date.today().year,
         required=True,
-        widget=forms.NumberInput(attrs={'placeholder': 'Ej: 2024'})
+        min_value=ANIO_MINIMO_PERMITIDO, # Validación básica del widget
+        max_value=ANIO_MAXIMO_PERMITIDO, # Validación básica del widget
+        initial=ANIO_ACTUAL, # Año actual por defecto
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control', 
+            'placeholder': f'Ej: {ANIO_ACTUAL}'
+        }),
+        help_text=f"Ingrese un año entre {ANIO_MINIMO_PERMITIDO} y {ANIO_MAXIMO_PERMITIDO}."
     )
+
+    # --- CAMPO MES ---
+    # La opción vacía se define primero
+    CHOICES_MESES = [('', '--- Seleccione Mes ---')] + [(str(i), str(i)) for i in range(1, 13)]
+    # Si quieres nombres de mes:
+    # NOMBRES_MESES_LITERAL_DICT = {
+    #     1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+    #     5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+    #     9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+    # }
+    # CHOICES_MESES = [('', '--- Seleccione Mes ---')] + [(str(k), v) for k, v in NOMBRES_MESES_LITERAL_DICT.items()]
+    
+    mes = forms.ChoiceField(
+        label="Mes",
+        choices=CHOICES_MESES,
+        required=True,
+        # No establecemos 'initial' aquí para que "--- Seleccione Mes ---" sea la opción por defecto visible.
+        # Si el usuario no selecciona nada, la validación 'required' y 'clean_mes' lo detectarán.
+        widget=forms.Select(attrs={'class': 'form-control'}) # o 'form-control'
+    )
+
+    # --- CAMPO TIPO ---
+    CHOICES_TIPO_CON_VACIO = [('', '--- Seleccione Tipo ---')] + list(PlanillaAsistencia.TIPO_CHOICES)
+    
     tipo = forms.ChoiceField(
         label="Tipo de Personal",
-        choices=PlanillaAsistencia.TIPO_CHOICES,
+        choices=CHOICES_TIPO_CON_VACIO,
         required=True,
-        widget=forms.Select(attrs={'class': 'form-control'})
+        widget=forms.Select(attrs={'class': 'form-control'}) # o 'form-control'
     )
+
+    def clean_anio(self):
+        data_anio = self.cleaned_data.get('anio')
+        if data_anio is not None: # IntegerField ya debería haber validado si es un entero
+            if not (self.ANIO_MINIMO_PERMITIDO <= data_anio <= self.ANIO_MAXIMO_PERMITIDO):
+                raise forms.ValidationError(
+                    f"El año debe estar entre {self.ANIO_MINIMO_PERMITIDO} y {self.ANIO_MAXIMO_PERMITIDO}."
+                )
+        # Si es None (porque no se proveyó y no era required, o falló la conversión a int),
+        # la validación 'required' del campo ya lo habría atrapado.
+        # Aquí solo validamos el rango si es un número.
+        return data_anio # Devuelve el entero
+
+    def clean_mes(self):
+        data_mes_str = self.cleaned_data.get('mes')
+        if not data_mes_str: # Si se seleccionó la opción vacía "--- Seleccione Mes ---" (value='')
+            raise forms.ValidationError("Debe seleccionar un mes.")
+        try:
+            mes_int = int(data_mes_str)
+            if not 1 <= mes_int <= 12: # Aunque ChoiceField ya lo valida, una doble verificación no hace daño
+                raise forms.ValidationError("Mes seleccionado no es válido.")
+            return mes_int # Devuelve el entero
+        except (ValueError, TypeError):
+            raise forms.ValidationError("Mes seleccionado no es válido.") # Si el valor no es un número convertible
+
+    def clean_tipo(self):
+        data_tipo = self.cleaned_data.get('tipo')
+        if not data_tipo: # Si se seleccionó la opción vacía "--- Seleccione Tipo ---"
+            raise forms.ValidationError("Debe seleccionar un tipo de personal.")
+        # La validación de que 'data_tipo' sea una de las TIPO_CHOICES válidas
+        # ya la realiza el ChoiceField por nosotros.
+        return data_tipo
+
 
 
 class EditarPlanillaAsistenciaForm(forms.ModelForm):
     """
-    Formulario para editar los campos de la cabecera de una PlanillaAsistencia.
-    (Lo incluyo por contexto, sin cambios)
+    Formulario para editar la cabecera de una PlanillaAsistencia.
+    Solo el estado y las observaciones son editables, con lógica de transición de estado.
+    Mes, Año y Tipo se muestran como solo lectura.
     """
-    # ... (tu código para EditarPlanillaAsistenciaForm) ...
+    # Usamos los nombres de campo del modelo para que se vinculen automáticamente a la instancia
+    # y se pueblen con los valores existentes. Luego los deshabilitamos.
+    anio = forms.IntegerField(label="Año", required=False)
+    mes = forms.IntegerField(label="Mes", required=False)
+    tipo = forms.CharField(label="Tipo de Personal", required=False) # Se llenará con get_tipo_display
+
     class Meta:
         model = PlanillaAsistencia
-        fields = ['mes', 'anio', 'estado']
-        # ... (widgets y método clean si los tienes) ...
+        # Campos que el ModelForm gestionará directamente para el guardado (si no están disabled)
+        fields = ['anio', 'mes', 'tipo', 'estado', 'observaciones_generales']
+        widgets = {
+            # Los widgets para anio, mes, tipo se definirán/modificarán en __init__
+            'estado': forms.Select(attrs={'class': 'form-select'}),
+            'observaciones_generales': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None) 
+        super().__init__(*args, **kwargs)
+        
+        logger.debug(f"FORM EditarPlanillaAsistenciaForm __init__: instance={self.instance}, instance.pk={self.instance.pk if self.instance else 'No instance'}")
+        logger.debug(f"FORM __init__: is_bound={self.is_bound}")
+
+
+        instance = getattr(self, 'instance', None)
+        if instance and instance.pk:
+            # Configurar campos de solo lectura
+            self.fields['anio'].initial = instance.anio
+            self.fields['anio'].widget.attrs['readonly'] = True
+            self.fields['anio'].widget.attrs['class'] = 'form-control-plaintext' # Estilo de solo lectura Bootstrap
+            self.fields['anio'].disabled = True # No se enviará en POST
+
+            self.fields['mes'].initial = instance.mes
+            self.fields['mes'].widget.attrs['readonly'] = True
+            self.fields['mes'].widget.attrs['class'] = 'form-control-plaintext'
+            self.fields['mes'].disabled = True
+
+            self.fields['tipo'].initial = instance.get_tipo_display()
+            self.fields['tipo'].widget = forms.TextInput(attrs={ # Asegurar que sea TextInput
+                'readonly': True, 
+                'class': 'form-control-plaintext'
+            })
+            self.fields['tipo'].disabled = True
+
+
+            # Lógica para restringir las opciones de estado disponibles en el <select>
+            # Solo modificar las choices si el formulario NO está vinculado (GET) o si NO es válido (re-render por error)
+            # para asegurar que las choices correctas se usen para la validación del POST.
+            if not self.is_bound or not self.is_valid():
+                current_estado = instance.estado
+                estado_choices_disponibles = []
+                TRANSICIONES_PERMITIDAS = {
+                    'borrador': [('borrador', 'Mantener como Borrador'), ('validado', 'Validar Planilla')],
+                    'validado': [('validado', 'Mantener como Validado'), ('archivado', 'Archivar Planilla')],
+                    'archivado': [('archivado', 'Archivado (No se puede cambiar)')],
+                }
+                # Opción para reabrir desde validado si es superusuario
+                if current_estado == 'validado' and self.user and self.user.is_superuser:
+                    if 'validado' not in [val for val, disp in TRANSICIONES_PERMITIDAS['validado']]: # Por si acaso
+                         TRANSICIONES_PERMITIDAS['validado'].insert(0,('validado', 'Mantener como Validado'))
+                    TRANSICIONES_PERMITIDAS['validado'].append(('borrador', 'Reabrir a Borrador (Admin)'))
+
+                if current_estado in TRANSICIONES_PERMITIDAS:
+                    estado_choices_disponibles = TRANSICIONES_PERMITIDAS[current_estado]
+                else: 
+                    # Para estados no contemplados en TRANSICIONES_PERMITIDAS (ej. 'completo', 'rechazado' si aún existen en BD)
+                    # Se permite mantener el estado actual.
+                    estado_choices_disponibles = [(current_estado, f"Mantener como {instance.get_estado_display()}")]
+                    # Podrías decidir deshabilitar el cambio si el estado actual no está en tu flujo simplificado.
+                    # self.fields['estado'].widget.attrs['disabled'] = True
+
+                self.fields['estado'].choices = estado_choices_disponibles
+                logger.debug(f"FORM __init__: Estado actual='{current_estado}', Choices para estado: {estado_choices_disponibles}")
+            
+            # Si el estado es archivado, deshabilitar todo lo editable
+            if instance.estado == 'archivado':
+                self.fields['estado'].widget.attrs['disabled'] = True
+                self.fields['observaciones_generales'].widget.attrs['disabled'] = True
+        else:
+            # Si no hay instancia (ej. error o uso incorrecto del form)
+            for field_name in self.fields:
+                if field_name not in ['anio', 'mes', 'tipo']: # Estos ya son Char/Integer
+                    self.fields[field_name].disabled = True
 
 
 # --- Inicio DetalleAsistenciaForm Modificado ---

@@ -16,7 +16,12 @@ from django.db.models import Q # Para consultas complejas si son necesarias
 from collections import defaultdict # Para agrupar designaciones
 from django.core.exceptions import ValidationError, FieldDoesNotExist
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+# --- Imports para django-auditlog ---
+from auditlog.models import LogEntry
+from django.contrib.contenttypes.models import ContentType
+# --- Fin Imports para django-auditlog ---
 
 # --- Importar modelos externos y librerías ---
 try:
@@ -50,43 +55,62 @@ logger = logging.getLogger(__name__)
 # --- Vistas para la Cabecera (PlanillaSueldo) ---
 # (Estas vistas permanecen igual que antes)
 @login_required
-@permission_required('sueldos.add_planillasueldos', raise_exception=True)
+@permission_required('sueldos.add_planillasueldo', raise_exception=True)
 def crear_planilla_sueldo(request):
+    # La generación de sugerencias no cambia
+    hoy = datetime.now()
+    anios_sugeridos = sorted(list(set([hoy.year - 1, hoy.year, hoy.year + 1])))
+    meses_sugeridos = list(range(1, 13))
+
     if request.method == 'POST':
-        # Usar el nuevo forms.Form
-        form = CrearPlanillaSueldoForm(request.POST)
+        # Pasamos las listas al form también en el POST para que pueda construir los 'choices' y validar
+        form = CrearPlanillaSueldoForm(request.POST, meses_sugeridos=meses_sugeridos, anios_sugeridos=anios_sugeridos)
         if form.is_valid():
-            # Extraer datos
+            # Obtenemos los datos desde cleaned_data, donde el método 'clean' ya los puso
             mes = form.cleaned_data['mes']
             anio = form.cleaned_data['anio']
             tipo = form.cleaned_data['tipo']
-            observaciones = form.cleaned_data['observaciones']
+            
+            if REPORTES_APP_AVAILABLE:
+                try:
+                    # Buscamos la planilla de asistencia correspondiente
+                    asistencia_requerida = PlanillaAsistencia.objects.get(
+                        mes=mes,
+                        anio=anio,
+                        tipo=tipo
+                    )
+                    # Verificamos si su estado es 'validado'
+                    if asistencia_requerida.estado != 'validado':
+                        messages.error(request, f"Acción denegada: El reporte de asistencia para {mes}/{anio} ({dict(PlanillaSueldo.TIPO_CHOICES).get(tipo)}) existe, pero su estado es '{asistencia_requerida.get_estado_display()}'. Debe estar 'Validado'.")
+                        # Devolvemos el control, recargando el formulario para que el usuario vea el mensaje
+                        return render(request, 'sueldos/crear_planilla_sueldo.html', {'form': form, 'titulo_pagina': 'Crear Nueva Planilla de Sueldos'})
 
-            # Verificar duplicados ANTES de crear
+                except PlanillaAsistencia.DoesNotExist:
+                    messages.error(request, f"Acción denegada: No existe un reporte de asistencia para el periodo {mes}/{anio} ({dict(PlanillaSueldo.TIPO_CHOICES).get(tipo)}). Por favor, créelo y valídelo primero.")
+                    # Devolvemos el control
+                    return render(request, 'sueldos/crear_planilla_sueldo.html', {'form': form, 'titulo_pagina': 'Crear Nueva Planilla de Sueldos'})
+            else:
+                messages.warning(request, "Advertencia: No se pudo verificar la existencia de un reporte de asistencia (app 'reportes' no disponible).")
+
             if PlanillaSueldo.objects.filter(mes=mes, anio=anio, tipo=tipo).exists():
                 messages.warning(request, f"Ya existe una planilla de sueldos para {dict(PlanillaSueldo.TIPO_CHOICES).get(tipo)} {mes}/{anio}.")
             else:
                 try:
-                    # Crear instancia manualmente
-                    planilla = PlanillaSueldo(
+                    planilla = PlanillaSueldo.objects.create(
                         mes=mes,
                         anio=anio,
                         tipo=tipo,
-                        observaciones=observaciones,
-                        estado='borrador', # Estado inicial por defecto
-                        usuario_creacion=request.user
+                        observaciones=form.cleaned_data.get('observaciones'),
+                        usuario_creacion=request.user,
+                        estado='borrador'
                     )
-                    planilla.save() # Guardar el objeto
-                    messages.success(request, f"Planilla de sueldos para {planilla.get_tipo_display()} {mes}/{anio} creada. Ahora puedes cargar el archivo Excel.")
+                    messages.success(request, f"Planilla para {planilla.get_tipo_display()} {mes}/{anio} creada. Ahora puedes cargar el archivo Excel.")
                     return redirect('subir_excel_sueldos', planilla_id=planilla.pk)
                 except Exception as e:
-                    logger.error(f"Error creando PlanillaSueldo: {e}", exc_info=True)
-                    messages.error(request, f"Error inesperado al crear la planilla: {e}")
-        else:
-             messages.error(request, "El formulario contiene errores.")
-    else: # GET
-        # Usar el nuevo forms.Form
-        form = CrearPlanillaSueldoForm()
+                    messages.error(request, f"Ocurrió un error inesperado: {e}")
+    else:
+        # Pasamos las listas al form en el GET para la renderización inicial
+        form = CrearPlanillaSueldoForm(meses_sugeridos=meses_sugeridos, anios_sugeridos=anios_sugeridos)
 
     context = {
         'form': form,
@@ -98,9 +122,26 @@ def crear_planilla_sueldo(request):
 @login_required
 @permission_required('sueldos.view_planillasueldo', raise_exception=True)
 def lista_planillas_sueldo(request):
-    planillas = PlanillaSueldo.objects.all().order_by('-anio', '-mes', 'tipo')
+    planillas_list = PlanillaSueldo.objects.all().order_by('-anio', '-mes', 'tipo')
+    paginator = Paginator(planillas_list, 10) 
+
+    # 3. Obtener el número de página que el usuario pide desde la URL (ej: "?page=2").
+    page_number = request.GET.get('page')
+
+    # 4. Obtener los objetos de la página solicitada.
+    try:
+        # Intentamos obtener la página que nos piden.
+        planillas_pagina_actual = paginator.page(page_number)
+    except PageNotAnInteger:
+        # Si el número de página no es un entero, mostramos la primera página.
+        planillas_pagina_actual = paginator.page(1)
+    except EmptyPage:
+        # Si el número de página está fuera de rango (ej. una página que no existe),
+        # mostramos la última página.
+        planillas_pagina_actual = paginator.page(paginator.num_pages)
+
     context = {
-        'planillas_sueldo': planillas,
+        'planillas_sueldo': planillas_pagina_actual,
         'titulo_pagina': 'Planillas de Sueldos Generadas'
     }
     return render(request, 'sueldos/lista_planillas_sueldo.html', context)
@@ -235,6 +276,8 @@ def subir_excel_sueldos(request, planilla_id):
             # --- FIN Bloques EXCEPT ---
 
             # --- Guardar Resultados en Base de Datos ---
+            log_description_base = f"Procesamiento Excel '{excel_file.name}' para Planilla ID {planilla.id}: "
+            log_details_for_audit = "" # Para construir el detalle de la operación
             if detalles_a_crear:
                 try:
                     with transaction.atomic(using='default'):
@@ -249,17 +292,67 @@ def subir_excel_sueldos(request, planilla_id):
                         if advertencias_carga: obs_resumen += f"\nAdvertencias ({len(advertencias_carga)}):\n" + "\n".join(advertencias_carga[:5]) + ("\n..." if len(advertencias_carga)>5 else "")
                         if errores_carga: obs_resumen += f"\nErrores ({len(errores_carga)}):\n" + "\n".join(errores_carga[:5]) + ("\n..." if len(errores_carga)>5 else "")
                         planilla.observaciones = obs_resumen; planilla.save()
+                    log_details_for_audit = obs_resumen
                     messages.success(request, f"Archivo procesado. Registros cargados: {filas_procesadas_ok}.")
                     num_problemas = len(advertencias_carga) + len(errores_carga);
                     if num_problemas > 0: messages.warning(request, f"Se encontraron {num_problemas} advertencias/errores (ver obs.).")
+                    # --- REGISTRAR ACCIÓN EXITOSA ---
+                    try:
+                        LogEntry.objects.create(
+                            actor=request.user,
+                            content_type=ContentType.objects.get_for_model(PlanillaSueldo),
+                            object_pk=str(planilla.pk),
+                            object_id=planilla.pk,
+                            object_repr=str(planilla),
+                            action=LogEntry.Action.UPDATE, # Se actualiza la planilla y sus detalles
+                            changes=log_description_base + log_details_for_audit,
+                            remote_addr=request.META.get('REMOTE_ADDR')
+                        )
+                    except Exception as e_audit: logger.error(f"Error Auditlog (subida exitosa): {e_audit}", exc_info=True)
                     return redirect('lista_planillas_sueldo')
-                except IntegrityError as e_int: logger.error(...); messages.error(request, f"Error BD: {e_int}"); planilla.estado='error_carga'; planilla.observaciones = f"Error BD: {e_int}"; planilla.save()
-                except Exception as e_save: logger.error(...); messages.error(request, f"Error guardando: {e_save}"); planilla.estado='error_carga'; planilla.observaciones = f"Error Guardando: {e_save}"; planilla.save()
+                except IntegrityError as e_int: 
+                    logger.error(f"Error de integridad BD al guardar detalles/planilla {planilla.id}: {e_int}", exc_info=True); 
+                    messages.error(request, f"Error BD: {e_int}"); 
+                    planilla.estado='error_carga'; 
+                    planilla.observaciones = f"Error BD: {e_int}"; 
+                    try: planilla.save(update_fields=['estado', 'observaciones'])
+                    except: pass
+                    log_details_for_audit = f"Error de Integridad en BD: {e_int}"
+                
+                except Exception as e_save: 
+                    logger.error(f"Error general guardando detalles/planilla {planilla.id}: {e_save}", exc_info=True); 
+                    messages.error(request, f"Error guardando: {e_save}"); 
+                    planilla.estado='error_carga'; 
+                    planilla.observaciones = f"Error Guardando: {e_save}"; 
+                    try: planilla.save(update_fields=['estado', 'observaciones'])
+                    except: pass
+                    log_details_for_audit = f"Error General al Guardar: {e_save}"
+                
             else:
                  messages.error(request, "No se procesó ningún registro válido del archivo Excel."); num_problemas = len(advertencias_carga) + len(errores_carga)
                  if num_problemas > 0: messages.warning(request, f"Se encontraron {num_problemas} problemas.")
                  planilla.estado = 'error_carga'; obs_error = "Ninguna fila procesada OK.\n"; # ... (añadir adv/err a obs_error) ...
-                 planilla.observaciones = obs_error; planilla.save()
+                 planilla.observaciones = obs_error; 
+                 try: planilla.save(update_fields=['estado', 'observaciones'])
+                 except: pass
+                 log_details_for_audit = obs_error
+
+            # --- REGISTRAR ACCIÓN CON ERRORES DE GUARDADO O SIN DATOS ---
+            # Esto se ejecutará si hubo un error en el try-except de la transacción
+            # o si no hubo detalles_a_crear.
+            if log_details_for_audit: # Solo si hay algo que loguear
+                try:
+                    LogEntry.objects.create(
+                        actor=request.user,
+                        content_type=ContentType.objects.get_for_model(PlanillaSueldo),
+                        object_pk=str(planilla.pk),
+                        object_id=planilla.pk,
+                        object_repr=str(planilla),
+                        action=LogEntry.Action.UPDATE, # Intento de actualización fallido o parcial
+                        changes=log_description_base + log_details_for_audit,
+                        remote_addr=request.META.get('REMOTE_ADDR')
+                    )
+                except Exception as e_audit: logger.error(f"Error Auditlog (subida con error guardado/sin datos): {e_audit}", exc_info=True)     
             return redirect('subir_excel_sueldos', planilla_id=planilla.id)
         else: messages.error(request, "Error en formulario. Seleccione archivo .xlsx.")
     else: form = SubirExcelSueldosForm()
@@ -277,36 +370,26 @@ def subir_excel_sueldos(request, planilla_id):
 @permission_required('sueldos.change_planillasueldo', raise_exception=True)
 def editar_planilla_sueldo(request, planilla_id):
     planilla = get_object_or_404(PlanillaSueldo, pk=planilla_id)
+    
     if request.method == 'POST':
-        # Usar el nuevo ModelForm de edición (que NO incluye 'tipo')
+        # Usamos el nuevo y específico EditarPlanillaSueldoForm
         form = EditarPlanillaSueldoForm(request.POST, instance=planilla)
         if form.is_valid():
-            # Verificar duplicados (basado en mes/año del form y tipo original)
-            mes = form.cleaned_data['mes']
-            anio = form.cleaned_data['anio']
-            tipo_original = planilla.tipo
-
-            if PlanillaSueldo.objects.filter(mes=mes, anio=anio, tipo=tipo_original).exclude(pk=planilla.pk).exists():
-                 messages.error(request, f"Ya existe otra planilla para {planilla.get_tipo_display()} {mes}/{anio}.")
-            else:
-                try:
-                    # Guardar los campos incluidos en el form ('mes', 'anio', 'estado', 'observaciones')
-                    planilla_editada = form.save()
-                    messages.success(request, f"Planilla '{planilla_editada}' actualizada.")
-                    return redirect('lista_planillas_sueldo')
-                except Exception as e:
-                    logger.error(f"Error guardando edición de PlanillaSueldo ID {planilla_id}: {e}", exc_info=True)
-                    messages.error(request, f"Ocurrió un error al guardar: {e}")
+            form.save()
+            messages.success(request, f"Planilla '{planilla}' actualizada correctamente.")
+            return redirect('lista_planillas_sueldo')
         else:
-            messages.error(request, "El formulario contiene errores.")
-    else: # GET
-        # Usar el nuevo ModelForm de edición
+            
+            # Si el formulario no es válido, se mostrarán los errores en la plantilla.
+            messages.error(request, "Por favor, corrige los errores en el formulario.")
+    else:
+        # Para peticiones GET, creamos una instancia del formulario con los datos actuales.
         form = EditarPlanillaSueldoForm(instance=planilla)
 
     context = {
         'form': form,
-        'planilla': planilla, # Pasar la planilla para mostrar info estática
-        'titulo_pagina': f"Editar Planilla Sueldos - {planilla}"
+        'planilla': planilla, # Pasamos la instancia completa para mostrar los datos no editables
+        'titulo_pagina': f"Editar Planilla Sueldos"
     }
     return render(request, 'sueldos/editar_planilla_sueldo.html', context)
 
@@ -318,6 +401,22 @@ def editar_planilla_sueldo(request, planilla_id):
 def borrar_planilla_sueldo(request, planilla_id):
     """ Permite borrar una PlanillaSueldo (cabecera) y sus detalles asociados. """
     planilla = get_object_or_404(PlanillaSueldo, pk=planilla_id)
+
+    # --- NUEVO: Verificación de dependencias ---
+    # Asumiendo que tienes una app 'boletas' con un modelo 'BoletaPago'
+    # que apunta a DetalleSueldo. ¡AJUSTA ESTO A TUS MODELOS REALES!
+    try:
+        from boletas.models import BoletaPago
+        # Contamos si alguna boleta apunta a alguno de los detalles de esta planilla
+        boletas_generadas = BoletaPago.objects.filter(detalle_sueldo__planilla_sueldo=planilla).exists()
+        if boletas_generadas:
+            messages.error(request, f"No se puede borrar la planilla '{planilla}' porque ya tiene boletas de pago generadas y asociadas.")
+            return redirect('lista_planillas_sueldo')
+    except ImportError:
+        # Si la app boletas no existe, no hacemos nada.
+        pass
+    # Puedes añadir más verificaciones aquí para otros modelos si es necesario
+    # --- FIN DE LA VERIFICACIÓN ---
     # Guardar datos para el mensaje antes de borrar
     planilla_str = str(planilla)
     # Contar detalles asociados (CASCADE los borrará automáticamente)
@@ -357,25 +456,22 @@ def borrar_planilla_sueldo(request, planilla_id):
 @login_required
 @permission_required('sueldos.view_detallesueldo', raise_exception=True)
 def ver_detalles_sueldo(request, planilla_id):
-    """ Muestra los detalles de sueldo filtrados y enriquecidos para una planilla. """
+    """ Muestra los detalles de sueldo paginados para una planilla. """
     logger.debug(f"Vista ver_detalles_sueldo llamada para planilla_id={planilla_id}")
     try:
-        # 1. Obtener todos los datos procesados desde la utilidad
-        processed_data = get_processed_sueldo_details(request, planilla_id)
+        # 1. Llamamos a la utilidad, que ahora se encarga de paginar.
+        #    Podemos pasar cuántos ítems queremos por página.
+        processed_data = get_processed_sueldo_details(request, planilla_id, items_por_pagina=15)
 
-        # 2. Manejar errores fatales (planilla no encontrada)
+        # 2. Manejo de errores (esta parte no cambia)
         if processed_data.get('error_message') and not processed_data.get('planilla_sueldo'):
             messages.error(request, processed_data['error_message'])
             return redirect('lista_planillas_sueldo')
-
-        # 3. Mostrar warnings por errores no fatales (ej: error cargando secretarías)
         elif processed_data.get('error_message'):
              messages.warning(request, processed_data['error_message'])
 
-        # 4. Preparar contexto final para la plantilla
-        # (Añadir form_edit si implementas edición rápida más adelante)
+        # 3. Preparar contexto final para la plantilla
         context = {
-            # Datos de la cabecera y filtros (vienen de processed_data)
             'planilla_sueldo': processed_data.get('planilla_sueldo'),
             'all_secretarias': processed_data.get('all_secretarias', []),
             'unidades_for_select': processed_data.get('unidades_for_select', []),
@@ -384,20 +480,16 @@ def ver_detalles_sueldo(request, planilla_id):
             'search_term': processed_data.get('search_term', ''),
             'search_active': processed_data.get('search_active', False),
 
-            # La lista de detalles enriquecidos
-            'detalles_sueldo': processed_data.get('detalles_sueldo', []),
-
-            # Datos para JS si hay edición rápida (ejemplo)
-            # 'visible_ids_list': processed_data.get('detalle_ids_order', []),
-            # 'form_edit': DetalleSueldoForm() # Si creas este form
+            # CAMBIO CLAVE: Ahora pasamos el objeto 'page_obj' directamente
+            'page_obj': processed_data.get('page_obj'),
 
             'titulo_pagina': f"Detalles Sueldos - {processed_data.get('planilla_sueldo')}" if processed_data.get('planilla_sueldo') else "Detalles Sueldos"
         }
 
-        # 5. Renderizar la plantilla (que crearemos a continuación)
+        # 4. Renderizar la plantilla
         return render(request, 'sueldos/ver_detalles_sueldo.html', context)
 
-    # Manejo de excepciones generales en la vista
+    # Manejo de excepciones (no cambia)
     except Exception as e_view:
         logger.error(f"Error inesperado en vista ver_detalles_sueldo ID {planilla_id}: {e_view}", exc_info=True)
         messages.error(request, "Ocurrió un error inesperado al mostrar los detalles de sueldo.")
@@ -568,7 +660,7 @@ EXTERNAL_TYPE_MAP = {
 }
 
 @login_required
-@permission_required('sueldos.add_cierremensualdeestado', raise_exception=True)
+@permission_required('sueldos.add_cierremensual', raise_exception=True)
 @transaction.atomic
 def generar_estado_mensual_form(request):
     if request.method == 'POST':
@@ -777,7 +869,7 @@ def generar_estado_mensual_form(request):
 #-------------------------------
 
 @login_required
-@permission_required('sueldos.view_cierremensualdeestado', raise_exception=True)
+@permission_required('sueldos.view_cierremensual', raise_exception=True)
 def lista_estado_mensual(request):
     """ Muestra los registros de EstadoMensualEmpleado generados, filtrados por periodo y tipo. """
     selected_mes = request.GET.get('mes', '')
@@ -896,7 +988,7 @@ def borrar_estado_mensual(request, estado_id):
 # ... (código de editar_detalle_sueldo y borrar_detalle_sueldo) ...
 
 @login_required
-@permission_required('sueldos.view_cierremensualdeestado', raise_exception=True)
+@permission_required('sueldos.view_cierremensual', raise_exception=True)
 def lista_cierres_mensuales(request):
     """ Muestra una lista de todos los Cierres Mensuales generados. """
     # Obtener parámetros de filtro (opcional, podrías añadir más adelante)
@@ -929,7 +1021,7 @@ def lista_cierres_mensuales(request):
 
 
 @login_required
-@permission_required('sueldos.delete_cierremensualdeestado', raise_exception=True)
+@permission_required('sueldos.delete_cierremensual', raise_exception=True)
 def borrar_cierre_mensual(request, cierre_id):
     """
     Permite borrar un CierreMensual específico y todos los
@@ -965,7 +1057,7 @@ def borrar_cierre_mensual(request, cierre_id):
 
 
 @login_required
-@permission_required('sueldos.delete_cierremensualdeestado', raise_exception=True)
+@permission_required('sueldos.view_cierremensual', raise_exception=True)
 def ver_detalle_cierre(request, cierre_id):
     cierre = get_object_or_404(CierreMensual, pk=cierre_id)
 

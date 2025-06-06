@@ -7,7 +7,18 @@
 <div class="right_col" role="main">
     <div class="page-title">
         <div class="title_left">
-            <h3>Lista de Planillas Generadas</h3>
+            <h3>{% firstof titulo_vista "Lista de Planillas Bono TE Generadas" %}
+                {% if page_obj and page_obj.paginator.count > 0 %}
+                    <small class="text-muted"> | Mostrando 
+                        {% if page_obj.object_list %} 
+                            {{ page_obj.start_index }}-{{ page_obj.end_index }} 
+                        {% else %}
+                            0 
+                        {% endif %}
+                        de {{ page_obj.paginator.count }} planilla{{ page_obj.paginator.count|pluralize }}
+                    </small>
+                {% endif %}
+            </h3>
         </div>
         <div class="title_right">
              <div class="pull-right">
@@ -58,7 +69,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for planilla_obj in planillas %} {# Renombrado 'planilla' a 'planilla_obj' #}
+                                {% for planilla_obj in page_obj.object_list %} {# Renombrado 'planilla' a 'planilla_obj' #}
                                 <tr>
                                     <td>{{ planilla_obj.mes }}/{{ planilla_obj.anio }}</td>
                                     <td>{{ planilla_obj.get_tipo_display }}</td>
@@ -94,6 +105,13 @@
                                             </a>
                                         {% endif %}
 
+                                        {# Botón para exportar DETALLES de ESTA planilla a PDF (el que SÍ quieres) #}
+                                        {% if perms.planilla.view_planilla or user.is_superuser %}
+                                        <a href="{% url 'export_detalles_bonote_pdf' planilla_id=planilla_obj.id %}" class="btn btn-sm btn-danger" title="Exportar Detalles a PDF">
+                                            <i class="fa fa-file-pdf-o"></i>
+                                        </a>
+                                        {% endif %}
+
                                         {# Botón Exportar a Excel #}
                                         {# Asumimos un permiso 'view_planilla' para exportar, o podrías crear uno personalizado 'export_planilla' #}
                                         {% if perms.planilla.view_planilla or user.is_superuser %} {# O 'perms.planilla.export_planilla' #}
@@ -109,6 +127,12 @@
                             </tbody>
                         </table>
                     </div>
+                    {# Controles de Paginación #}
+                    {% if page_obj.has_other_pages %}
+                        <div class="mt-3">
+                            {% include "partials/paginacion.html" with page_obj=page_obj request=request %}
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

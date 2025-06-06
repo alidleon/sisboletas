@@ -32,6 +32,7 @@ urlpatterns = [
     path('sueldos/', include('sueldos.urls')),
     path('boletas/', include('boletas.urls')),
     path('administracion/', include('administracion.urls')),
+    path('sistema/bitacora/', include('bitacora.urls')),
     #path('accounts/', include('django.contrib.auth.urls')),
 
     

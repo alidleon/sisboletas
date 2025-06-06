@@ -139,6 +139,11 @@
                                 </tbody>
                             </table>
                         </div>
+                        <!-- ===== INICIO DEL CÓDIGO  PAGINACION ===== -->
+                        <div class="mt-3">
+                            {% include "partials/paginacion.html" with page_obj=planillas_sueldo request=request %}
+                        </div>
+                        <!-- ===== FIN DEL CÓDIGO PAGIANCION ===== -->
                     </div>
                 </div>
             </div>

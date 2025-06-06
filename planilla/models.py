@@ -243,7 +243,7 @@ class DetalleBonoTe(models.Model):
     mes = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Mes (Heredado)')
 
     # Campos de ausencias/permisos (sin cambios estructurales)
-    abandono_dias = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='Abandono (días)', help_text="Días registrados como abandono de trabajo.")
+    
     faltas = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='Faltas (días)')
     viajes = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='Viajes (días)')
     pcgh = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='PCGH (días)')
@@ -308,7 +308,7 @@ class DetalleBonoTe(models.Model):
         # ... (resto de la lógica igual que antes) ...
         dias_habiles_planilla = self.id_planilla.dias_habiles if self.id_planilla else None
         self.dias_no_pagados = sum(filter(None, [
-            self.abandono_dias, self.faltas, self.vacacion, self.viajes, self.bajas_medicas,
+            self.faltas, self.vacacion, self.viajes, self.bajas_medicas,
             self.pcgh, self.psgh, self.perm_excep, self.asuetos,
             self.pcgh_embar_enf_base
         ]))

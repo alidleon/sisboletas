@@ -8,22 +8,38 @@ from django.db import transaction, IntegrityError
 from django.urls import reverse_lazy # Usaremos reverse_lazy para el redirect
 from .forms import EditarPlanillaAsistenciaForm 
 # Importar modelos y formularios necesarios
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, HttpResponse
 from .models import PlanillaAsistencia, DetalleAsistencia
 from .forms import PlanillaAsistenciaForm
-from .utils import get_processed_asistencia_details
+from .utils import get_processed_asistencia_details, get_planilla_data_for_export, generar_pdf_asistencia
 from .forms import AddDetalleAsistenciaForm # Importar el nuevo form
 from urllib.parse import urlencode
 from django.http import JsonResponse, HttpResponseBadRequest, Http404 # 
 from django.template.loader import render_to_string # Para renderizar 
 from django.views.decorators.http import require_POST, require_GET # 
 from .forms import DetalleAsistenciaForm # <-- Importante
+from django.utils import timezone
 
-from decimal import Decimal # <--- Para reconocer 'Decimal'
+from decimal import Decimal, InvalidOperation # <--- Para reconocer 'Decimal'
 from django.db import models 
 
 from django.http import JsonResponse # Asegúrate de importar JsonResponse
 import json # Para decodificar errores del formulario
+
+from reportlab.lib.utils import ImageReader # Para manejar imágenes desde archivos
+import os # Para construir rutas de archivo de forma segura
+from django.conf import settings # Para obtener BASE_DIR
+
+# Imports para ReportLab
+from reportlab.lib.pagesizes import letter, landscape # landscape para horizontal
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
+from reportlab.lib import colors
+from reportlab.lib.units import inch, cm
+import io # Para manejar el PDF en memoria
+from collections import defaultdict
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 
 # Importar modelos externos de la app 'planilla'
@@ -196,49 +212,124 @@ def crear_planilla_asistencia(request):
 @permission_required('reportes.view_planillaasistencia', raise_exception=True)
 def lista_planillas_asistencia(request):
     """
-    Muestra una lista de todas las Planillas de Asistencia creadas.
+    Muestra una lista PAGINADA de todas las Planillas de Asistencia creadas.
     """
-    # Consultamos todas las planillas de asistencia, ordenadas
-    planillas = PlanillaAsistencia.objects.all().order_by('-anio', '-mes', 'tipo')
+    logger.debug(f"Vista lista_planillas_asistencia llamada. GET params: {request.GET.urlencode()}")
+
+    # 1. Obtener el queryset completo de planillas, ordenadas
+    planillas_list_completa = PlanillaAsistencia.objects.all().order_by('-anio', '-mes', 'tipo')
+    
+    # 2. Configurar paginación
+    items_por_pagina = 10 # O el número que prefieras
+    paginator = Paginator(planillas_list_completa, items_por_pagina)
+    
+    page_number_str = request.GET.get('page', '1')
+    logger.debug(f"Número de página solicitado: '{page_number_str}'")
+
+    try:
+        page_obj_planillas = paginator.page(page_number_str)
+    except PageNotAnInteger:
+        logger.warning(f"Número de página inválido ('{page_number_str}'). Mostrando página 1.")
+        page_obj_planillas = paginator.page(1)
+    except EmptyPage:
+        logger.warning(f"Página '{page_number_str}' fuera de rango. Mostrando última página {paginator.num_pages}.")
+        page_obj_planillas = paginator.page(paginator.num_pages)
+
+    logger.info(f"Mostrando página {page_obj_planillas.number} de {paginator.num_pages} para planillas de asistencia (Total: {paginator.count}).")
 
     context = {
-        'planillas_asistencia': planillas,
+        'page_obj': page_obj_planillas, # <--- CAMBIO: Pasar el objeto Page
+        # 'planillas_asistencia': planillas, # Ya no se pasa la lista completa directamente
         'titulo_pagina': "Reportes de Asistencia Creados"
     }
     return render(request, 'reportes/lista_planillas_asistencia.html', context)
 
 @login_required
 @permission_required('reportes.change_planillaasistencia', raise_exception=True)
-def editar_planilla_asistencia(request, pk): # Usamos 'pk' como en Django admin/generic views
-    """
-    Permite editar los campos de la cabecera de una PlanillaAsistencia existente.
-    """
-    planilla = get_object_or_404(PlanillaAsistencia, pk=pk)
+def editar_planilla_asistencia(request, pk):
+    planilla_obj = get_object_or_404(PlanillaAsistencia, pk=pk)
+    logger.debug(f"VISTA: Editando PlanillaAsistencia ID: {pk}, Estado actual al cargar: {planilla_obj.estado}")
+
+    estado_original_al_cargar_pagina = planilla_obj.estado 
 
     if request.method == 'POST':
-        # Pasamos instance para indicar que es edición
-        form = EditarPlanillaAsistenciaForm(request.POST, instance=planilla)
+        # Pasar el usuario al formulario para la lógica de transiciones (si el form lo usa)
+        form = EditarPlanillaAsistenciaForm(request.POST, instance=planilla_obj, user=request.user)
+        
+        if planilla_obj.estado == 'archivado' and estado_original_al_cargar_pagina == 'archivado':
+            messages.error(request, "No se pueden guardar cambios en un reporte archivado.")
+            # Redirigir o simplemente re-renderizar el form deshabilitado
+            # Para evitar un loop si el form no deshabilita bien, es mejor redirigir.
+            return redirect('lista_planillas_asistencia') 
+
         if form.is_valid():
             try:
-                planilla_editada = form.save()
-                messages.success(request, f"Cabecera del reporte {planilla_editada} actualizada correctamente.")
-                # Redirigir de vuelta a la lista
+                # Los campos 'anio', 'mes', 'tipo' están disabled en el form,
+                # por lo que no vendrán en form.cleaned_data si se envían desde el navegador
+                # o no serán modificados por form.save() si se usa Meta.fields.
+                # ModelForm.save() es inteligente y no intentará actualizar campos que no cambiaron
+                # o que no estaban en los datos del formulario POST si estaban disabled.
+                
+                nuevo_estado_seleccionado = form.cleaned_data.get('estado')
+                observaciones_nuevas = form.cleaned_data.get('observaciones_generales')
+                
+                logger.debug(f"VISTA POST: Estado original='{estado_original_al_cargar_pagina}', Estado del form='{nuevo_estado_seleccionado}', Obs del form='{observaciones_nuevas[:50]}...'")
+
+                # Crear una instancia separada para no afectar planilla_obj hasta estar seguros
+                planilla_a_guardar = form.save(commit=False) 
+                
+                # Lógica de transición y guardado:
+                # El campo 'estado' y 'observaciones_generales' son los únicos que el form gestiona para el guardado.
+                # 'anio', 'mes', 'tipo' no se modifican porque están disabled y/o no en Meta.fields del ModelForm.
+
+                # Si el estado ha cambiado respecto al original de la página
+                if nuevo_estado_seleccionado != estado_original_al_cargar_pagina:
+                    logger.info(f"Planilla ID {pk}: Aplicando cambio de estado de '{estado_original_al_cargar_pagina}' a '{nuevo_estado_seleccionado}'.")
+                    
+                    # Aplicar el nuevo estado a la instancia que vamos a guardar
+                    planilla_a_guardar.estado = nuevo_estado_seleccionado 
+                    
+                    # Lógica específica para la transición a 'validado'
+                    if nuevo_estado_seleccionado == 'validado' and estado_original_al_cargar_pagina == 'borrador':
+                        planilla_a_guardar.usuario_validacion = request.user
+                        planilla_a_guardar.fecha_validacion = timezone.now()
+                        # Los campos a actualizar se manejarán al final
+                    
+                    # Lógica específica para la transición de 'validado' a 'borrador' (reabrir)
+                    elif nuevo_estado_seleccionado == 'borrador' and estado_original_al_cargar_pagina == 'validado':
+                        if request.user.is_superuser: # Asegurar permiso
+                            planilla_a_guardar.usuario_validacion = None
+                            planilla_a_guardar.fecha_validacion = None
+                        else:
+                            messages.error(request, "No tiene permisos para reabrir una planilla validada.")
+                            # Re-renderizar el formulario con el estado original
+                            form = EditarPlanillaAsistenciaForm(instance=planilla_obj, user=request.user) # Reset form
+                            context = {'form': form, 'planilla_obj': planilla_obj, 'titulo_pagina': f"Editar Reporte ({planilla_obj.get_tipo_display()} - {planilla_obj.mes}/{planilla_obj.anio})"}
+                            return render(request, 'reportes/editar_planilla_asistencia.html', context)
+                
+                # Guardar la instancia con todos los cambios acumulados
+                # (estado, observaciones, y campos actualizados por la lógica de transición)
+                planilla_a_guardar.save() # Esto guardará los campos en Meta.fields del form
+                                          # y cualquier campo modificado en planilla_a_guardar antes de este save.
+
+                messages.success(request, f"Reporte '{planilla_a_guardar}' actualizado correctamente.")
                 return redirect('lista_planillas_asistencia')
+
             except Exception as e_save:
-                logger.error(f"Error guardando cabecera PlanillaAsistencia ID {pk}: {e_save}", exc_info=True)
+                logger.error(f"VISTA: Error guardando cabecera PlanillaAsistencia ID {pk}: {e_save}", exc_info=True)
                 messages.error(request, f"Ocurrió un error al guardar los cambios: {e_save}")
         else:
+            logger.warning(f"VISTA: Formulario de edición para Planilla ID {pk} no es válido: {form.errors}")
             messages.error(request, "El formulario contiene errores. Por favor, corrígelos.")
-            # Se re-renderiza abajo con el form con errores
-
-    # Si es GET o el POST no fue válido
-    else:
-        form = EditarPlanillaAsistenciaForm(instance=planilla) # Llenar con datos actuales
+            # El formulario con errores se pasará al contexto y se re-renderizará
+    else: # GET
+        logger.debug(f"VISTA GET: Creando form con instance ID: {planilla_obj.pk}, Estado: {planilla_obj.estado}")
+        form = EditarPlanillaAsistenciaForm(instance=planilla_obj, user=request.user)
 
     context = {
         'form': form,
-        'planilla': planilla, # Pasamos el objeto para mostrar info si es necesario
-        'titulo_pagina': f"Editar Reporte {planilla}"
+        'planilla_obj': planilla_obj,
+        'titulo_pagina': f"Editar Reporte ({planilla_obj.get_tipo_display()} - {planilla_obj.mes}/{planilla_obj.anio})"
     }
     return render(request, 'reportes/editar_planilla_asistencia.html', context)
 
@@ -295,68 +386,63 @@ def borrar_planilla_asistencia(request, pk):
 # ... (tus imports y otras vistas) ...
 
 @login_required
-@permission_required('reportes.view_detalleasistencia', raise_exception=True)
+@permission_required('reportes.view_detalleasistencia', raise_exception=True) # o el permiso que uses
 def ver_detalles_asistencia(request, pk):
-    """
-    Muestra los detalles de asistencia filtrados y enriquecidos, pasando la
-    lista de IDs visibles y una instancia del form a la plantilla.
-    """
-    logger.debug(f"Vista ver_detalles_asistencia llamada para planilla_asistencia_id={pk}")
+    logger.debug(f"--- VISTA: INICIO ver_detalles_asistencia - Planilla ID: {pk}, GET: {request.GET.urlencode()} ---")
+    
     try:
-        # 1. Obtener todos los datos procesados desde la utilidad
-        #    Asumimos que processed_data contendrá:
-        #    'planilla_asistencia', 'error_message', 'all_secretarias',
-        #    'unidades_for_select', 'selected_secretaria_id', 'selected_unidad_id',
-        #    'search_term', 'detalles_asistencia', 'detalle_ids_order', 'search_active'
-        processed_data = get_processed_asistencia_details(request, pk)
+        items_por_pagina_vista = 25 # O el valor que desees, podrías leerlo del request.GET también
+        
+        processed_data = get_processed_asistencia_details(request, pk, items_por_pagina=items_por_pagina_vista)
 
-        # 2. Manejar errores fatales (planilla no encontrada)
-        if processed_data.get('error_message') and not processed_data.get('planilla_asistencia'):
-            messages.error(request, processed_data['error_message'])
+        planilla_obj_vista = processed_data.get('planilla_asistencia') # Renombrado para claridad
+        page_obj_vista = processed_data.get('page_obj')
+        error_msg_from_util = processed_data.get('error_message')
+
+        # Log detallado de lo que devuelve la utilidad
+        logger.debug(f"VISTA: planilla_obj_vista: {'Sí' if planilla_obj_vista else 'No'}")
+        logger.debug(f"VISTA: page_obj_vista: {'Sí' if page_obj_vista else 'No'}")
+        if page_obj_vista:
+            logger.debug(f"VISTA: page_obj_vista.object_list count: {len(page_obj_vista.object_list)}")
+            logger.debug(f"VISTA: page_obj_vista.paginator.count: {page_obj_vista.paginator.count}")
+            logger.debug(f"VISTA: page_obj_vista.has_other_pages(): {page_obj_vista.has_other_pages()}")
+        logger.debug(f"VISTA: error_msg_from_util: {error_msg_from_util}")
+
+
+        if not planilla_obj_vista and error_msg_from_util:
+            messages.error(request, error_msg_from_util)
             return redirect('lista_planillas_asistencia')
-
-        # 3. Mostrar warnings por errores no fatales
-        elif processed_data.get('error_message'):
-             messages.warning(request, processed_data['error_message'])
-
-        # 4. Crear instancia del formulario para el panel de edición rápida
-        #    Se pasa vacío, el JS lo llenará con datos vía AJAX.
-        form_para_panel = DetalleAsistenciaForm()
-
-        # 5. Extraer la lista de detalles y la lista de IDs del resultado de la utilidad
-        detalles_actuales = processed_data.get('detalles_asistencia', [])
-        # Usamos 'detalle_ids_order' que tu utilidad ya genera
-        lista_ids_visibles = processed_data.get('detalle_ids_order', [])
-
-        # 6. Construir el contexto final para la plantilla
+        if not planilla_obj_vista:
+            messages.error(request, "Reporte de asistencia no encontrado.")
+            return redirect('lista_planillas_asistencia')
+        if error_msg_from_util and planilla_obj_vista: # Warning si hubo error pero la planilla se cargó
+             messages.warning(request, error_msg_from_util)
+        
+        form_edit_panel = DetalleAsistenciaForm() # Para el panel de edición rápida
+        
         context = {
-            # Datos de la cabecera y filtros (vienen de processed_data)
-            'planilla_asistencia': processed_data.get('planilla_asistencia'),
+            'planilla_asistencia': planilla_obj_vista,
             'all_secretarias': processed_data.get('all_secretarias', []),
             'unidades_for_select': processed_data.get('unidades_for_select', []),
             'selected_secretaria_id': processed_data.get('selected_secretaria_id'),
             'selected_unidad_id': processed_data.get('selected_unidad_id'),
             'search_term': processed_data.get('search_term', ''),
-            'search_active': processed_data.get('search_active', False),
-
-            # Datos para la tabla
-            'detalles_asistencia': detalles_actuales,
-
-            # Datos para el JavaScript (edición rápida)
-            'visible_ids_list': lista_ids_visibles, # Lista de IDs para el json_script
-            'form_edit': form_para_panel,         # Instancia del form para renderizar el panel
-
-            # Título de la página
-            'titulo_pagina': f"Detalles Asistencia - {processed_data.get('planilla_asistencia')}" if processed_data.get('planilla_asistencia') else "Detalles Asistencia"
+            'search_active': processed_data.get('search_active', False), # Para la plantilla
+            'page_obj': page_obj_vista, # El objeto Page para la plantilla
+            'visible_ids_list': processed_data.get('detalle_ids_order', []), 
+            'form_edit': form_edit_panel,
+            'titulo_pagina': f"Detalles Asistencia - {planilla_obj_vista.get_tipo_display()} {planilla_obj_vista.mes}/{planilla_obj_vista.anio}",
         }
-
-        # 7. Renderizar la plantilla
+        
         return render(request, 'reportes/ver_detalles_asistencia.html', context)
 
-    # Manejo de excepciones generales en la vista
+    except Http404: # Aunque la utilidad debería manejar esto, por si acaso
+        logger.warning(f"VISTA: PlanillaAsistencia ID {pk} no encontrada (Http404).")
+        messages.error(request, "Reporte de asistencia no encontrado.")
+        return redirect('lista_planillas_asistencia')
     except Exception as e_view:
-        logger.error(f"Error inesperado en vista ver_detalles_asistencia ID {pk}: {e_view}", exc_info=True)
-        messages.error(request, "Ocurrió un error inesperado al intentar mostrar los detalles de asistencia.")
+        logger.error(f"VISTA: Error inesperado en ver_detalles_asistencia ID {pk}: {e_view}", exc_info=True)
+        messages.error(request, "Ocurrió un error inesperado al intentar mostrar los detalles.")
         return redirect('lista_planillas_asistencia')
 
 #-------------------------------------------
@@ -412,6 +498,18 @@ def editar_detalle_asistencia(request, detalle_id):
     )
     planilla_asistencia = detalle.planilla_asistencia
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+    # --- CONTROL DE ESTADO ---
+    ESTADOS_PERMITEN_MODIFICACION_DETALLES = ['borrador']
+    if planilla_asistencia.estado not in ESTADOS_PERMITEN_MODIFICACION_DETALLES:
+        error_msg = f"No se pueden modificar detalles. El reporte está en estado '{planilla_asistencia.get_estado_display()}'."
+        logger.warning(f"Intento de edición de DetalleAsistencia ID {detalle_id} bloqueado. Planilla ID {planilla_asistencia.id} en estado '{planilla_asistencia.estado}'. Usuario: {request.user.username}")
+        if is_ajax:
+            return JsonResponse({'status': 'error', 'message': error_msg, 'errors': {'__all__': [error_msg]}}, status=403) # 403 Forbidden
+        else:
+            messages.error(request, error_msg)
+            return redirect('ver_detalles_asistencia', pk=planilla_asistencia.pk)
+    # --- FIN CONTROL DE ESTADO ---
 
     # --- Variables para datos externos y URL de redirección (inicializar) ---
     persona_externa = None
@@ -561,6 +659,15 @@ def borrar_detalle_asistencia(request, detalle_id):
     # Guardamos el ID de la planilla para la redirección
     planilla_asistencia_id = planilla_asistencia.pk
 
+    # --- CONTROL DE ESTADO ---
+    ESTADOS_PERMITEN_MODIFICACION_DETALLES = ['borrador']
+    if planilla_asistencia.estado not in ESTADOS_PERMITEN_MODIFICACION_DETALLES:
+        error_msg = f"No se pueden borrar detalles. El reporte está en estado '{planilla_asistencia.get_estado_display()}'."
+        logger.warning(f"Intento de borrado de DetalleAsistencia ID {detalle_id} bloqueado. Planilla ID {planilla_asistencia.id} en estado '{planilla_asistencia.estado}'. Usuario: {request.user.username}")
+        messages.error(request, error_msg)
+        return redirect('ver_detalles_asistencia', pk=planilla_asistencia.pk)
+    # --- FIN CONTROL DE ESTADO ---
+
     # --- Obtener nombre para el mensaje de confirmación ---
     persona_nombre = f"ID Externo {detalle.personal_externo_id}" # Valor por defecto
     if PLANILLA_APP_AVAILABLE and detalle.personal_externo_id:
@@ -610,6 +717,12 @@ def add_detalle_asistencia(request, planilla_asistencia_id):
     PlanillaAsistencia existente, buscando al personal por CI o Item.
     """
     planilla_asistencia = get_object_or_404(PlanillaAsistencia, pk=planilla_asistencia_id)
+     # --- CONTROL DE ESTADO ---
+    ESTADOS_PERMITEN_MODIFICACION_DETALLES = ['borrador']
+    if planilla_asistencia.estado not in ESTADOS_PERMITEN_MODIFICACION_DETALLES:
+        messages.error(request, f"No se pueden añadir registros a esta planilla porque su estado es '{planilla_asistencia.get_estado_display()}'.")
+        return redirect('ver_detalles_asistencia', pk=planilla_asistencia.pk)
+    # --- FIN CONTROL DE ESTADO ---
 
     # Verificar si la app planilla está disponible
     if not PLANILLA_APP_AVAILABLE:
@@ -799,3 +912,217 @@ def get_detalle_asistencia_json(request, detalle_id):
         # Cualquier otro error inesperado en la vista
         logger.error(f"Error inesperado en get_detalle_asistencia_json para ID {detalle_id}: {e}", exc_info=True)
         return JsonResponse({'error': 'Error interno del servidor al procesar la solicitud.'}, status=500)
+    
+
+
+# --- funcion para generar pdf ---
+@login_required
+@permission_required('reportes.view_planillaasistencia', raise_exception=True)
+def exportar_planilla_asistencia_pdf(request, pk):
+    logger.info(f"Solicitud de exportación PDF para PlanillaAsistencia ID: {pk}")
+
+    data_export = get_planilla_data_for_export(pk)
+    planilla_cabecera = data_export.get('planilla_asistencia')
+    # AHORA USAMOS LOS DATOS AGRUPADOS
+    detalles_agrupados = data_export.get('detalles_agrupados_por_unidad')
+    orden_unidades = data_export.get('orden_unidades')
+    error_message = data_export.get('error_message')
+
+    if error_message or not planilla_cabecera:
+        # ... (manejo de error sin cambios) ...
+        logger.error(f"Error al obtener datos para exportar PDF (Planilla ID {pk}): {error_message}")
+        messages.error(request, f"No se pudo generar el PDF: {error_message or 'Planilla no encontrada.'}")
+        return redirect('lista_planillas_asistencia')
+
+
+    # Verificar si hay datos agrupados para exportar
+    if not detalles_agrupados or not orden_unidades:
+        logger.warning(f"PlanillaAsistencia ID {pk} no tiene detalles agrupados para exportar a PDF.")
+        messages.warning(request, "El reporte de asistencia no tiene detalles (o no se pudieron agrupar) para exportar.")
+        # Quizás redirigir a ver_detalles_asistencia si la planilla existe pero no hay detalles
+        return redirect('ver_detalles_asistencia', pk=pk) if planilla_cabecera else redirect('lista_planillas_asistencia')
+
+
+    
+    # --- Definición de Columnas para la tabla (SIN CAMBIOS RESPECTO A TU ÚLTIMA VERSIÓN) ---
+    # Las columnas de identificación (Nro, Item, CI, Nombre, Cargo) + las 18 numéricas
+    column_definitions = [
+        ('Nro.',    0.3*inch, 'nro'),                         
+        ('Ítem',    0.4*inch, 'item_externo'),                
+        ('CI',      0.6*inch, 'ci_externo'),                  
+        ('Nombre Completo', 1.5*inch, 'nombre_completo_externo'), 
+        ('Cargo',   1.56*inch, 'cargo_externo'),                
+
+        ('Om.Ct',   0.33*inch, 'omision_cant'),
+        ('Om.Sn',   0.33*inch, 'omision_sancion'),
+        ('Ab.Día',  0.33*inch, 'abandono_dias'),
+        ('Ab.Sn',   0.33*inch, 'abandono_sancion'),
+        ('Fal.Día', 0.33*inch, 'faltas_dias'),
+        ('Fal.Sn',  0.33*inch, 'faltas_sancion'),
+        ('Atr.Min', 0.33*inch, 'atrasos_minutos'),
+        ('Atr.Sn',  0.33*inch, 'atrasos_sancion'),
+        ('Vac.',    0.33*inch, 'vacacion'),
+        ('Viaj.',   0.33*inch, 'viajes'),
+        ('B.Med',   0.33*inch, 'bajas_medicas'),
+        ('PCGH',    0.33*inch, 'pcgh'),
+        ('P.Exc',   0.33*inch, 'perm_excep'),
+        ('Asuet',   0.33*inch, 'asuetos'),
+        ('PSGH',    0.33*inch, 'psgh'),
+        ('PCGH.E',  0.33*inch, 'pcgh_embar_enf_base'),
+        ('Act.Nav', 0.33*inch, 'actividad_navidad'),
+        ('Iza.B',   0.33*inch, 'iza_bandera'),
+    ]
+    # Suma total anchos: 10.5 pulgadas
+
+    # 3. Preparar respuesta HTTP y buffer
+    response = HttpResponse(content_type='application/pdf')
+    filename = f"asistencia_{planilla_cabecera.mes}_{planilla_cabecera.anio}_{planilla_cabecera.get_tipo_display().replace(' ', '_')}_por_unidad.pdf"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    buffer = io.BytesIO()
+
+    # 4. Llamar a la función de utilidad para generar el PDF
+    try:
+        generar_pdf_asistencia(
+            output_buffer=buffer,
+            planilla_cabecera=planilla_cabecera,
+            detalles_agrupados=detalles_agrupados,
+            orden_unidades=orden_unidades,
+            column_definitions=column_definitions
+        )
+    except Exception as e_gen_pdf:
+        # La función generar_pdf_asistencia ya loguea el error específico de build
+        logger.error(f"Vista: Falla al llamar a generar_pdf_asistencia para Planilla ID {pk}: {e_gen_pdf}", exc_info=True)
+        messages.error(request, f"Ocurrió un error crítico al generar el documento PDF: {e_gen_pdf}")
+        return redirect('lista_planillas_asistencia')
+
+    # 5. Escribir el PDF en la respuesta
+    pdf_data = buffer.getvalue()
+    buffer.close()
+    response.write(pdf_data)
+    
+    logger.info(f"Vista: PDF completo generado y enviado para Planilla ID {pk}.")
+    return response
+
+#---funcion para exportar por filtrado
+@login_required
+@permission_required('reportes.view_planillaasistencia', raise_exception=True) # O un permiso más específico
+def exportar_detalles_filtrados_pdf(request, pk):
+    logger.info(f"Vista: Solicitud de exportación PDF FILTRADO para PlanillaAsistencia ID: {pk} con filtros: {request.GET.urlencode()}")
+
+    # 1. Obtener datos procesados usando la utilidad.
+    #    get_processed_asistencia_details devuelve un page_obj que contiene los detalles paginados.
+    #    Para la exportación, queremos TODOS los detalles filtrados, no solo una página.
+    #    La forma más directa es acceder al paginator.object_list del page_obj devuelto.
+    
+    # Puedes definir items_por_pagina para la llamada a la utilidad, aunque para la exportación
+    # usaremos la lista completa del paginador de todos modos.
+    items_para_vista_web = 25 # Un valor por defecto si la utilidad no lo define
+    processed_data = get_processed_asistencia_details(request, pk, items_por_pagina=items_para_vista_web)
+
+    planilla_cabecera = processed_data.get('planilla_asistencia')
+    page_obj_devuelto_por_util = processed_data.get('page_obj') # La utilidad devuelve el page_obj
+    error_message_data = processed_data.get('error_message')
+
+    # Manejo de errores al obtener la planilla
+    if error_message_data and not planilla_cabecera:
+        logger.error(f"Vista (filtrado): Error al obtener planilla para exportar PDF (ID {pk}): {error_message_data}")
+        messages.error(request, f"No se pudo generar el PDF: {error_message_data}")
+        return redirect('lista_planillas_asistencia')
+    
+    if not planilla_cabecera:
+        logger.error(f"Vista (filtrado): Planilla ID {pk} no encontrada para exportar PDF.")
+        messages.error(request, "Planilla no encontrada.")
+        return redirect('lista_planillas_asistencia')
+
+    # --- OBTENER LA LISTA COMPLETA DE DETALLES FILTRADOS ---
+    if page_obj_devuelto_por_util and hasattr(page_obj_devuelto_por_util, 'paginator'):
+        # paginator.object_list contiene la lista completa de objetos que se usó para crear el paginador
+        todos_los_detalles_filtrados = page_obj_devuelto_por_util.paginator.object_list
+        logger.debug(f"Vista (filtrado): Total de detalles filtrados obtenidos del paginador: {len(todos_los_detalles_filtrados)}")
+    else:
+        todos_los_detalles_filtrados = []
+        logger.warning(f"Vista (filtrado): No se pudo obtener page_obj o paginator de la utilidad para Planilla ID {pk}. Datos de detalle podrían estar vacíos.")
+
+    # Comprobar si, después de todo, hay detalles para exportar
+    if not todos_los_detalles_filtrados:
+        logger.warning(f"Vista (filtrado): Planilla ID {pk} no tiene detalles (o ninguno coincide con los filtros) para exportar.")
+        messages.warning(request, "No hay detalles que coincidan con los filtros para exportar.")
+        redirect_url = reverse('ver_detalles_asistencia', kwargs={'pk': pk})
+        if request.GET:
+            redirect_url += '?' + request.GET.urlencode()
+        return redirect(redirect_url)
+
+    # 2. Agrupar los detalles filtrados por unidad
+    detalles_agrupados_filtrados = defaultdict(list)
+    for detalle_obj in todos_los_detalles_filtrados: # Usar la lista completa filtrada
+        unidad_nombre = getattr(detalle_obj, 'unidad_externa_nombre', 'SIN UNIDAD ESPECÍFICA')
+        if unidad_nombre is None or not str(unidad_nombre).strip(): # Asegurar que no sea None o vacío
+            unidad_nombre = 'SIN UNIDAD ESPECÍFICA'
+        detalles_agrupados_filtrados[unidad_nombre].append(detalle_obj)
+    
+    orden_unidades_filtradas = sorted(detalles_agrupados_filtrados.keys())
+    # Los detalles dentro de cada grupo ya fueron ordenados por get_processed_asistencia_details
+    # antes de la paginación, por lo que ese orden se mantiene en todos_los_detalles_filtrados.
+
+    # 3. Definir las columnas para el PDF (usando tus anchos actualizados)
+    column_definitions = [
+        ('Nro.',    0.3*inch, 'nro'),                         
+        ('Ítem',    0.4*inch, 'item_externo'),                
+        ('CI',      0.6*inch, 'ci_externo'),                  
+        ('Nombre Completo', 1.5*inch, 'nombre_completo_externo'), 
+        ('Cargo',   1.56*inch, 'cargo_externo'),                
+
+        ('Om.Ct',   0.33*inch, 'omision_cant'),
+        ('Om.Sn',   0.33*inch, 'omision_sancion'),
+        ('Ab.Día',  0.33*inch, 'abandono_dias'),
+        ('Ab.Sn',   0.33*inch, 'abandono_sancion'),
+        ('Fal.Día', 0.33*inch, 'faltas_dias'),
+        ('Fal.Sn',  0.33*inch, 'faltas_sancion'),
+        ('Atr.Min', 0.33*inch, 'atrasos_minutos'),
+        ('Atr.Sn',  0.33*inch, 'atrasos_sancion'),
+        ('Vac.',    0.33*inch, 'vacacion'),
+        ('Viaj.',   0.33*inch, 'viajes'),
+        ('B.Med',   0.33*inch, 'bajas_medicas'),
+        ('PCGH',    0.33*inch, 'pcgh'),
+        ('P.Exc',   0.33*inch, 'perm_excep'),
+        ('Asuet',   0.33*inch, 'asuetos'),
+        ('PSGH',    0.33*inch, 'psgh'),
+        ('PCGH.E',  0.33*inch, 'pcgh_embar_enf_base'),
+        ('Act.Nav', 0.33*inch, 'actividad_navidad'),
+        ('Iza.B',   0.33*inch, 'iza_bandera'),
+    ] # Suma total de anchos: 0.3+0.4+0.6+2.4+1.56 + (18*0.28) = 5.26 + 5.04 = 10.3 pulgadas.
+      # Esto debería caber bien en 10.5 pulgadas de ancho útil.
+
+    # 4. Preparar respuesta HTTP y buffer
+    response = HttpResponse(content_type='application/pdf')
+    filter_suffix = "_filtrado" if request.GET.get('buscar') or request.GET.get('secretaria') or request.GET.get('unidad') or request.GET.get('q') else ""
+    filename = f"asistencia_{planilla_cabecera.mes}_{planilla_cabecera.anio}_{planilla_cabecera.get_tipo_display().replace(' ', '_')}_por_unidad{filter_suffix}.pdf"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    buffer = io.BytesIO()
+
+    # 5. Llamar a la función de utilidad para generar el PDF
+    try:
+        generar_pdf_asistencia( # Esta función está en utils.py
+            output_buffer=buffer,
+            planilla_cabecera=planilla_cabecera,
+            detalles_agrupados=dict(detalles_agrupados_filtrados),
+            orden_unidades=orden_unidades_filtradas,
+            column_definitions=column_definitions # Usar la definición de columnas de esta vista
+        )
+    except Exception as e_gen_pdf:
+        logger.error(f"Vista (filtrado): Falla al llamar a generar_pdf_asistencia para Planilla ID {pk}: {e_gen_pdf}", exc_info=True)
+        messages.error(request, f"Ocurrió un error crítico al generar el documento PDF (filtrado): {e_gen_pdf}")
+        redirect_url = reverse('ver_detalles_asistencia', kwargs={'pk': pk})
+        if request.GET:
+            redirect_url += '?' + request.GET.urlencode()
+        return redirect(redirect_url)
+
+    # 6. Escribir el PDF en la respuesta
+    pdf_data = buffer.getvalue()
+    buffer.close()
+    response.write(pdf_data)
+    
+    logger.info(f"Vista: PDF FILTRADO generado y enviado para Planilla ID {pk} con {len(todos_los_detalles_filtrados)} detalles.")
+    return response

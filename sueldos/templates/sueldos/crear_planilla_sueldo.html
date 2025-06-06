@@ -1,4 +1,4 @@
-{% extends 'index_master.html' %} {# Ajusta si tu base es diferente #}
+{% extends 'index_master.html' %}
 {% load static %}
 
 {% block title_suffix %} - Crear Planilla Sueldos{% endblock %}
@@ -14,95 +14,68 @@
         <div class="clearfix"></div>
 
         <div class="row">
-            <div class="col-md-8 col-sm-10 offset-md-2 offset-sm-1"> {# Centrar un poco el formulario #}
+            <div class="col-md-8 col-sm-10 offset-md-2 offset-sm-1">
                 <div class="x_panel">
                     <div class="x_title">
                         <h2>Definir Periodo y Tipo</h2>
                         <div class="clearfix"></div>
                     </div>
                     <div class="x_content">
-
-                        {# Mostrar mensajes de Django (especialmente útil para el error de duplicado) #}
                         {% if messages %}
+                            <div class="my-2">
                             {% for message in messages %}
                                 <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
                                     {{ message|safe }}
-                                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                        <span aria-hidden="true">×</span>
-                                    </button>
+                                    <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button>
                                 </div>
                             {% endfor %}
+                            </div>
                         {% endif %}
 
-                        <p>Ingrese los datos para identificar la planilla de sueldos que desea crear.</p>
-
-                        {# Usar novalidate para permitir validación de Django y añadir clases de Gentelella #}
                         <form method="post" class="form-horizontal form-label-left" novalidate>
                             {% csrf_token %}
-
-                            {# Renderizar campos del PlanillaSueldoForm individualmente para mejor control de estilo #}
-                            {# Campo Mes #}
-                            <div class="item form-group mb-3"> {# mb-3 para espacio vertical Bootstrap #}
-                                <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.mes.id_for_label }}">
-                                    {{ form.mes.label }} <span class="required">*</span>
-                                </label>
-                                <div class="col-md-6 col-sm-6 ">
-                                    {{ form.mes }}
-                                    {% if form.mes.errors %}
-                                        <ul class="parsley-errors-list filled mt-1"> {# mt-1 margen superior #}
-                                        {% for error in form.mes.errors %}<li>{{ error }}</li>{% endfor %}
-                                        </ul>
-                                    {% endif %}
-                                    <small class="form-text text-muted">{{ form.mes.help_text }}</small>
+                            
+                            {% if form.non_field_errors %}
+                                <div class="alert alert-danger">
+                                    {% for error in form.non_field_errors %}
+                                        <p>{{ error }}</p>
+                                    {% endfor %}
                                 </div>
-                            </div>
+                            {% endif %}
 
-                            {# Campo Año #}
+                            <!-- CAMPO MES -->
                             <div class="item form-group mb-3">
-                                <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.anio.id_for_label }}">
-                                    {{ form.anio.label }} <span class="required">*</span>
+                                <label class="col-form-label col-md-3 col-sm-3 label-align">
+                                    Mes <span class="required">*</span>
                                 </label>
-                                <div class="col-md-6 col-sm-6 ">
-                                    {{ form.anio }}
-                                    {% if form.anio.errors %}
-                                        <ul class="parsley-errors-list filled mt-1">
-                                        {% for error in form.anio.errors %}<li>{{ error }}</li>{% endfor %}
-                                        </ul>
-                                    {% endif %}
-                                     <small class="form-text text-muted">{{ form.anio.help_text }}</small>
-                                </div>
+                                <!-- Mostramos el select y el input manual uno al lado del otro -->
+                                <div class="col-md-3 col-sm-3">{{ form.mes_select }}</div>
+                                <div class="col-md-3 col-sm-3">{{ form.mes_manual }}</div>
                             </div>
 
-                             {# Campo Tipo #}
+                            <!-- CAMPO AÑO -->
+                            <div class="item form-group mb-3">
+                                <label class="col-form-label col-md-3 col-sm-3 label-align">
+                                    Año <span class="required">*</span>
+                                </label>
+                                <div class="col-md-3 col-sm-3">{{ form.anio_select }}</div>
+                                <div class="col-md-3 col-sm-3">{{ form.anio_manual }}</div>
+                            </div>
+
+                            <!-- CAMPO TIPO -->
                             <div class="item form-group mb-3">
                                 <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.tipo.id_for_label }}">
                                     {{ form.tipo.label }} <span class="required">*</span>
                                 </label>
-                                <div class="col-md-6 col-sm-6 ">
-                                    {{ form.tipo }} {# Asume que el widget ya tiene clases form-select #}
-                                    {% if form.tipo.errors %}
-                                        <ul class="parsley-errors-list filled mt-1">
-                                        {% for error in form.tipo.errors %}<li>{{ error }}</li>{% endfor %}
-                                        </ul>
-                                    {% endif %}
-                                     <small class="form-text text-muted">{{ form.tipo.help_text }}</small>
-                                </div>
+                                <div class="col-md-6 col-sm-6 ">{{ form.tipo }}</div>
                             </div>
-
-                             {# Campo Observaciones #}
+                            
+                            <!-- CAMPO OBSERVACIONES -->
                             <div class="item form-group mb-3">
                                 <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.observaciones.id_for_label }}">
                                     {{ form.observaciones.label }}
                                 </label>
-                                <div class="col-md-6 col-sm-6 ">
-                                    {{ form.observaciones }} {# Asume que el widget ya tiene clases form-control #}
-                                    {% if form.observaciones.errors %}
-                                        <ul class="parsley-errors-list filled mt-1">
-                                        {% for error in form.observaciones.errors %}<li>{{ error }}</li>{% endfor %}
-                                        </ul>
-                                    {% endif %}
-                                     <small class="form-text text-muted">{{ form.observaciones.help_text }}</small>
-                                </div>
+                                <div class="col-md-6 col-sm-6 ">{{ form.observaciones }}</div>
                             </div>
 
                             <div class="ln_solid"></div>
@@ -114,23 +87,15 @@
                                     </button>
                                 </div>
                             </div>
-
-                        </form> {# Fin del formulario #}
-                    </div> {# Fin x_content #}
-                </div> {# Fin x_panel #}
-            </div> {# Fin col #}
-        </div> {# Fin row #}
-    </div> {# Fin container #}
-</div> {# Fin right_col #}
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
-{# No es estrictamente necesario si los widgets en forms.py ya tienen clases Bootstrap #}
-{# <script>
-    $(document).ready(function() {
-        $('#{{ form.mes.id_for_label }}, #{{ form.anio.id_for_label }}, #{{ form.observaciones.id_for_label }}').addClass('form-control form-control-sm');
-        $('#{{ form.tipo.id_for_label }}').addClass('form-select form-select-sm');
-        $('#{{ form.observaciones.id_for_label }}').css('height', 'auto');
-    });
-</script> #}
+<!-- No se necesita JavaScript para esta versión -->
 {% endblock %}

@@ -2,6 +2,7 @@
 
 import logging
 from django.shortcuts import get_object_or_404
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 # Importa los modelos externos necesarios
 from .models import (
     Planilla, DetalleBonoTe,
@@ -10,14 +11,27 @@ from .models import (
 )
 from django.db.models import Q
 from decimal import Decimal # Para convertir Item
+from collections import defaultdict
+from decimal import Decimal, InvalidOperation
 
+
+# Imports para ReportLab
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.lib import colors
+from reportlab.lib.units import inch, cm
+from reportlab.lib.utils import ImageReader
+import os
+from django.conf import settings
+import io
 logger = logging.getLogger(__name__)
 
-def get_processed_planilla_details(request, planilla_id):
+def get_processed_planilla_details(request, planilla_id, items_por_pagina=25, return_all_for_export=False):
     """
     Obtiene la planilla, listas de filtros (externos), y los detalles de Bono TE
-    (filtrados por unidad/búsqueda externa y enriquecidos con datos externos).
-    Incluye prints de depuración.
+    (PAGINADOS para la vista, o TODOS para exportación).
     """
     result = {
         'planilla': None,
@@ -25,274 +39,558 @@ def get_processed_planilla_details(request, planilla_id):
         'unidades_for_select': PrincipalUnidadExterna.objects.none(),
         'selected_secretaria_id': None,
         'selected_unidad_id': None,
-        'detalles_enriquecidos': [],
+        'page_obj': None,
         'search_active': False,
         'error_message': None,
         'search_term': '',
+        'all_items_for_export': [], # Para la lista completa en modo exportación
+        # Para exportación
+        'all_items_for_export_list': [], # Lista plana de todos los detalles filtrados
+        'detalles_agrupados_por_unidad_export': {}, # Diccionario para exportación
+        'orden_unidades_export': [],             # Lista para orden en exportación
     }
+    print(f"\n--- [DEBUG UTIL PLANILLA] INICIO (Planilla ID: {planilla_id}, ExportMode: {return_all_for_export}) ---")
+    logger.info(f"[Util Planilla] Procesando Planilla ID {planilla_id}, ExportMode: {return_all_for_export}")
 
     # --- 0. Obtener la Planilla (Interna) ---
     try:
-        planilla = Planilla.objects.get(pk=planilla_id)
-        result['planilla'] = planilla
-        logger.info(f"[Util] Procesando Planilla ID {planilla.id} (Tipo: {planilla.get_tipo_display()})")
+        planilla_obj = Planilla.objects.get(pk=planilla_id)
+        result['planilla'] = planilla_obj
     except Planilla.DoesNotExist:
-        logger.error(f"[Util] Planilla con ID={planilla_id} no encontrada.")
+        logger.error(f"[Util Planilla] Planilla con ID={planilla_id} no encontrada.")
         result['error_message'] = f"Planilla ID {planilla_id} no encontrada."
         return result
     except Exception as e_plan:
-        logger.error(f"[Util] Error obteniendo Planilla ID {planilla_id}: {e_plan}", exc_info=True)
+        logger.error(f"[Util Planilla] Error obteniendo Planilla ID {planilla_id}: {e_plan}", exc_info=True)
         result['error_message'] = f"Error inesperado al buscar la planilla: {e_plan}"
         return result
 
     # --- 1. Obtener Secretarías Externas ---
     try:
-        # Consulta a BD externa
-        all_secretarias = PrincipalSecretariaExterna.objects.using('personas_db').order_by('nombre_secretaria')
-        result['all_secretarias'] = all_secretarias
+        all_secretarias_qs = PrincipalSecretariaExterna.objects.using('personas_db').order_by('nombre_secretaria')
+        result['all_secretarias'] = list(all_secretarias_qs)
     except Exception as e_sec:
-        logger.error(f"[Util] Error obteniendo secretarías externas: {e_sec}", exc_info=True)
-        result['error_message'] = f"No se pudo cargar la lista de secretarías externas: {e_sec}"
-        # No es fatal, continuar
+        logger.error(f"[Util Planilla] Error obteniendo secretarías externas: {e_sec}", exc_info=True)
+        result['error_message'] = (result.get('error_message') or "") + f" Error cargando secretarías: {e_sec}"
 
-    # --- 2. Procesar Filtros GET (Secretaría, Unidad, Búsqueda 'q') ---
+    # --- 2. Procesar Filtros GET ---
     filter_secretaria_str = request.GET.get('secretaria', '').strip()
     filter_unidad_str = request.GET.get('unidad', '').strip()
     search_term = request.GET.get('q', '').strip()
     result['search_term'] = search_term
-    print(f"\n--- [DEBUG UTIL] ---") # Separador para cada request
-    print(f"[DEBUG UTIL] GET Params: secretaria='{filter_secretaria_str}', unidad='{filter_unidad_str}', q='{search_term}'") # LOG 0
-
-    # Marcar si hay filtro/búsqueda activa
+    print(f"[DEBUG UTIL PLANILLA] GET Params: secretaria='{filter_secretaria_str}', unidad='{filter_unidad_str}', q='{search_term}'")
     result['search_active'] = bool(filter_secretaria_str or filter_unidad_str or search_term)
-    print(f"[DEBUG UTIL] Search Active: {result['search_active']}")
+    print(f"[DEBUG UTIL PLANILLA] Search Active (por cualquier filtro): {result['search_active']}")
 
     # --- 3. Cargar Unidades Externas si se seleccionó Secretaría ---
-    unidades_qs = PrincipalUnidadExterna.objects.none()
-    selected_secretaria_id = None
+    selected_secretaria_id_int = None
     if filter_secretaria_str:
         try:
-            selected_secretaria_id = int(filter_secretaria_str)
-            result['selected_secretaria_id'] = selected_secretaria_id
-            print(f"[DEBUG UTIL] Consultando Unidades Externas para secretaria_id={selected_secretaria_id}") # LOG 3.1
-            # Consulta a BD externa
+            selected_secretaria_id_int = int(filter_secretaria_str)
+            result['selected_secretaria_id'] = selected_secretaria_id_int
             unidades_qs = PrincipalUnidadExterna.objects.using('personas_db') \
-                                .filter(secretaria_id=selected_secretaria_id) \
+                                .filter(secretaria_id=selected_secretaria_id_int) \
                                 .order_by('nombre_unidad')
-            result['unidades_for_select'] = unidades_qs
-            # print(f"[DEBUG UTIL] Unidades Externas encontradas: {list(unidades_qs.values_list('nombre_unidad', flat=True))}") # LOG 3.2 (Opcional, puede ser largo)
+            result['unidades_for_select'] = list(unidades_qs)
         except (ValueError, TypeError):
-             logger.warning(f"[Util] ID de Secretaría externa inválido: '{filter_secretaria_str}'")
+             logger.warning(f"[Util Planilla] ID de Secretaría externa inválido: '{filter_secretaria_str}'")
              result['selected_secretaria_id'] = None
         except Exception as e_uni:
-             logger.error(f"[Util] Error obteniendo unidades externas para sec ID {selected_secretaria_id}: {e_uni}", exc_info=True)
+             logger.error(f"[Util Planilla] Error obteniendo unidades externas para sec ID {selected_secretaria_id_int}: {e_uni}", exc_info=True)
              result['unidades_for_select'] = PrincipalUnidadExterna.objects.none()
 
-    # --- 4. Obtener IDs de Personal Externo Relevantes ---
-    personal_ids_to_filter_local = set()
-    proceed_with_details = result['search_active'] # Buscar detalles si hay filtro/búsqueda
+    # --- 4. Obtener IDs de Personal Externo Relevantes SI HAY FILTROS ACTIVOS ---
+    personal_ids_para_filtrar_detalles_locales = None 
+    if result['search_active']:
+        personal_ids_para_filtrar_detalles_locales = set()
+        personal_ids_in_unidad = set()
+        selected_unidad_id_int_filter = None
+        if filter_unidad_str:
+            try:
+                selected_unidad_id_int_filter = int(filter_unidad_str)
+                result['selected_unidad_id'] = selected_unidad_id_int_filter
+                designaciones_qs = PrincipalDesignacionExterno.objects.using('personas_db').filter(unidad_id=selected_unidad_id_int_filter, estado='ACTIVO').values_list('personal_id', flat=True).distinct()
+                personal_ids_in_unidad = set(pid for pid in designaciones_qs if pid is not None)
+                print(f"[DEBUG UTIL PLANILLA] IDs por unidad '{filter_unidad_str}': {personal_ids_in_unidad}")
+            except (ValueError, TypeError): logger.warning(f"ID Unidad para filtro inválido: {filter_unidad_str}")
+            except Exception as e: logger.error(f"Error IDs por Unidad {selected_unidad_id_int_filter}: {e}")
+        
+        personal_ids_from_search = set()
+        if search_term:
+             try:
+                 item_numeric = None
+                 try: item_numeric = int(search_term)
+                 except: pass
+                 ids_ci_qs = PrincipalPersonalExterno.objects.using('personas_db').filter(ci__iexact=search_term).values_list('id', flat=True)
+                 personal_ids_from_search.update(ids_ci_qs)
+                 if item_numeric is not None:
+                      ids_item_qs = PrincipalDesignacionExterno.objects.using('personas_db').filter(item=item_numeric, estado='ACTIVO').values_list('personal_id', flat=True).distinct()
+                      personal_ids_from_search.update(p_id for p_id in ids_item_qs if p_id is not None)
+                 print(f"[DEBUG UTIL PLANILLA] IDs por búsqueda '{search_term}': {personal_ids_from_search}")
+             except Exception as e: logger.error(f"Error IDs por Búsqueda '{search_term}': {e}")
+        
+        if filter_unidad_str and search_term: 
+            personal_ids_para_filtrar_detalles_locales = personal_ids_in_unidad.intersection(personal_ids_from_search)
+        elif search_term: 
+            personal_ids_para_filtrar_detalles_locales = personal_ids_from_search
+        elif filter_unidad_str: 
+            personal_ids_para_filtrar_detalles_locales = personal_ids_in_unidad
+        elif filter_secretaria_str and not filter_unidad_str and not search_term:
+             personal_ids_para_filtrar_detalles_locales = None # No filtrar por personal si solo se especificó secretaría
+             print(f"[DEBUG UTIL PLANILLA] Combinación: Solo Filtro Secretaría, no se filtrarán IDs de personal (todos los de la planilla se considerarán).")
 
-    personal_ids_in_unidad = set()
-    selected_unidad_id = None
-    if filter_unidad_str:
-        try:
-            selected_unidad_id = int(filter_unidad_str)
-            result['selected_unidad_id'] = selected_unidad_id
-            print(f"[DEBUG UTIL] Filtrando Designaciones Externas por unidad_id={selected_unidad_id} y estado='ACTIVO'") # LOG 1
-            # Consulta a BD externa, asumiendo estado='ACTIVO'
-            designaciones_qs = PrincipalDesignacionExterno.objects.using('personas_db') \
-                .filter(unidad_id=selected_unidad_id, estado='ACTIVO') \
-                .values_list('personal_id', flat=True).distinct()
-            personal_ids_in_unidad = set(pid for pid in designaciones_qs if pid is not None)
-            print(f"[DEBUG UTIL] IDs externos encontrados en unidad ({selected_unidad_id}): {personal_ids_in_unidad}") # LOG 2
-            logger.info(f"[Util] IDs externos en Unidad {selected_unidad_id} (Activos): {len(personal_ids_in_unidad)}")
-
-        except (ValueError, TypeError):
-             logger.warning(f"[Util] ID de Unidad externa inválido: '{filter_unidad_str}'")
-             result['error_message'] = "ID de Unidad inválido."
-             proceed_with_details = False
-        except Exception as e_pers_ids:
-            logger.error(f"[Util] Error obteniendo personal_ids externos para Unidad {selected_unidad_id}: {e_pers_ids}", exc_info=True)
-            result['error_message'] = "Error al buscar personal externo en la unidad."
-            proceed_with_details = False
-
-    # 4.b Búsqueda Externa (CI o Item)
-    personal_ids_from_search = set()
-    if search_term:
-        try:
-            item_numeric = None
-            try: item_numeric = int(search_term) # O Decimal? Verifica tipo de Item
-            except: item_numeric = None
-            print(f"[DEBUG UTIL] Buscando por CI='{search_term}' o Item={item_numeric}") # LOG 3.0
-
-            # Consulta CI en Personal Externo
-            ids_ci_qs = PrincipalPersonalExterno.objects.using('personas_db') \
-                        .filter(ci__iexact=search_term) \
-                        .values_list('id', flat=True)
-            ids_ci = list(ids_ci_qs) # Ejecutar consulta
-            personal_ids_from_search.update(ids_ci)
-            print(f"[DEBUG UTIL] IDs externos encontrados por CI: {ids_ci}") # LOG 3a
-
-            # Consulta Item en Designacion Externa (Activa)
-            if item_numeric is not None:
-                ids_item_qs = PrincipalDesignacionExterno.objects.using('personas_db') \
-                            .filter(item=item_numeric, estado='ACTIVO') \
-                            .values_list('personal_id', flat=True).distinct()
-                ids_item = list(p_id for p_id in ids_item_qs if p_id is not None) # Ejecutar y filtrar Nones
-                personal_ids_from_search.update(ids_item)
-                print(f"[DEBUG UTIL] IDs externos encontrados por Item ({item_numeric}, Activo): {ids_item}") # LOG 3b
-            else:
-                print("[DEBUG UTIL] Término de búsqueda no es numérico, no se busca por Item.")
-
-            print(f"[DEBUG UTIL] IDs externos combinados de búsqueda: {personal_ids_from_search}") # LOG 3c
-            logger.info(f"[Util] IDs externos encontrados por búsqueda '{search_term}': {len(personal_ids_from_search)}")
-
-        except Exception as e_search:
-            logger.error(f"[Util] Error durante búsqueda externa para '{search_term}': {e_search}", exc_info=True)
-            result['error_message'] = "Error durante la búsqueda externa."
-            proceed_with_details = False
-
-    # 4.c Combinar resultados
-    if filter_unidad_str and search_term:
-        personal_ids_to_filter_local = personal_ids_in_unidad.intersection(personal_ids_from_search)
-        print(f"[DEBUG UTIL] Combinación: Intersección Unidad y Búsqueda")
-    elif search_term:
-        personal_ids_to_filter_local = personal_ids_from_search
-        print(f"[DEBUG UTIL] Combinación: Solo Búsqueda")
-    elif filter_unidad_str:
-        personal_ids_to_filter_local = personal_ids_in_unidad
-        print(f"[DEBUG UTIL] Combinación: Solo Filtro Unidad")
+        if personal_ids_para_filtrar_detalles_locales is not None and not personal_ids_para_filtrar_detalles_locales:
+             print("[DEBUG UTIL PLANILLA] Búsqueda/Filtro externo NO encontró IDs. Los detalles locales se filtrarán a vacío si se aplica este filtro.")
+        elif personal_ids_para_filtrar_detalles_locales is not None:
+             print(f"[DEBUG UTIL PLANILLA] IDs externos finales para filtrar DetalleBonoTe: {list(personal_ids_para_filtrar_detalles_locales)[:10]}")
     else:
-        print(f"[DEBUG UTIL] Combinación: Sin filtro de unidad ni búsqueda activa")
-
-    print(f"[DEBUG UTIL] IDs externos finales para filtrar DetalleBonoTe: {personal_ids_to_filter_local}") # LOG 4
+        print("[DEBUG UTIL PLANILLA] No hay filtros activos, no se obtendrán IDs externos específicos para filtrar detalles.")
 
     # --- 5. Obtener y Enriquecer Detalles Locales ---
-    if proceed_with_details:
-        if not personal_ids_to_filter_local and result['search_active']:
-            logger.info("[Util] Filtro/Búsqueda activa pero no se encontraron IDs externos coincidentes.")
-            print("[DEBUG UTIL] No se encontraron IDs externos que coincidan con el filtro/búsqueda.") # LOG 5.1
-            result['detalles_enriquecidos'] = []
-        elif personal_ids_to_filter_local: # Solo proceder si hay IDs para buscar
-            try:
-                # PASO A: Filtrar Detalles Locales por Planilla y IDs externos encontrados
-                print(f"[DEBUG UTIL] Filtrando DetalleBonoTe por planilla_id={planilla.id} y personal_externo_id__in={personal_ids_to_filter_local}") # LOG 5
-                detalles_locales_qs = DetalleBonoTe.objects.filter(
-                    id_planilla=planilla,
-                    personal_externo_id__in=personal_ids_to_filter_local # Filtrar por FK a externo
-                )
-                print(f"[DEBUG UTIL] QuerySet DetalleBonoTe filtrado (antes de ejecutar): {detalles_locales_qs.query}") # LOG 6a (Muestra SQL)
-                detalles_locales_filtrados = list(detalles_locales_qs) # Convertir a lista para enriquecer
-                print(f"[DEBUG UTIL] Detalles Bono Te internos encontrados: {len(detalles_locales_filtrados)}") # LOG 6b
+    all_filtered_detalles_list = []
+    # Inicializar paginator y page_obj_resultado para evitar UnboundLocalError
+    paginator = None
+    page_obj_resultado = None
 
-                # PASO B: Enriquecer (si hay detalles locales)
-                if detalles_locales_filtrados:
-                    ids_needed = {d.personal_externo_id for d in detalles_locales_filtrados if d.personal_externo_id}
-                    print(f"[DEBUG UTIL] IDs externos necesarios para enriquecimiento: {ids_needed}") # LOG 7
+    try:
+        detalles_locales_qs = DetalleBonoTe.objects.filter(id_planilla=planilla_obj)
+        print(f"[DEBUG UTIL PLANILLA] COUNT DetalleBonoTe INICIAL para planilla {planilla_obj.id}: {detalles_locales_qs.count()}")
 
-                    # Diccionarios para info externa
-                    personal_info_ext = {}
-                    designaciones_info_ext = {}
+        # Aplicar filtro de personal_id si se determinó un conjunto de IDs y la búsqueda está activa
+        if result['search_active'] and personal_ids_para_filtrar_detalles_locales is not None:
+            print(f"[DEBUG UTIL PLANILLA] Aplicando filtro personal_externo_id__in con {len(personal_ids_para_filtrar_detalles_locales)} IDs.")
+            detalles_locales_qs = detalles_locales_qs.filter(
+                personal_externo_id__in=list(personal_ids_para_filtrar_detalles_locales)
+            )
+            print(f"[DEBUG UTIL PLANILLA] COUNT DetalleBonoTe DESPUÉS de filtro por ID externo: {detalles_locales_qs.count()}")
 
-                    # Consultar info de Personal Externo
-                    if ids_needed:
-                        try:
-                            print("[DEBUG UTIL] Consultando BD Externa: PrincipalPersonalExterno...") # LOG 8
-                            personas_externas = PrincipalPersonalExterno.objects.using('personas_db').filter(id__in=ids_needed)
-                            personal_info_ext = {p.id: p for p in personas_externas}
-                            print(f"[DEBUG UTIL] Info Personal Externo obtenida para {len(personal_info_ext)} IDs.") # LOG 9
-                        except Exception as e_pers_f: logger.error(f"Error consultando personal externo para enriquecer: {e_pers_f}")
+        all_filtered_detalles_list_for_processing = list(detalles_locales_qs)
+        print(f"[DEBUG UTIL PLANILLA] Detalles Bono Te para procesar (después de filtro de IDs, antes de enriquecer): {len(all_filtered_detalles_list_for_processing)}")
 
-                    # Consultar info de Designación Externa (ACTIVA y relevante)
-                    if ids_needed:
-                        try:
-                            print(f"[DEBUG UTIL] Consultando BD Externa: PrincipalDesignacionExterno (Activas, para IDs: {ids_needed})...") # LOG 10
-                            desig_query_ext = PrincipalDesignacionExterno.objects.using('personas_db') \
-                                .filter(personal_id__in=ids_needed, estado='ACTIVO') \
-                                .select_related('cargo', 'unidad') \
-                                .order_by('personal_id', '-id')
+        if all_filtered_detalles_list_for_processing:
+            # --- INICIO DE TU LÓGICA DE ENRIQUECIMIENTO ORIGINAL ---
+            ids_needed = {d.personal_externo_id for d in all_filtered_detalles_list_for_processing if d.personal_externo_id}
+            personal_info_ext = {}
+            designaciones_info_ext = {}
+            if ids_needed:
+                try:
+                    personas_externas_qs = PrincipalPersonalExterno.objects.using('personas_db').filter(id__in=ids_needed)
+                    personal_info_ext = {p.id: p for p in personas_externas_qs}
+                except Exception as e_enrich_pers:
+                    logger.error(f"[Util Planilla] Error enriqueciendo (personal): {e_enrich_pers}", exc_info=True)
+                try:
+                    desig_qs = PrincipalDesignacionExterno.objects.using('personas_db') \
+                        .filter(personal_id__in=ids_needed, estado='ACTIVO') \
+                        .select_related('cargo', 'unidad') \
+                        .order_by('personal_id', '-id')
+                    temp_desig = {}
+                    for d_ext in desig_qs:
+                        if d_ext.personal_id not in temp_desig: temp_desig[d_ext.personal_id] = d_ext
+                    designaciones_info_ext = {
+                        pid: {
+                            'item': d.item,
+                            'cargo': d.cargo.nombre_cargo if d.cargo else 'N/A',
+                            'unidad_nombre': d.unidad.nombre_unidad if d.unidad and d.unidad.nombre_unidad else 'SIN UNIDAD ESPECÍFICA'
+                        } for pid, d in temp_desig.items()
+                    }
+                except Exception as e_enrich_desig:
+                    logger.error(f"[Util Planilla] Error enriqueciendo (designaciones): {e_enrich_desig}", exc_info=True)
 
-                            # Si se filtró por unidad, añadir filtro externo
-                            if selected_unidad_id:
-                                print(f"[DEBUG UTIL]   (Añadiendo filtro de unidad_id={selected_unidad_id} a consulta designaciones)") # LOG 10.1
-                                desig_query_ext = desig_query_ext.filter(unidad_id=selected_unidad_id)
+            for detalle_obj_item in all_filtered_detalles_list_for_processing:
+                persona_ext = personal_info_ext.get(detalle_obj_item.personal_externo_id)
+                info_desig_ext = designaciones_info_ext.get(detalle_obj_item.personal_externo_id)
 
-                            # Tomar la más reciente por persona
-                            designaciones_relevantes_ext = {}
-                            processed_person_ids_ext = set()
-                            # Iterar para obtener las relevantes (ejecuta la consulta)
-                            for desig in desig_query_ext:
-                                if desig.personal_id not in processed_person_ids_ext:
-                                    designaciones_relevantes_ext[desig.personal_id] = desig
-                                    processed_person_ids_ext.add(desig.personal_id)
-                            print(f"[DEBUG UTIL] Info Designaciones Externas obtenida para {len(designaciones_relevantes_ext)} IDs.") # LOG 11
+                detalle_obj_item.item_externo = info_desig_ext.get('item', '') if info_desig_ext else ''
+                detalle_obj_item.cargo_externo = info_desig_ext.get('cargo', 'N/A') if info_desig_ext else 'N/A'
+                detalle_obj_item.unidad_externa_nombre = info_desig_ext.get('unidad_nombre', 'SIN UNIDAD ESPECÍFICA') if info_desig_ext else 'SIN UNIDAD ESPECÍFICA'
+                detalle_obj_item.ci_externo = persona_ext.ci if persona_ext else 'N/A'
+                detalle_obj_item.nombre_completo_externo = persona_ext.nombre_completo if persona_ext else f'ID:{detalle_obj_item.personal_externo_id} (No Encontrado)'
+            
+            def get_sort_key_item_bonote(detalle_obj_sort):
+                item_val_attr = getattr(detalle_obj_sort, 'item_externo', None)
+                nombre_completo_val = (getattr(detalle_obj_sort, 'nombre_completo_externo', '') or '').strip().upper()
+                item_sort_val = float('inf')
+                if item_val_attr is not None and str(item_val_attr).strip():
+                    try: item_sort_val = int(str(item_val_attr).strip())
+                    except ValueError: pass
+                return (item_sort_val, nombre_completo_val)
 
-                            # Crear dict de info externa
-                            designaciones_info_ext = {
-                                pid: {
-                                    'item': desig.item,
-                                    'cargo': desig.cargo.nombre_cargo if desig.cargo else 'N/A',
-                                    'unidad_nombre': desig.unidad.nombre_unidad if desig.unidad else 'N/A'
-                                } for pid, desig in designaciones_relevantes_ext.items()
-                            }
-                        except Exception as e_desig_f: logger.error(f"Error consultando designaciones externas para enriquecer: {e_desig_f}")
+            all_filtered_detalles_list_for_processing.sort(key=get_sort_key_item_bonote)
+            # --- FIN DE TU LÓGICA DE ENRIQUECIMIENTO ORIGINAL ---
+            print(f"[DEBUG UTIL PLANILLA] Enriquecimiento y ordenamiento completado para {len(all_filtered_detalles_list_for_processing)} detalles.")
 
-                    # Bucle de enriquecimiento (añadir atributos con sufijo _externo)
-                    enriched_list_temp = []
-                    print("[DEBUG UTIL] Iniciando bucle de enriquecimiento...") # LOG 12
-                    for detalle in detalles_locales_filtrados:
-                        persona_ext = personal_info_ext.get(detalle.personal_externo_id)
-                        info_desig_ext = designaciones_info_ext.get(detalle.personal_externo_id)
+        logger.info(f"[Util Planilla] {len(all_filtered_detalles_list_for_processing)} detalles preparados (filtrados y enriquecidos).")
 
-                        detalle.item_externo = info_desig_ext.get('item', '') if info_desig_ext else ''
-                        detalle.cargo_externo = info_desig_ext.get('cargo', 'N/A') if info_desig_ext else 'N/A'
-                        detalle.unidad_externa_nombre = info_desig_ext.get('unidad_nombre', 'N/A') if info_desig_ext else 'N/A'
-                        detalle.ci_externo = persona_ext.ci if persona_ext else 'N/A'
-                        detalle.nombre_completo_externo = persona_ext.nombre_completo if persona_ext else f'No encontrado ({detalle.personal_externo_id})'
+        if return_all_for_export:
+            result['all_items_for_export_list'] = all_filtered_detalles_list_for_processing
 
-                        enriched_list_temp.append(detalle)
-                    print("[DEBUG UTIL] Bucle de enriquecimiento finalizado.") # LOG 13
+            detalles_agrupados_export_temp = defaultdict(list)
+            for detalle_export_item in all_filtered_detalles_list_for_processing:
+                unidad_nombre_export = getattr(detalle_export_item, 'unidad_externa_nombre', 'SIN UNIDAD ESPECÍFICA')
+                if unidad_nombre_export is None or not str(unidad_nombre_export).strip():
+                    unidad_nombre_export = 'SIN UNIDAD ESPECÍFICA'
+                detalles_agrupados_export_temp[unidad_nombre_export].append(detalle_export_item)
 
-                    # Ordenar (usando los atributos _externo)
-                    # --- Lógica de ordenamiento por ITEM  ---
-                    def get_sort_key_item_bonote(detalle_obj):
-                        item_val_attr = getattr(detalle_obj, 'item_externo', None) # Puede ser int, None, o ''
-                        nombre_completo_val = (getattr(detalle_obj, 'nombre_completo_externo', '') or '').strip().upper()
-                        
-                        item_sort_val = float('inf') # Valor para ítems no válidos, None, o ausentes
+            result['orden_unidades_export'] = sorted(detalles_agrupados_export_temp.keys())
+            result['detalles_agrupados_por_unidad_export'] = dict(detalles_agrupados_export_temp)
 
-                        # Verificar si item_val_attr es None, o un string que (después de strip) está vacío
-                        if item_val_attr is not None and str(item_val_attr).strip():
-                            try:
-                                item_sort_val = int(str(item_val_attr).strip()) # Convertir a int para orden numérico
-                            except ValueError:
-                                # Si no se puede convertir a int (ej. si fuera 'N/A', 'S/I'), va al final.
-                                logger.debug(f"[Util Planilla] Item no numérico '{item_val_attr}' para {nombre_completo_val}, se ordenará al final.")
-                                # Mantiene float('inf')
-                        
-                        # Clave de ordenamiento: primero por ítem numérico, luego por nombre completo
-                        return (item_sort_val, nombre_completo_val)
+            logger.info(f"[Util Planilla] Devolviendo {len(all_filtered_detalles_list_for_processing)} items agrupados para exportar.")
+        else:
+            page_number_str = request.GET.get('page', '1')
+            if items_por_pagina <= 0:
+                items_por_pagina = 25
+                logger.warning(f"[Util Planilla] items_por_pagina era <=0, usando default {items_por_pagina} para paginación.")
 
-                    enriched_list_temp.sort(key=get_sort_key_item_bonote)
-                    logger.info(f"[Util Planilla] Lista de detalles Bono TE ordenada por item_externo (asc) y luego por nombre.")
-                    
+            if all_filtered_detalles_list_for_processing:
+                paginator = Paginator(all_filtered_detalles_list_for_processing, items_por_pagina)
+                logger.debug(f"UTIL Planilla: Paginator creado. Count={paginator.count}, NumPages={paginator.num_pages}, ItemsPerPage={items_por_pagina}")
+                try:
+                    page_obj_resultado = paginator.page(page_number_str)
+                except PageNotAnInteger:
+                    page_obj_resultado = paginator.page(1)
+                    logger.warning(f"UTIL Planilla: Número de página inválido ('{page_number_str}'). Mostrando página 1.")
+                except EmptyPage:
+                    page_obj_resultado = paginator.page(paginator.num_pages)
+                    logger.warning(f"UTIL Planilla: Página '{page_number_str}' fuera de rango ({paginator.num_pages} páginas). Mostrando última página.")
+            else:
+                logger.info("[Util Planilla] No hay detalles para paginar.")
 
+        result['page_obj'] = page_obj_resultado
 
-                    result['detalles_enriquecidos'] = enriched_list_temp
-                    logger.info(f"[Util] Enriquecimiento externo completado para {len(enriched_list_temp)} detalles.")
+        if result['page_obj']:
+            logger.debug(f"UTIL Planilla: Página actual: {result['page_obj'].number}, Items en página: {len(result['page_obj'].object_list)}")
 
-            except Exception as e_filter_enrich:
-                 logger.error(f"[Util] Error general durante filtrado/enriquecimiento (externo): {e_filter_enrich}", exc_info=True)
-                 result['error_message'] = f"Ocurrió un error al procesar los detalles: {e_filter_enrich}"
-                 result['detalles_enriquecidos'] = []
-        else: # Caso: Hay filtros activos pero personal_ids_to_filter_local está vacío
-             print("[DEBUG UTIL] Filtro/Búsqueda activa, pero no se encontraron IDs externos válidos para buscar detalles internos.")
-             result['detalles_enriquecidos'] = []
+    except Exception as e_general:
+         logger.error(f"[Util Planilla] Error INESPERADO obteniendo/procesando detalles Bono TE: {e_general}", exc_info=True)
+         result['error_message'] = (result.get('error_message') or '') + f" Error procesando detalles del bono: {e_general}"
+         result['page_obj'] = None
+         result['all_items_for_export_list'] = []
+         result['detalles_agrupados_por_unidad_export'] = {}
+         result['orden_unidades_export'] = []
 
-    else: # Caso: No hay filtros ni búsqueda activa
-        print("[DEBUG UTIL] No hay filtros ni búsqueda activa, no se recuperan detalles.")
-        result['detalles_enriquecidos'] = []
-
-
-    print(f"--- [DEBUG UTIL] FIN (Planilla: {planilla_id}) ---") # Separador Fin
+    print(f"--- [DEBUG UTIL PLANILLA] FIN (Planilla: {planilla_id}, ExportMode: {return_all_for_export}, "
+          f"Total items for export list: {len(result['all_items_for_export_list'])}, "
+          f"Unidades export: {len(result['orden_unidades_export'])}, "
+          f"Detalles Paginador: {len(result['page_obj'].object_list) if result['page_obj'] else 0}) ---")
     return result
+
+
+def generar_pdf_bonote_detalles(
+    output_buffer,
+    planilla_cabecera_bonote,
+    detalles_agrupados_bonote,
+    orden_unidades_bonote,
+    column_definitions_bonote
+    ):
+    """
+    Genera el contenido de un PDF de Detalles de Bono TE en el output_buffer.
+    Agrupado por unidad.
+    """
+    logger.info(f"Iniciando generación de PDF para Detalles Bono TE de Planilla ID: {planilla_cabecera_bonote.pk}")
+
+    PAGE_WIDTH, PAGE_HEIGHT = landscape(letter)
+
+    doc = SimpleDocTemplate(output_buffer, pagesize=(PAGE_WIDTH, PAGE_HEIGHT),
+                            rightMargin=0.25*inch, leftMargin=0.25*inch,
+                            topMargin=1.2*inch, bottomMargin=0.5*inch)
+
+    styles = getSampleStyleSheet()
+    story = []
+
+    style_titulo_principal = ParagraphStyle(name='TituloPrincipal', parent=styles['h1'], alignment=TA_CENTER, fontSize=12, spaceAfter=0.15*inch, fontName='Helvetica-Bold')
+    style_subtitulo_principal = ParagraphStyle(name='SubtituloPrincipal', parent=styles['h2'], alignment=TA_CENTER, fontSize=10, spaceAfter=0.1*inch, fontName='Helvetica')
+    style_nombre_unidad = ParagraphStyle(name='NombreUnidad', parent=styles['h3'], fontSize=9, fontName='Helvetica-Bold', spaceBefore=0.15*inch, spaceAfter=0.05*inch, alignment=TA_LEFT, leading=10,leftIndent=10, rightIndent=10,)
+    style_tabla_header = ParagraphStyle(name='TablaHeader', parent=styles['Normal'], alignment=TA_CENTER, fontSize=7, fontName='Helvetica-Bold', leading=8, textColor=colors.black)
+    style_tabla_cell = ParagraphStyle(name='TablaCell', parent=styles['Normal'], alignment=TA_LEFT, fontSize=6, leading=7)
+    style_tabla_cell_num = ParagraphStyle(name='TablaCellNum', parent=styles['Normal'], alignment=TA_RIGHT, fontSize=6, leading=7)
+    style_tabla_cell_center = ParagraphStyle(name='TablaCellCenter', parent=styles['Normal'], alignment=TA_CENTER, fontSize=6, leading=7)
+
+    def primera_pagina_encabezado(canvas, doc_obj):
+        canvas.saveState()
+        text_y_start = PAGE_HEIGHT - 0.5*inch
+        line_height = 12
+        canvas.setFont('Helvetica', 8)
+        canvas.drawString(0.5*inch, text_y_start, "GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ")
+        canvas.drawString(0.5*inch, text_y_start - line_height, "SECRETARÍA DEPTAL. ADMINISTRATIVA FINANCIERA")
+        canvas.drawString(0.5*inch, text_y_start - 2*line_height, "UNIDAD DE RECURSOS HUMANOS")
+        try:
+            logo_path = None
+            # Intenta buscar en STATICFILES_DIRS primero si está configurado
+            if settings.STATICFILES_DIRS:
+                logo_path_candidate = os.path.join(settings.STATICFILES_DIRS[0], 'img', 'gadp.png')
+                if os.path.exists(logo_path_candidate):
+                    logo_path = logo_path_candidate
+            
+            # Si no se encontró o STATICFILES_DIRS no está, intenta en /static/img/gadp.png relativo a BASE_DIR
+            if not logo_path:
+                logo_path_candidate_base = os.path.join(settings.BASE_DIR, 'static', 'img', 'gadp.png')
+                if os.path.exists(logo_path_candidate_base):
+                    logo_path = logo_path_candidate_base
+            
+            if logo_path and os.path.exists(logo_path):
+                logo_height = 0.9*inch
+                img = ImageReader(logo_path)
+                img_width_orig, img_height_orig = img.getSize()
+                aspect_ratio = img_width_orig / float(img_height_orig)
+                logo_width = logo_height * aspect_ratio
+                margen_superior_logo = 0.3*inch
+                logo_y = PAGE_HEIGHT - margen_superior_logo - logo_height
+                logo_x = PAGE_WIDTH - doc_obj.rightMargin - logo_width - 0.25*inch
+                canvas.drawImage(logo_path, logo_x, logo_y, width=logo_width, height=logo_height, mask='auto')
+                logger.info(f"Logo cargado desde: {logo_path}")
+            else:
+                logger.warning(f"Logo no encontrado. Rutas intentadas: {settings.STATICFILES_DIRS[0] if settings.STATICFILES_DIRS else 'N/A'}, {os.path.join(settings.BASE_DIR, 'static', 'img', 'gadp.png')}")
+        except Exception as e_logo:
+            logger.error(f"Error al cargar o dibujar el logo: {e_logo}", exc_info=True)
+        canvas.restoreState()
+
+    nombres_meses = {
+        1: "ENERO", 2: "FEBRERO", 3: "MARZO", 4: "ABRIL",
+        5: "MAYO", 6: "JUNIO", 7: "JULIO", 8: "AGOSTO",
+        9: "SEPTIEMBRE", 10: "OCTUBRE", 11: "NOVIEMBRE", 12: "DICIEMBRE"
+    }
+    nombre_mes = nombres_meses.get(planilla_cabecera_bonote.mes, str(planilla_cabecera_bonote.mes))
+
+    story.append(Paragraph(f"PLANILLA DE PAGO BONO DE TÉ - PERSONAL {planilla_cabecera_bonote.get_tipo_display().upper()}", style_titulo_principal))
+    story.append(Paragraph(f"CORRESPONDIENTE AL MES DE {nombre_mes.upper()} DE {planilla_cabecera_bonote.anio}", style_subtitulo_principal))
+    
+    table_headers_styled = [Paragraph(col_def[0], style_tabla_header) for col_def in column_definitions_bonote]
+    col_widths = [col_def[1] for col_def in column_definitions_bonote]
+
+    nro_general_item = 0
+
+    for unidad_idx, nombre_unidad in enumerate(orden_unidades_bonote):
+        detalles_de_esta_unidad = detalles_agrupados_bonote[nombre_unidad]
+        if not detalles_de_esta_unidad:
+            continue
+
+        story.append(Spacer(1, 0.1*inch))
+        story.append(Paragraph(f"UNIDAD: {nombre_unidad.upper()}", style_nombre_unidad))
+
+        data_pdf_unidad = [table_headers_styled]
+        nro_item_unidad = 0
+        for detalle_bonote in detalles_de_esta_unidad:
+            nro_item_unidad += 1
+            nro_general_item +=1
+            fila = []
+            for idx_col, (header_text, col_w, field_key) in enumerate(column_definitions_bonote):
+                cell_value_raw = None
+                cell_style = style_tabla_cell
+
+                if field_key == 'nro_item':
+                    cell_value_raw = str(nro_item_unidad)
+                    cell_style = style_tabla_cell_center
+                elif field_key == 'dias_habiles_planilla':
+                    cell_value_raw = planilla_cabecera_bonote.dias_habiles
+                    cell_style = style_tabla_cell_num
+                else:
+                    cell_value_raw = getattr(detalle_bonote, field_key, None)
+
+                campos_numericos_decimales = ['faltas', 'vacacion', 'viajes', 'bajas_medicas', 'pcgh', 'psgh', 'perm_excep', 'asuetos', 'pcgh_embar_enf_base', 'dias_no_pagados', 'dias_pagados', 'total_ganado', 'descuentos', 'liquido_pagable', 'dias_habiles_planilla']
+                campos_texto_largo = ['nombre_completo_externo', 'cargo_externo', 'observaciones_bono', 'observaciones_asistencia']
+                campos_centrados = ['item_externo', 'ci_externo', 'nro_item']
+
+                if isinstance(cell_value_raw, Decimal):
+                    cell_value = f"{cell_value_raw:.2f}"
+                    if field_key not in campos_texto_largo + campos_centrados:
+                         cell_style = style_tabla_cell_num
+                elif isinstance(cell_value_raw, (int, float)) and field_key not in ['item_externo']:
+                    if field_key in campos_numericos_decimales:
+                        try: cell_value = f"{Decimal(cell_value_raw):.2f}"
+                        except (TypeError, InvalidOperation): cell_value = "0.00"
+                    else:
+                        cell_value = str(cell_value_raw if cell_value_raw is not None else "")
+                    if field_key not in campos_texto_largo + campos_centrados:
+                         cell_style = style_tabla_cell_num
+                elif cell_value_raw is None:
+                    cell_value = ""
+                    if field_key in campos_numericos_decimales:
+                        cell_value = "0.00"
+                        cell_style = style_tabla_cell_num
+                else: # Strings
+                    cell_value = str(cell_value_raw)
+                
+                # Ajustar estilo final basado en el tipo de campo
+                if field_key in campos_centrados:
+                    cell_style = style_tabla_cell_center
+                elif field_key in campos_texto_largo:
+                    cell_style = style_tabla_cell
+                elif field_key not in campos_centrados + campos_texto_largo: # Si no es texto largo ni centrado, es numérico
+                    cell_style = style_tabla_cell_num
+
+
+                fila.append(Paragraph(cell_value, cell_style))
+            data_pdf_unidad.append(fila)
+
+        tabla_unidad = Table(data_pdf_unidad, colWidths=col_widths, repeatRows=1)
+
+        table_style_cmds = [
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#00FFFF")),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 7),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 4),
+            ('TOPPADDING', (0, 0), (-1, 0), 4),
+            ('GRID', (0, 0), (-1, -1), 0.25, colors.black),
+            ('FONTSIZE', (0, 1), (-1, -1), 6),
+            ('LEFTPADDING', (0, 1), (-1, -1), 2),
+            ('RIGHTPADDING', (0, 1), (-1, -1), 2),
+        ]
+
+        for i, col_def in enumerate(column_definitions_bonote):
+            if col_def[2] in campos_texto_largo:
+                table_style_cmds.append(('ALIGN', (i, 1), (i, -1), 'LEFT'))
+            elif col_def[2] not in campos_centrados + campos_texto_largo: # Numéricos
+                 table_style_cmds.append(('ALIGN', (i, 1), (i, -1), 'RIGHT'))
+            # Los centrados ya están por el ALIGN general de la tabla
+
+        tabla_unidad.setStyle(TableStyle(table_style_cmds))
+        story.append(tabla_unidad)
+        story.append(Spacer(1, 0.05*inch))
+
+    try:
+        doc.build(story, onFirstPage=primera_pagina_encabezado)
+        logger.info(f"Contenido PDF de Detalles Bono TE construido en buffer para Planilla ID: {planilla_cabecera_bonote.pk}")
+    except Exception as e_build:
+        logger.error(f"Error final al construir el PDF de Detalles Bono TE en buffer para Planilla ID {planilla_cabecera_bonote.pk}: {e_build}", exc_info=True)
+        
+        
+
+def generar_pdf_lista_planillas(
+    output_buffer,
+    planillas_qs, # QuerySet o lista de objetos Planilla
+    column_definitions_lista, # Definición de columnas para esta tabla
+    titulo_reporte="LISTA DE PLANILLAS DE BONO DE TÉ GENERADAS" # Título general
+    ):
+    """
+    Genera un PDF con la lista de Planillas de Bono de Té.
+    """
+    logger.info(f"Iniciando generación de PDF para la lista de planillas. Total: {len(planillas_qs) if hasattr(planillas_qs, '__len__') else 'Desconocido'}")
+
+    # Usaremos tamaño carta vertical (portrait) para una lista simple.
+    # Puedes cambiar a landscape(letter) si tienes muchas columnas o muy anchas.
+    PAGE_WIDTH, PAGE_HEIGHT = letter
+    doc = SimpleDocTemplate(output_buffer, pagesize=(PAGE_WIDTH, PAGE_HEIGHT),
+                            rightMargin=0.5*inch, leftMargin=0.5*inch,
+                            topMargin=1.2*inch, bottomMargin=0.5*inch)
+
+    styles = getSampleStyleSheet()
+    story = []
+
+    # Estilos (puedes personalizarlos más si es necesario)
+    style_titulo_principal = ParagraphStyle(name='TituloPrincipalLista', parent=styles['h1'], alignment=TA_CENTER, fontSize=14, spaceAfter=0.2*inch, fontName='Helvetica-Bold')
+    style_tabla_header = ParagraphStyle(name='TablaHeaderLista', parent=styles['Normal'], alignment=TA_CENTER, fontSize=9, fontName='Helvetica-Bold', leading=10, textColor=colors.whitesmoke)
+    style_tabla_cell = ParagraphStyle(name='TablaCellLista', parent=styles['Normal'], alignment=TA_LEFT, fontSize=8, leading=9)
+    style_tabla_cell_center = ParagraphStyle(name='TablaCellListaCenter', parent=style_tabla_cell, alignment=TA_CENTER)
+    style_tabla_cell_right = ParagraphStyle(name='TablaCellListaRight', parent=style_tabla_cell, alignment=TA_RIGHT)
+
+
+    # Función para el encabezado de la primera página (puedes reutilizar la de generar_pdf_bonote_detalles si es idéntica)
+    # O definir una específica si necesitas cambios. Por simplicidad, la redefinimos aquí.
+    def primera_pagina_encabezado_lista(canvas, doc_obj):
+        canvas.saveState()
+        text_y_start = PAGE_HEIGHT - 0.5*inch
+        line_height = 12
+        canvas.setFont('Helvetica', 8)
+        canvas.drawString(0.5*inch, text_y_start, "GOBIERNO AUTÓNOMO DEPARTAMENTAL DE POTOSÍ")
+        canvas.drawString(0.5*inch, text_y_start - line_height, "SECRETARÍA DEPTAL. ADMINISTRATIVA FINANCIERA")
+        canvas.drawString(0.5*inch, text_y_start - 2*line_height, "UNIDAD DE RECURSOS HUMANOS")
+        try:
+            logo_path = None
+            if settings.STATICFILES_DIRS:
+                logo_path_candidate = os.path.join(settings.STATICFILES_DIRS[0], 'img', 'gadp.png')
+                if os.path.exists(logo_path_candidate): logo_path = logo_path_candidate
+            if not logo_path:
+                logo_path_candidate_base = os.path.join(settings.BASE_DIR, 'static', 'img', 'gadp.png')
+                if os.path.exists(logo_path_candidate_base): logo_path = logo_path_candidate_base
+            
+            if logo_path and os.path.exists(logo_path):
+                logo_height = 0.9*inch
+                img = ImageReader(logo_path)
+                img_width_orig, img_height_orig = img.getSize()
+                aspect_ratio = img_width_orig / float(img_height_orig)
+                logo_width = logo_height * aspect_ratio
+                margen_superior_logo = 0.3*inch
+                logo_y = PAGE_HEIGHT - margen_superior_logo - logo_height
+                logo_x = PAGE_WIDTH - doc_obj.rightMargin - logo_width - 0.25*inch
+                canvas.drawImage(logo_path, logo_x, logo_y, width=logo_width, height=logo_height, mask='auto')
+            else: logger.warning(f"Logo no encontrado para PDF lista planillas.")
+        except Exception as e_logo: logger.error(f"Error al cargar/dibujar logo en PDF lista planillas: {e_logo}", exc_info=True)
+        canvas.restoreState()
+
+    # Título del reporte
+    story.append(Paragraph(titulo_reporte.upper(), style_titulo_principal))
+    story.append(Spacer(1, 0.1*inch))
+
+    # Preparar datos para la tabla
+    table_data = []
+    # Encabezados
+    table_headers = [Paragraph(col_def[0], style_tabla_header) for col_def in column_definitions_lista]
+    table_data.append(table_headers)
+
+    # Filas de datos
+    nro_item = 0
+    for planilla_item in planillas_qs:
+        nro_item += 1
+        row = []
+        for header_text, col_width, field_key_or_callable, field_type in column_definitions_lista:
+            cell_value = ""
+            current_cell_style = style_tabla_cell # Default
+
+            if field_key_or_callable == 'nro_item_lista':
+                cell_value = str(nro_item)
+                current_cell_style = style_tabla_cell_center
+            elif callable(field_key_or_callable): # Si es una función para obtener el valor
+                cell_value = field_key_or_callable(planilla_item)
+            else: # Si es una clave de atributo
+                value_raw = getattr(planilla_item, field_key_or_callable, None)
+                if field_key_or_callable == 'fecha_elaboracion' or field_key_or_callable == 'fecha_aprobacion':
+                    cell_value = value_raw.strftime("%d/%m/%Y") if value_raw else "-"
+                elif field_key_or_callable == 'dias_habiles':
+                    cell_value = f"{value_raw:.2f}" if value_raw is not None else "N/A"
+                elif field_key_or_callable == 'usuario_elaboracion':
+                    cell_value = value_raw.username if value_raw else "-"
+                else: # Para mes, anio, tipo, estado
+                    cell_value = str(value_raw) if value_raw is not None else "-"
+            
+            # Ajustar estilo según field_type
+            if field_type == 'center':
+                current_cell_style = style_tabla_cell_center
+            elif field_type == 'right':
+                current_cell_style = style_tabla_cell_right
+            # else usa style_tabla_cell (left)
+
+            row.append(Paragraph(str(cell_value), current_cell_style))
+        table_data.append(row)
+
+    if not planillas_qs: # Si no hay planillas
+        table_data.append([Paragraph("No hay planillas para mostrar.", style_tabla_cell_center, colSpan=len(column_definitions_lista))])
+
+    # Anchos de columna
+    col_widths = [col_def[1] for col_def in column_definitions_lista]
+
+    # Crear y estilizar la tabla
+    lista_table = Table(table_data, colWidths=col_widths, repeatRows=1)
+    lista_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#003366")), # Fondo cabecera
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),        # Texto cabecera
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),                  # Alineación general
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),                 # Alineación vertical
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),       # Fuente cabecera
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),          # Rejilla
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),                  # Padding cabecera
+        ('TOPPADDING', (0, 0), (-1, 0), 6),                     # Padding cabecera
+        ('LEFTPADDING', (0, 1), (-1, -1), 3),                   # Padding datos
+        ('RIGHTPADDING', (0, 1), (-1, -1), 3),                  # Padding datos
+    ]))
+    story.append(lista_table)
+
+    # Construir PDF
+    try:
+        doc.build(story, onFirstPage=primera_pagina_encabezado_lista)
+        logger.info(f"PDF de lista de planillas construido en buffer.")
+    except Exception as e_build:
+        logger.error(f"Error al construir PDF de lista de planillas: {e_build}", exc_info=True)
+        raise

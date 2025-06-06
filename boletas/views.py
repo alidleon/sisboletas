@@ -58,6 +58,10 @@ except ImportError:
 # from .forms import PlantillaBoletaForm # Crearemos este formulario después
 import json # Para pasar datos a la plantilla JS
 
+# Importar LogEntry para registro manual
+from auditlog.models import LogEntry
+from django.contrib.contenttypes.models import ContentType # Para obtener el ContentType
+
 # Lista de placeholders (temporalmente aquí, podría ir a utils.py)
 # Deberás refinar esta lista basada en los campos exactos que necesites
 
@@ -348,10 +352,11 @@ def render_object_to_html(obj, sample_data):
         return f'<div style="{final_styles_str}" class="{classes}" {additional_attrs_str}>{ensure_string(content)}</div>'
 
 # --- Vista de Previsualización ---
+@require_POST # Asegurar que solo se acceda por POST
 @csrf_exempt # DESCOMENTAR SOLO PARA PRUEBAS AJAX SIN CONFIGURAR CSRF EN JS
 @login_required
-@permission_required('boletas.view_plantilladeboleta', raise_exception=True)
-@require_POST # Asegurar que solo se acceda por POST
+@permission_required('boletas.view_plantillaboleta', raise_exception=True)
+
 def preview_boleta_view(request):
     logger.debug("Recibida solicitud de previsualización")
     try:
@@ -658,6 +663,33 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
     if num_boletas_generadas > 0:
         logger.info(f"Generación PDF completada. Boletas generadas: {num_boletas_generadas}. Errores: {len(errores_empleados)}.")
         p.save() # Guardar el contenido PDF en el buffer
+         # --- REGISTRAR ACCIÓN EN AUDITLOG (FORMA CORREGIDA) ---
+        try:
+            content_type_planilla_sueldo = ContentType.objects.get_for_model(PlanillaSueldo)
+            log_changes_description = (
+                f"Se generó un PDF con {num_boletas_generadas} boletas para la Planilla de Sueldos "
+                f"{planilla_sueldo.get_tipo_display()} {planilla_sueldo.mes}/{planilla_sueldo.anio} (ID: {planilla_sueldo.id}). "
+                f"Se utilizó la Plantilla de Boleta '{plantilla_boleta.nombre}' (ID: {plantilla_boleta.id})."
+            )
+            if errores_empleados:
+                log_changes_description += f" Hubo {len(errores_empleados)} errores al procesar empleados individuales."
+
+            # Crear la entrada de log directamente
+            LogEntry.objects.create(
+                actor=request.user,
+                content_type=content_type_planilla_sueldo,
+                object_pk=str(planilla_sueldo.pk), # object_pk es CharField
+                object_id=planilla_sueldo.pk,    # object_id es BigAutoField o similar (el numérico)
+                object_repr=str(planilla_sueldo),
+                action=LogEntry.Action.ACCESS, # 3 para ACCESS
+                changes=log_changes_description,
+                remote_addr=request.META.get('REMOTE_ADDR'), # Capturar IP si es posible
+                # timestamp se establece automáticamente por auto_now_add=True en LogEntry
+            )
+            logger.info(f"Acción de generación de PDF registrada en auditlog para PlanillaSueldo ID: {planilla_sueldo.id}")
+        except Exception as e_audit:
+            logger.error(f"Error al registrar la acción de generación de PDF en auditlog: {e_audit}", exc_info=True)
+        # --- FIN REGISTRAR ACCIÓN EN AUDITLOG ---
 
         buffer.seek(0) # Volver al inicio del buffer para la respuesta
         response = HttpResponse(buffer, content_type='application/pdf')
@@ -670,6 +702,27 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
         messages.error(request, "No se pudo generar ninguna boleta. Revise los logs para más detalles.")
         if errores_empleados:
             messages.warning(request, f"Errores encontrados durante la generación: {'; '.join(errores_empleados[:3])}{'...' if len(errores_empleados)>3 else ''}")
+
+        # --- REGISTRAR INTENTO FALLIDO EN AUDITLOG (FORMA CORREGIDA) ---
+        try:
+            content_type_planilla_sueldo = ContentType.objects.get_for_model(PlanillaSueldo)
+            log_failure_description = (
+                # ... (tu descripción de fallo) ...
+            )
+            LogEntry.objects.create(
+                actor=request.user,
+                content_type=content_type_planilla_sueldo,
+                object_pk=str(planilla_sueldo.pk),
+                object_id=planilla_sueldo.pk,
+                object_repr=str(planilla_sueldo),
+                action=LogEntry.Action.ACCESS, # O un ID de acción personalizado
+                changes=log_failure_description,
+                remote_addr=request.META.get('REMOTE_ADDR'),
+            )
+            logger.info(f"Intento fallido de generación de PDF registrado en auditlog para PlanillaSueldo ID: {planilla_sueldo.id}")
+        except Exception as e_audit_fail:
+            logger.error(f"Error al registrar el intento fallido de generación de PDF en auditlog: {e_audit_fail}", exc_info=True)
+        # --- FIN REGISTRAR INTENTO FALLIDO ---
         # return redirect('lista_planillas_sueldo') # Ajustar URL
         return HttpResponse("Error: No se generaron boletas.", status=500)
     
@@ -976,6 +1029,56 @@ def vista_generar_pdf_boleta_unica(request, personal_externo_id, anio, mes):
     
     p_canvas.showPage() # Solo una página para esta boleta individual
     p_canvas.save()
+
+    # --- REGISTRAR ACCIÓN EN AUDITLOG ---
+    try:
+        # El objeto principal podría ser el DetalleSueldo o el PrincipalPersonalExterno
+        # Usemos DetalleSueldo como el "recurso" principal accedido para esta acción específica.
+        # O PrincipalPersonalExterno si lo consideras más relevante para "generar boleta PARA un empleado".
+        # Vamos con PrincipalPersonalExterno ya que la boleta es PARA esa persona.
+        
+        # Asegurarse de que personal_ext (PrincipalPersonalExterno) está disponible y es el correcto
+        if personal_ext: # Si pudimos cargar la info del empleado externo
+            content_type_obj = ContentType.objects.get_for_model(PrincipalPersonalExterno)
+            obj_pk = str(personal_ext.pk)
+            obj_id_numeric = personal_ext.pk
+            obj_repr = str(personal_ext)
+        elif detalle_sueldo.personal_externo_id: # Fallback si personal_ext no se cargó pero tenemos el ID
+            # En este caso, no podemos obtener el ContentType de PrincipalPersonalExterno directamente
+            # si la app no está disponible o el modelo no se cargó, así que podríamos asociarlo
+            # al DetalleSueldo como fallback.
+            content_type_obj = ContentType.objects.get_for_model(DetalleSueldo)
+            obj_pk = str(detalle_sueldo.pk)
+            obj_id_numeric = detalle_sueldo.pk
+            obj_repr = f"Detalle Sueldo ID {detalle_sueldo.pk} (Personal Ext. ID {detalle_sueldo.personal_externo_id})"
+        else: # Caso muy improbable si la lógica anterior funciona
+            content_type_obj = None
+            obj_pk = None
+            obj_id_numeric = None
+            obj_repr = "Boleta Individual (Contexto Desconocido)"
+
+        log_description = (
+            f"Generada boleta individual para "
+            f"{datos_empleado_actual.get('{{nombre_completo}}', f'Personal ID {detalle_sueldo.personal_externo_id}')} "
+            f"(CI: {datos_empleado_actual.get('{{ci}}', 'N/A')}) "
+            f"para el periodo {planilla_sueldo_base.mes}/{planilla_sueldo_base.anio}. "
+            f"Plantilla utilizada: '{plantilla_boleta.nombre}' (ID: {plantilla_boleta.id})."
+        )
+
+        LogEntry.objects.create(
+            actor=request.user,
+            content_type=content_type_obj,
+            object_pk=obj_pk,
+            object_id=obj_id_numeric, # Campo numérico para la FK genérica
+            object_repr=obj_repr,
+            action=LogEntry.Action.ACCESS,
+            changes=log_description,
+            remote_addr=request.META.get('REMOTE_ADDR'),
+        )
+        logger.info(f"Acción de generación de boleta individual registrada. Target Obj PK: {obj_pk}")
+    except Exception as e_audit:
+        logger.error(f"Error al registrar la acción de generación de boleta individual en auditlog: {e_audit}", exc_info=True)
+    # --- FIN REGISTRAR ACCIÓN EN AUDITLOG ---
 
     buffer.seek(0)
     response = HttpResponse(buffer, content_type='application/pdf')

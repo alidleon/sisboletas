@@ -35,63 +35,23 @@ ALLOWED_HOSTS = []
 
 LOGGING = {
     'version': 1,
-    'disable_existing_loggers': False,  # Mantener los loggers existentes de Django
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} L{lineno}: {message}',
-            'style': '{',
-        },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler', # Envía a stderr (consola)
         },
     },
-    #'handlers': {
-    #    'console': {
-    #        'level': 'DEBUG',  # Nivel mínimo que este handler procesará
-    #        'class': 'logging.StreamHandler', # Envía a la consola (stderr por defecto)
-    #        'formatter': 'verbose', # Usa el formato detallado
-    #    },
-        # Puedes añadir más handlers aquí, como para archivos:
-        # 'file': {
-        #     'level': 'DEBUG',
-        #     'class': 'logging.FileHandler',
-        #     'filename': BASE_DIR / 'debug.log', # Asegúrate que BASE_DIR esté definido
-        #     'formatter': 'verbose',
-        # },
-    #},
-    #'loggers': {
-    #    'django': { # Logger para los mensajes internos de Django
-    #        'handlers': ['console'], # O ['console', 'file']
-    #        'level': 'INFO',       # Solo mostrar INFO y superiores de Django
-    #        'propagate': False,    # No pasar mensajes de Django al logger 'root'
-    #    },
-    #    'django.db.backends': { # Para ver las queries SQL (puede ser muy verboso)
-    #        'handlers': ['console'],
-    #        'level': 'DEBUG',      # Cambia a INFO o WARNING para menos detalle SQL
-    #        'propagate': False,
-    #    },
-        #'boletas': { # Logger específico para tu app 'boletas'
-         #   'handlers': ['console'], # O ['console', 'file']
-          #  'level': 'DEBUG',      # Mostrar todos los mensajes DEBUG de 'boletas'
-           # 'propagate': False,     # Permitir que los mensajes también vayan al root si es necesario
-        #},
-        # Puedes añadir configuraciones para otras de tus apps:
-        # 'planilla': {
-        #     'handlers': ['console'],
-        #     'level': 'DEBUG',
-        #     'propagate': True,
-        # },
-        # 'sueldos': {
-        #     'handlers': ['console'],
-        #     'level': 'DEBUG',
-        #     'propagate': True,
-        # },
-    #},
-    #'root': { # Logger raíz, captura todo lo que no es manejado por loggers específicos y tiene propagate=True
-     #   'handlers': ['console'], # O ['console', 'file']
-      #  'level': 'INFO',       # Nivel por defecto para lo que no tiene config específica
-    #},
+    'root': { # Logger raíz
+        'handlers': ['console'],
+        'level': 'INFO', # Muestra INFO, WARNING, ERROR, CRITICAL
+    },
+    'loggers': {
+        'django': { # Logger específico para Django
+            'handlers': ['console'],
+            'level': 'INFO', # O 'DEBUG' para más detalle
+            'propagate': False,
+        },
+    }
 }
 
 # ... (resto de settings.py) ...
@@ -106,13 +66,15 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.humanize', 
+    'django.contrib.humanize',
+    'auditlog', 
     'administracion.apps.AdministracionConfig',
-    'planilla',
-    'reportes',
     'widget_tweaks',
-    'sueldos', 
-    'boletas',
+    'planilla.apps.PlanillaConfig', # <--- ASÍ para la app planilla
+    'reportes.apps.ReportesConfig',
+    'sueldos.apps.SueldosConfig',
+    'boletas.apps.BoletasConfig',
+    'bitacora.apps.BitacoraConfig',
 
 ]
 
@@ -124,6 +86,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'auditlog.middleware.AuditlogMiddleware',
 ]
 
 ROOT_URLCONF = 'sisboletas.urls'
@@ -184,7 +147,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
 
-LANGUAGE_CODE = 'es-es'
+LANGUAGE_CODE = 'es-bo'
 TIME_ZONE = 'America/La_Paz'
 USE_I18N = True
 USE_TZ = True # Recomendado mantener en True

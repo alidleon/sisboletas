@@ -1,4 +1,4 @@
-{% extends 'index_master.html' %} {# Ajusta si tu base es diferente #}
+{% extends 'index_master.html' %}
 {% load static %}
 
 {% block title_suffix %} - Editar Planilla Sueldos{% endblock %}
@@ -14,138 +14,64 @@
         <div class="clearfix"></div>
 
         <div class="row">
-            <div class="col-md-8 col-sm-10 offset-md-2 offset-sm-1"> {# Centrar formulario #}
+            <div class="col-md-8 col-sm-10 offset-md-2 offset-sm-1">
                 <div class="x_panel">
                     <div class="x_title">
                         <h2>Datos de la Planilla: {{ planilla }}</h2>
-                         {# Botón para volver a la lista #}
-                        <ul class="nav navbar-right panel_toolbox">
-                            <li>
-                                <a href="{% url 'lista_planillas_sueldo' %}" class="btn btn-sm btn-secondary" title="Volver a la lista">
-                                    <i class="fa fa-list"></i> Volver a Lista
-                                </a>
-                            </li>
-                        </ul>
+
                         <div class="clearfix"></div>
                     </div>
                     <div class="x_content">
-
-                        {# Mostrar mensajes de Django #}
                         {% if messages %}
-                            {% for message in messages %}
-                                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
-                                    {{ message|safe }}
-                                    <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button>
-                                </div>
-                            {% endfor %}
+                            <!-- ... bloque de mensajes ... -->
                         {% endif %}
 
-                        {# Inicio del formulario de edición #}
                         <form method="post" class="form-horizontal form-label-left" novalidate>
                             {% csrf_token %}
 
-                            {# ---- Campos Editables y No Editables ---- #}
-
-                            {# Campo Mes (Editable) #}
+                            <!-- Django renderizará todos los campos definidos en el form -->
+                            <!-- Los que marcamos como 'disabled' en forms.py se mostrarán bloqueados -->
+                            
                             <div class="item form-group mb-3">
-                                <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.mes.id_for_label }}">
-                                    {{ form.mes.label }} <span class="required">*</span>
-                                </label>
-                                <div class="col-md-6 col-sm-6 ">
-                                    {{ form.mes }} {# Renderiza el input number con widgets del form #}
-                                    {% if form.mes.errors %}
-                                        <ul class="parsley-errors-list filled mt-1">{% for error in form.mes.errors %}<li>{{ error }}</li>{% endfor %}</ul>
-                                    {% endif %}
-                                    <small class="form-text text-muted">{{ form.mes.help_text }}</small>
-                                </div>
+                                <label class="col-form-label col-md-3 col-sm-3 label-align">{{ form.mes.label }}</label>
+                                <div class="col-md-6 col-sm-6">{{ form.mes }}</div>
+                            </div>
+                            <div class="item form-group mb-3">
+                                <label class="col-form-label col-md-3 col-sm-3 label-align">{{ form.anio.label }}</label>
+                                <div class="col-md-6 col-sm-6">{{ form.anio }}</div>
+                            </div>
+                            <div class="item form-group mb-3">
+                                <label class="col-form-label col-md-3 col-sm-3 label-align">{{ form.tipo.label }}</label>
+                                <div class="col-md-6 col-sm-6">{{ form.tipo }}</div>
                             </div>
 
-                            {# Campo Año (Editable) #}
-                            <div class="item form-group mb-3">
-                                <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.anio.id_for_label }}">
-                                    {{ form.anio.label }} <span class="required">*</span>
-                                </label>
-                                <div class="col-md-6 col-sm-6 ">
-                                    {{ form.anio }} {# Renderiza el input number con widgets del form #}
-                                    {% if form.anio.errors %}
-                                        <ul class="parsley-errors-list filled mt-1">{% for error in form.anio.errors %}<li>{{ error }}</li>{% endfor %}</ul>
-                                    {% endif %}
-                                    <small class="form-text text-muted">{{ form.anio.help_text }}</small>
-                                </div>
-                            </div>
+                            <div class="ln_solid"></div>
 
-                            {# --- Campo Tipo (Mostrar Info Estática) --- #}
                             <div class="item form-group mb-3">
-                                <label class="col-form-label col-md-3 col-sm-3 label-align">
-                                    Tipo de Personal {# Etiqueta fija #}
-                                </label>
-                                <div class="col-md-6 col-sm-6 ">
-                                    {# Mostrar el valor directamente desde el objeto planilla #}
-                                    {# Usamos un input readonly para mantener estilo visual #}
-                                    <input type="text" value="{{ planilla.get_tipo_display }}" class="form-control form-control-sm disabled-look" readonly>
-                                </div>
+                                <label class="col-form-label col-md-3 col-sm-3 label-align">{{ form.estado.label }} <span class="required">*</span></label>
+                                <div class="col-md-6 col-sm-6">{{ form.estado }}</div>
                             </div>
-                            {# -------------------------------------- #}
-
-                            {# --- Campo Estado (Editable) --- #}
                             <div class="item form-group mb-3">
-                                <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.estado.id_for_label }}">
-                                    {{ form.estado.label }} <span class="required">*</span>
-                                </label>
-                                <div class="col-md-6 col-sm-6 ">
-                                    {{ form.estado }} {# Renderiza el select con widgets del form #}
-                                    {% if form.estado.errors %}
-                                        <ul class="parsley-errors-list filled mt-1">
-                                        {% for error in form.estado.errors %}<li>{{ error }}</li>{% endfor %}
-                                        </ul>
-                                    {% endif %}
-                                     <small class="form-text text-muted">{{ form.estado.help_text }}</small>
-                                </div>
+                                <label class="col-form-label col-md-3 col-sm-3 label-align">{{ form.observaciones.label }}</label>
+                                <div class="col-md-6 col-sm-6">{{ form.observaciones }}</div>
                             </div>
-                            {# ------------------------------- #}
-
-                            {# Campo Observaciones (Editable) #}
-                            <div class="item form-group mb-3">
-                                <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.observaciones.id_for_label }}">
-                                    {{ form.observaciones.label }}
-                                </label>
-                                <div class="col-md-6 col-sm-6 ">
-                                    {{ form.observaciones }} {# Renderiza el textarea con widgets del form #}
-                                    {% if form.observaciones.errors %}
-                                        <ul class="parsley-errors-list filled mt-1">{% for error in form.observaciones.errors %}<li>{{ error }}</li>{% endfor %}</ul>
-                                    {% endif %}
-                                    <small class="form-text text-muted">{{ form.observaciones.help_text }}</small>
-                                </div>
-                            </div>
-
-                            {# ---- Fin Campos ---- #}
 
                             <div class="ln_solid"></div>
                             <div class="item form-group">
                                 <div class="col-md-6 col-sm-6 offset-md-3">
                                     <a href="{% url 'lista_planillas_sueldo' %}" class="btn btn-secondary" type="button">Cancelar</a>
-                                    <button type="submit" class="btn btn-primary"> {# Botón primario para guardar #}
-                                        <i class="fa fa-save"></i> Guardar Cambios
-                                    </button>
+                                    {% if not form.estado.disabled %}
+                                        <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> Guardar Cambios</button>
+                                    {% else %}
+                                        <button type="submit" class="btn btn-primary" disabled><i class="fa fa-lock"></i> Guardar Cambios</button>
+                                    {% endif %}
                                 </div>
                             </div>
-                        </form> {# Fin del formulario #}
-
-                    </div> {# Fin x_content #}
-                </div> {# Fin x_panel #}
-            </div> {# Fin col #}
-        </div> {# Fin row #}
-    </div> {# Fin container #}
-</div> {# Fin right_col #}
-{% endblock %}
-
-{% block extra_js %}
-{# Estilo CSS opcional para el campo de tipo readonly #}
-<style>
-    .disabled-look {
-        background-color: #e9ecef; /* Color grisáceo similar a Bootstrap disabled */
-        opacity: 1;
-        cursor: not-allowed;
-    }
-</style>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

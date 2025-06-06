@@ -9,85 +9,129 @@ from decimal import Decimal
 from django.db import models
 
 class CrearPlanillaSueldoForm(forms.Form):
-    """ Recopila los datos iniciales para crear una PlanillaSueldo. """
-    mes = forms.IntegerField(
-        label="Mes de la Planilla",
-        min_value=1, max_value=12, required=True,
-        widget=forms.NumberInput(attrs={'placeholder': 'Ej: 5', 'min': '1', 'max': '12', 'class': 'form-control form-control-sm'}),
-        help_text='Ingrese el número del mes (1-12).'
+    # --- Campos Visibles para el Usuario ---
+    # Los hacemos no requeridos a nivel de campo, la lógica central estará en clean()
+    mes_select = forms.ChoiceField(
+        label="Mes (Sugerido)",
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-control form-control-sm'})
     )
-    anio = forms.IntegerField(
-        label="Año de la Planilla",
-        min_value=2000, max_value=2100, required=True, # Rango ajustado
-        widget=forms.NumberInput(attrs={'placeholder': 'Ej: 2024', 'min': '2000', 'max': '2100', 'class': 'form-control form-control-sm'}),
-        help_text='Ingrese el año (4 dígitos).'
+    mes_manual = forms.IntegerField(
+        label="o Mes (Manual)",
+        required=False,
+        min_value=1, max_value=12,
+        widget=forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Ej: 7'})
     )
+
+    anio_select = forms.ChoiceField(
+        label="Año (Sugerido)",
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-control form-control-sm'})
+    )
+    anio_manual = forms.IntegerField(
+        label="o Año (Manual)",
+        required=False,
+        min_value=2000, max_value=2100,
+        widget=forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Ej: 2024'})
+    )
+
+    # --- Campo Tipo ---
+    TIPO_CHOICES_CON_PLACEHOLDER = [('', '-- Seleccione Tipo --')] + PlanillaSueldo.TIPO_CHOICES
     tipo = forms.ChoiceField(
         label="Tipo de Personal",
-        choices=PlanillaSueldo.TIPO_CHOICES, # Obtener choices del modelo
-        required=True,
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm'}), # Clase Bootstrap
-        help_text='Seleccione el tipo de personal para esta planilla.'
+        choices=TIPO_CHOICES_CON_PLACEHOLDER,
+        required=True, # Este sí es requerido siempre
+        widget=forms.Select(attrs={'class': 'form-control form-control-sm'})
     )
     observaciones = forms.CharField(
         label="Observaciones Iniciales (Opcional)",
-        required=False, # Hacerlo opcional
+        required=False,
         widget=forms.Textarea(attrs={'rows': 3, 'class': 'form-control form-control-sm'})
     )
 
-    # Puedes mantener las validaciones clean aquí si prefieres
-    def clean_mes(self):
-        mes = self.cleaned_data.get('mes')
-        if mes and not 1 <= mes <= 12: raise ValidationError("El mes debe estar entre 1 y 12.")
-        return mes
+    # Ya no definimos los campos 'mes' y 'anio' aquí.
 
-    def clean_anio(self):
-        anio = self.cleaned_data.get('anio')
-        if anio and not 2000 <= anio <= 2100: raise ValidationError("Ingrese un año válido (4 dígitos).")
-        return anio
+    def __init__(self, *args, **kwargs):
+        # Extraemos las listas dinámicas que pasaremos desde la vista
+        meses_sugeridos = kwargs.pop('meses_sugeridos', [])
+        anios_sugeridos = kwargs.pop('anios_sugeridos', [])
+        super().__init__(*args, **kwargs)
+
+        # Poblamos los choices de los selects dinámicamente
+        if meses_sugeridos:
+            self.fields['mes_select'].choices = [('', '-- Seleccione Mes --')] + [(m, m) for m in meses_sugeridos]
+        if anios_sugeridos:
+            self.fields['anio_select'].choices = [('', '-- Seleccione Año --')] + [(a, a) for a in anios_sugeridos]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        
+        # Prioridad al SELECT. Si no, usamos el MANUAL.
+        mes_s = cleaned_data.get('mes_select')
+        mes_m = cleaned_data.get('mes_manual')
+        final_mes = None
+        
+        if mes_s:
+            final_mes = int(mes_s)
+        elif mes_m:
+            final_mes = mes_m
+        else:
+            # Añadimos un error general al formulario si no se proporciona mes
+            self.add_error(None, "Debe seleccionar un Mes o introducirlo manualmente.")
+
+        anio_s = cleaned_data.get('anio_select')
+        anio_m = cleaned_data.get('anio_manual')
+        final_anio = None
+
+        if anio_s:
+            final_anio = int(anio_s)
+        elif anio_m:
+            final_anio = anio_m
+        else:
+            # Añadimos un error general al formulario si no se proporciona año
+            self.add_error(None, "Debe seleccionar un Año o introducirlo manualmente.")
+        
+        # Si no hubo errores hasta ahora, poblamos cleaned_data con los valores finales
+        # para que la vista pueda acceder a ellos.
+        if not self.errors:
+            cleaned_data['mes'] = final_mes
+            cleaned_data['anio'] = final_anio
+        
+        return cleaned_data
 
 
 # --- Formulario para EDITAR (Similar a reportes.EditarPlanillaAsistenciaForm) ---
+# sueldos/forms.py
+
 class EditarPlanillaSueldoForm(forms.ModelForm):
-    """ Edita los campos permitidos de una PlanillaSueldo existente. """
+    """
+    Formulario para editar una PlanillaSueldo. Los campos clave
+    se muestran pero no son editables.
+    """
     class Meta:
         model = PlanillaSueldo
-        # Campos EDITABLES: mes, año, estado, observaciones. TIPO se omite.
-        fields = ['mes', 'anio', 'estado', 'observaciones']
+        # Incluimos TODOS los campos relevantes en el formulario
+        fields = ['mes', 'anio', 'tipo', 'estado', 'observaciones']
+
         widgets = {
-            'mes': forms.NumberInput(attrs={'placeholder': 'Ej: 5', 'min': '1', 'max': '12', 'class': 'form-control form-control-sm'}),
-            'anio': forms.NumberInput(attrs={'placeholder': 'Ej: 2024', 'min': '2000', 'max': '2100', 'class': 'form-control form-control-sm'}),
-            'estado': forms.Select(attrs={'class': 'form-select form-select-sm'}),
-            'observaciones': forms.Textarea(attrs={'rows': 3, 'class': 'form-control form-control-sm'}),
+            'estado': forms.Select(attrs={'class': 'form-control form-control-sm'}),
+            'observaciones': forms.Textarea(attrs={'rows': 4, 'class': 'form-control form-control-sm'}),
         }
-        labels = { # Ajustar etiquetas si es necesario
-            'mes': 'Mes',
-            'anio': 'Año',
-            'estado': 'Estado',
-            'observaciones': 'Observaciones',
-        }
-        help_texts = { # Ajustar ayuda si es necesario
-            'mes': 'Mes de la planilla (1-12).',
-            'anio': 'Año de la planilla (4 dígitos).',
-            'estado': 'Estado actual de la planilla.',
-        }
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        instance = getattr(self, 'instance', None)
 
-    # Ya NO necesitamos el __init__ complejo para manejar 'tipo_display'
-
-    # Validaciones clean (puedes mantenerlas)
-    def clean_mes(self):
-        mes = self.cleaned_data.get('mes')
-        # ... (validación igual) ...
-        if mes is not None:
-            if not 1 <= mes <= 12: raise ValidationError("El mes debe estar entre 1 y 12.")
-        return mes
-
-    def clean_anio(self):
-        anio = self.cleaned_data.get('anio')
-        # ... (validación igual) ...
-        if anio is not None:
-             if not 2000 <= anio <= 2100: raise ValidationError("Ingrese un año válido (4 dígitos).")
-        return anio
+        if instance and instance.pk:
+            # Hacemos que mes, año y tipo no sean editables
+            self.fields['mes'].disabled = True
+            self.fields['anio'].disabled = True
+            self.fields['tipo'].disabled = True
+            
+            # Y mantenemos la lógica de seguridad para estados finales
+            if instance.estado in ['pagado', 'archivado']:
+                self.fields['estado'].disabled = True
+                self.fields['observaciones'].disabled = True
 
 
 class SubirExcelSueldosForm(forms.Form):

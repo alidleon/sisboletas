@@ -1,15 +1,22 @@
-{% extends 'index_master.html' %} {# Ajusta si tu template base se llama diferente #}
+{% extends 'index_master.html' %}
+
+{% block title_suffix %} - Crear Reporte Asistencia{% endblock %}
 
 {% block content %}
 <div class="right_col" role="main">
-    <h2>{% firstof titulo_pagina "Crear Nuevo Reporte de Asistencia" %}</h2>
-    <hr>
+    <div class="page-title">
+        <div class="title_left">
+            <h3>{% firstof titulo_pagina "Crear Nuevo Reporte de Asistencia" %}</h3>
+        </div>
+    </div>
+    <hr class="d-none d-sm-block">
+    <div class="clearfix"></div>
 
     {% if messages %}
         {% for message in messages %}
             <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
                 {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button> 
             </div>
         {% endfor %}
     {% endif %}
@@ -17,66 +24,58 @@
     <div class="card">
         <div class="card-body">
             <h5 class="card-title">Seleccione Periodo y Tipo</h5>
-            <form method="post">
+            <form method="post" novalidate>
                 {% csrf_token %}
 
-                {# Renderizar formulario campo por campo para mejor control (opcional) #}
                 <div class="row mb-3">
                     <div class="col-md-4">
                         <label for="{{ form.anio.id_for_label }}" class="form-label">{{ form.anio.label }}</label>
-                        {{ form.anio }}
+                        {{ form.anio }} {# Renderizará el <input type="number"> #}
+                        {% if form.anio.help_text %}
+                            <small class="form-text text-muted d-block">{{ form.anio.help_text }}</small> {# d-block para que help_text ocupe su línea #}
+                        {% endif %}
                         {% if form.anio.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.anio.errors|striptags }}
+                            <div class="text-danger mt-1">
+                                <small>{{ form.anio.errors|first }}</small>
                             </div>
                         {% endif %}
                     </div>
                     <div class="col-md-4">
                         <label for="{{ form.mes.id_for_label }}" class="form-label">{{ form.mes.label }}</label>
-                        {{ form.mes }}
+                        {{ form.mes }} {# Renderizará el <select> #}
+                        {% if form.mes.help_text %}
+                            <small class="form-text text-muted d-block">{{ form.mes.help_text }}</small>
+                        {% endif %}
                         {% if form.mes.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.mes.errors|striptags }}
+                            <div class="text-danger mt-1">
+                                <small>{{ form.mes.errors|first }}</small>
                             </div>
                         {% endif %}
                     </div>
                     <div class="col-md-4">
                         <label for="{{ form.tipo.id_for_label }}" class="form-label">{{ form.tipo.label }}</label>
-                        {{ form.tipo }}
+                        {{ form.tipo }} {# Renderizará el <select> #}
+                        {% if form.tipo.help_text %}
+                            <small class="form-text text-muted d-block">{{ form.tipo.help_text }}</small>
+                        {% endif %}
                         {% if form.tipo.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.tipo.errors|striptags }}
+                            <div class="text-danger mt-1">
+                                <small>{{ form.tipo.errors|first }}</small>
                             </div>
                         {% endif %}
                     </div>
                 </div>
 
-                 {# O renderizar como párrafos (más rápido) #}
-                 {# {{ form.as_p }} #}
-
                 <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-plus-circle me-1"></i> Crear Reporte e Inicializar Personal
+                    <i class="fa fa-plus-circle me-1"></i> Crear Reporte e Inicializar Personal
                 </button>
-                {# Puedes añadir un botón de cancelar si quieres #}
-                {# <a href="{% url 'alguna_vista_anterior' %}" class="btn btn-secondary">Cancelar</a> #}
+                <a href="{% url 'lista_planillas_asistencia' %}" class="btn btn-secondary">Cancelar</a>
             </form>
         </div>
     </div>
-
 </div>
 {% endblock %}
 
 {% block extra_js %}
-{# Si necesitas JS específico para esta página #}
-<script>
-    // Ejemplo: Añadir clases de Bootstrap a los campos del form si no se hizo en el widget
-    document.addEventListener('DOMContentLoaded', function() {
-        const formControls = document.querySelectorAll('input[type="number"], select');
-        formControls.forEach(function(control) {
-            if (!control.classList.contains('form-select')) { // No sobrescribir select si ya tiene clase
-                 control.classList.add('form-control');
-            }
-        });
-    });
-</script>
+{# Ya no es necesario el JS para añadir clases si se definen en los widgets del form #}
 {% endblock %}

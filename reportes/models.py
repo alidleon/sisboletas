@@ -1,9 +1,10 @@
+import logging
 from django.db import models
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone # <--- Añadir esta importación
-# Create your models here.
+from django.apps import apps
 
 try:
     from planilla.models import PrincipalPersonalExterno, Planilla as PlanillaBonoTE
@@ -12,6 +13,10 @@ except ImportError:
     PlanillaBonoTE = None
     print("ADVERTENCIA: No se pudieron importar modelos de la app 'planilla'. "
           "Esto puede ser normal durante las migraciones iniciales.")
+
+# ... (otros imports y el logger si lo defines a nivel de módulo)
+
+logger_model = logging.getLogger(__name__)
 
 # --- Modelo Cabecera: Planilla de Asistencia ---
 class PlanillaAsistencia(models.Model):
@@ -60,12 +65,14 @@ class PlanillaAsistencia(models.Model):
              raise ValidationError({'tipo': "Tipo de planilla no válido."})
 
     def marcar_como_validado(self, usuario):
+        logger_model.info(f"MODELO Planilla ID {self.id}: Intentando marcar como validado. Estado actual ANTES de cambio: '{self.estado}'")
         if self.estado in ['borrador', 'completo']:
             self.estado = 'validado'
             self.usuario_validacion = usuario
             self.fecha_validacion = timezone.now() # <-- Usa timezone
             self.save(update_fields=['estado', 'usuario_validacion', 'fecha_validacion']) # Optimización
             return True
+        logger_model.warning(f"MODELO Planilla ID {self.id}: NO SE PUDO marcar como validado. Condición de estado no cumplida (estado actual: '{self.estado}')")
         return False
 
 # --- Modelo Detalle: Registro de Asistencia por Persona ---
@@ -121,12 +128,17 @@ class DetalleAsistencia(models.Model):
         # ordering = [...] # Considerar si el ordenamiento por defecto es necesario aquí
 
     def __str__(self):
-        # No mostrar datos personales sensibles aquí por defecto
-        nombre_persona = f"Personal ID Externo: {self.personal_externo_id}"
-        if self.personal_externo: # Intentar obtener CI si el objeto está cargado
-             try: nombre_persona = f"CI: {self.personal_externo.ci or 'S/CI'}"
-             except AttributeError: pass # Si el modelo externo no tiene CI o no está cargado
-        return f"Asistencia para {nombre_persona} en Planilla ID {self.planilla_asistencia_id}"
+        # Usamos _id para evitar consultas a la base de datos externa desde __str__
+        # Esto es más seguro y eficiente, especialmente cuando auditlog lo llama.
+        
+        planilla_id_display = self.planilla_asistencia_id if self.planilla_asistencia_id is not None else "N/A"
+        
+        if self.personal_externo_id is not None:
+            personal_display = f"Personal ID Externo: {self.personal_externo_id}"
+        else:
+            personal_display = "Personal No Asignado"
+        
+        return f"Asistencia para {personal_display} en Planilla ID {planilla_id_display}"
 
     def clean(self):
         super().clean()

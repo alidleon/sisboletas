@@ -6,25 +6,52 @@ from django.core.exceptions import ValidationError
 from reportes.models import PlanillaAsistencia
 
 class DetalleBonoTeForm(forms.ModelForm):
-    # Campo informativo dias_habiles (igual que antes)
     dias_habiles = forms.DecimalField(
         label='Días Hábiles (Planilla)',
         required=False,
-        widget=forms.NumberInput(attrs={'readonly': 'readonly'}) # O disabled=True
+        widget=forms.NumberInput(attrs={'readonly': 'readonly', 'class':'form-control form-control-sm'}) # Añadir clases
     )
 
     class Meta:
         model = DetalleBonoTe
-        # Campos editables originales (verifica si eran estos)
-        fields = ['mes', 'abandono_dias', 'faltas', 'vacacion', 'viajes', 'bajas_medicas', 'pcgh', 'psgh', 'perm_excep', 'asuetos',
-                  'pcgh_embar_enf_base', 'descuentos', 'observaciones_bono'] # Excluye personal_externo, id_planilla, calculados
+        fields = [
+            'mes', 
+            
+            'faltas', 'vacacion', 'viajes', 'bajas_medicas', 'pcgh', 'psgh', 
+            'perm_excep', 'asuetos', 'pcgh_embar_enf_base', 
+            'descuentos', 'observaciones_bono'
+        ]
+        # Opcional: definir widgets para añadir clases de Bootstrap
+        widgets = {
+            'faltas': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'step': '0.01'}),
+            'vacacion': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'step': '0.01'}),
+            'viajes': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'step': '0.01'}),
+            'bajas_medicas': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'step': '0.01'}),
+            'pcgh': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'step': '0.01'}),
+            'psgh': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'step': '0.01'}),
+            'perm_excep': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'step': '0.01'}),
+            'asuetos': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'step': '0.01'}),
+            'pcgh_embar_enf_base': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'step': '0.01'}),
+            'descuentos': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'step': '0.01'}),
+            'observaciones_bono': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 2}),
+        }
+
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Hacer 'mes' readonly si no debe editarse
         if 'mes' in self.fields:
             self.fields['mes'].widget.attrs['readonly'] = True
-            # O self.fields['mes'].disabled = True
+            self.fields['mes'].widget.attrs['class'] = 'form-control form-control-sm' # Añadir clase
+        
+        # Aplicar clases a otros campos si no se definieron en Meta.widgets
+        for field_name, field in self.fields.items():
+            if field_name != 'dias_habiles' and field_name != 'mes': # Estos ya tienen widgets o se manejan arriba
+                if isinstance(field.widget, forms.NumberInput):
+                    field.widget.attrs.update({'class': 'form-control form-control-sm', 'step': '1.00'})
+                elif isinstance(field.widget, forms.Textarea):
+                    field.widget.attrs.update({'class': 'form-control form-control-sm', 'rows': 2})
+                elif not field.widget.attrs.get('class'): # Si no tiene clase, añadir una genérica
+                    field.widget.attrs.update({'class': 'form-control form-control-sm'})
 
 
 class PlanillaForm(forms.ModelForm):

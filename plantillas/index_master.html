@@ -174,6 +174,14 @@
                     </ul>
                   </li>
                   {% endif %}
+
+                  {% if perms.auditlog.view_logentry or user.is_superuser %} {# Permiso para ver logs de auditlog, o si es superusuario #}
+                  <li> 
+                      <a href="{% url 'lista_registros_log' %}"> {# URL sin namespace #}
+                          <i class="fa fa-archive"></i> Bitácora del Sistema 
+                      </a>
+                  </li>
+                  {% endif %}
                 </ul>
               </div>
               {# Puedes añadir más menu_section si es necesario #}
