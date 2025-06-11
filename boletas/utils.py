@@ -13,11 +13,8 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont # Para registrar fuentes TrueType
 from reportlab.lib import colors # Para colores predefinidos y HexColor
-
-
-
-
-
+import qrcode  
+from qrcode.util import QRData
 
 from reportlab.platypus import Paragraph # Para texto multilinea si es necesario
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -111,6 +108,9 @@ PLACEHOLDERS_BOLETA_DEFINICION = [
     {'id': '{{dias_trab}}', 'label': 'Días Trab.', 'fuente': 'DetalleSueldo.dias_trab'},
     {'id': '{{haber_basico}}', 'label': 'Haber Básico', 'fuente': 'DetalleSueldo.haber_basico'},
     {'id': '{{categoria}}', 'label': 'Categoría', 'fuente': 'DetalleSueldo.categoria'}, # Bono Antigüedad?
+    {'id': '{{lactancia_prenatal}}', 'label': 'Lactancia Prenatal', 'fuente': 'DetalleSueldo.lactancia_prenatal'},
+    {'id': '{{otros_ingresos}}', 'label': 'Otros Ingresos', 'fuente': 'DetalleSueldo.otros_ingresos'},
+    {'id': '{{saldo_credito_fiscal}}', 'label': 'Saldo RC-IVA', 'fuente': 'DetalleSueldo.saldo_credito_fiscal'},
     {'id': '{{total_ganado}}', 'label': 'Total Ganado', 'fuente': 'DetalleSueldo.total_ganado'},
     {'id': '{{rc_iva_retenido}}', 'label': 'RC-IVA Retenido', 'fuente': 'DetalleSueldo.rc_iva_retenido'},
     {'id': '{{gestora_publica}}', 'label': 'Gestora Pública (AFP)', 'fuente': 'DetalleSueldo.gestora_publica'},
@@ -121,12 +121,14 @@ PLACEHOLDERS_BOLETA_DEFINICION = [
     {'id': '{{otros_descuentos}}', 'label': 'Otros Descuentos', 'fuente': 'DetalleSueldo.otros_descuentos'},
     {'id': '{{total_descuentos}}', 'label': 'Total Descuentos', 'fuente': 'DetalleSueldo.total_descuentos'},
     {'id': '{{liquido_pagable}}', 'label': 'Líquido Pagable', 'fuente': 'DetalleSueldo.liquido_pagable'},
+    {'id': '{{cargo_referencia}}', 'label': 'Cargo (Referencia Excel)', 'fuente': 'DetalleSueldo.cargo_referencia'},
 
     # --- Datos Calculados / Generales (A generar en la vista de PDF) ---
     {'id': '{{literal_liquido}}', 'label': 'Líquido Pagable (Literal)', 'fuente': 'Calculado'},
     {'id': '{{fecha_emision_actual}}', 'label': 'Fecha Emisión Boleta', 'fuente': 'Calculado'},
-    {'id': '{{mes_literal_actual}}', 'label': 'Mes Emisión (Literal)', 'fuente': 'Calculado'}, # Ej. MAYO
-    # ... otros que puedas necesitar ...
+    {'id': '{{mes_literal_actual}}', 'label': 'Mes Emisión (Literal)', 'fuente': 'Calculado'},
+    {'id': '{{CODIGO_QR}}', 'label': 'Código QR de Validación', 'fuente': 'Calculado'}, 
+    
 ]
 
 # Nota: Para los campos de relaciones (cargo, unidad, secretaria), necesitarás obtener
@@ -168,11 +170,66 @@ def numero_a_literal(numero):
     from decimal import Decimal
     if not NUM2WORDS_AVAILABLE: return f"LITERAL ({Decimal(str(numero)):.2f})"
     try:
-        numero_dec = Decimal(str(numero)).quantize(Decimal('0.01'))
-        entero = int(numero_dec); decimal_part = int((numero_dec - entero) * 100)
-        return f"{num2words(entero, lang='es').upper()} {decimal_part:02d}/100 BOLIVIANOS"
-    except Exception as e: logger.error(f"Error num a lit ({numero}): {e}"); return f"ERROR LIT ({Decimal(str(numero)):.2f})"
+        numero_dec = Decimal(str(numero)) # No necesitamos redondear si solo usamos la parte entera
+        entero = int(numero_dec) # Obtenemos solo la parte entera del número
+        # La parte decimal ya no es necesaria
+        # decimal_part = int((numero_dec - entero) * 100)
+        
+        # NUEVA LÍNEA DE RETURN MODIFICADA
+        return f"{num2words(entero, lang='es').upper()} BOLIVIANOS"
+        
+    except Exception as e: 
+        logger.error(f"Error num a lit ({numero}): {e}")
+        return f"ERROR LIT ({Decimal(str(numero)):.2f})"
 #-------------------------------------------
+
+
+def generar_imagen_qr(datos_a_codificar):
+    """
+    Genera una imagen de código QR en memoria a partir de una cadena de texto,
+    manejando correctamente la codificación UTF-8.
+    """
+    try:
+        # Asegurarnos de que estamos trabajando con un string.
+        # Si por casualidad se pasaron bytes, los decodificamos.
+        if isinstance(datos_a_codificar, bytes):
+            datos_string = datos_a_codificar.decode('utf-8')
+        else:
+            datos_string = str(datos_a_codificar)
+            
+        # 1. Crear el objeto QRCode. El modo 'wb' (write bytes) implícito
+        #    en la librería a veces necesita ayuda para saber qué codificación usar.
+        #    Al crear el QR, especificaremos el modo byte.
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        
+        # 2. Añadir los datos. Aquí es donde ocurre la magia.
+        #    La librería qrcode tiene un método interno para manejar esto,
+        #    pero la forma más segura es pasar los datos ya codificados
+        #    y asegurarse de que el objeto QR sepa que está en modo byte.
+        #    La documentación recomienda añadir datos como strings y la librería
+        #    se encarga. Si eso falla, este es el método a prueba de fallos.
+        qr.add_data(data=datos_string, optimize=20)
+        qr.make(fit=True)
+
+        # 3. Crear la imagen en memoria (esta parte no cambia)
+        img = qr.make_image(fill_color="black", back_color="white")
+
+        img_buffer = io.BytesIO()
+        img.save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+
+        return ImageReader(img_buffer)
+        
+    except Exception as e:
+        logger.error(f"Error generando imagen QR: {e}", exc_info=True)
+        return None
+    
+#--------------------------------------------------
 def dibujar_boleta_en_canvas(pdf_canvas, page_height, diseno_json_dict, datos_empleado):
     if not diseno_json_dict or 'objects' not in diseno_json_dict:
         logger.error("PDF: Diseño JSON inválido o sin objetos para dibujar.")
@@ -188,7 +245,7 @@ def dibujar_boleta_en_canvas(pdf_canvas, page_height, diseno_json_dict, datos_em
         try:
             obj_type = obj_fabric.get('type', 'unknown')
 
-            # Propiedades base de Fabric.js
+            
             f_left = float(obj_fabric.get('left', 0))
             f_top = float(obj_fabric.get('top', 0))
             f_width_base = float(obj_fabric.get('width', 1)) # Ancho ANTES de scaleX
@@ -200,20 +257,15 @@ def dibujar_boleta_en_canvas(pdf_canvas, page_height, diseno_json_dict, datos_em
             f_origin_x_str = obj_fabric.get('originX', 'left')
             f_origin_y_str = obj_fabric.get('originY', 'top')
 
-            # Dimensiones visuales FINALES del objeto (después de su propia escala)
             obj_visual_width = f_width_base * f_scale_x
             obj_visual_height = f_height_base * f_scale_y
 
             pdf_canvas.setFillAlpha(f_opacity)
             pdf_canvas.setStrokeAlpha(f_opacity)
 
-            # --- Transformaciones de Posicionamiento y Rotación (COMÚN A TODOS LOS OBJETOS) ---
-            # 1. Calcular el centro del objeto en coordenadas Fabric (después de su escala y origen)
             anchor_fab_x = f_left
             anchor_fab_y = f_top
 
-            # Desplazamiento del centro local del objeto (0,0) a su punto de anclaje (originX, originY)
-            # Esto es ANTES de la rotación del objeto.
             local_anchor_offset_x_unscaled = 0
             if f_origin_x_str == 'left': local_anchor_offset_x_unscaled = f_width_base / 2
             elif f_origin_x_str == 'right': local_anchor_offset_x_unscaled = -f_width_base / 2
@@ -222,11 +274,9 @@ def dibujar_boleta_en_canvas(pdf_canvas, page_height, diseno_json_dict, datos_em
             if f_origin_y_str == 'top': local_anchor_offset_y_unscaled = f_height_base / 2
             elif f_origin_y_str == 'bottom': local_anchor_offset_y_unscaled = -f_height_base / 2
             
-            # Aplicar la escala individual del objeto a este desplazamiento del anclaje
             local_anchor_offset_x_scaled = local_anchor_offset_x_unscaled * f_scale_x
             local_anchor_offset_y_scaled = local_anchor_offset_y_unscaled * f_scale_y
 
-            # Rotar este desplazamiento del anclaje
             angle_rad = math.radians(f_angle_degrees)
             cos_a = math.cos(angle_rad)
             sin_a = math.sin(angle_rad)
@@ -234,26 +284,50 @@ def dibujar_boleta_en_canvas(pdf_canvas, page_height, diseno_json_dict, datos_em
             rotated_anchor_offset_x = local_anchor_offset_x_scaled * cos_a - local_anchor_offset_y_scaled * sin_a
             rotated_anchor_offset_y = local_anchor_offset_x_scaled * sin_a + local_anchor_offset_y_scaled * cos_a
             
-            # Centro final del objeto en coordenadas Fabric
             center_x_fab = anchor_fab_x + rotated_anchor_offset_x
             center_y_fab = anchor_fab_y + rotated_anchor_offset_y
 
-            # 2. Convertir centro a coordenadas ReportLab y aplicar transformaciones al canvas
             center_x_rl = center_x_fab
-            center_y_rl = page_height - center_y_fab # Invertir Y
+            center_y_rl = page_height - center_y_fab
 
             pdf_canvas.translate(center_x_rl, center_y_rl)
-            pdf_canvas.rotate(-f_angle_degrees) # Rotación en ReportLab es antihoraria
-            # Ahora el origen (0,0) del canvas de ReportLab está en el centro del objeto rotado.
-            # --- FIN Transformaciones de Posicionamiento y Rotación ---
-
-            # Coordenadas relativas para dibujar el objeto (respecto a su centro ahora en 0,0)
-            # Para rect, line, image, este es el bounding box visual.
+            pdf_canvas.rotate(-f_angle_degrees)
+            
             draw_rel_x_bbox = -obj_visual_width / 2
             draw_rel_y_bbox = -obj_visual_height / 2
+            
 
-            # --- Dibujo específico por tipo de objeto ---
-            if obj_type == 'rect':
+            
+            # --- DIBUJO ESPECÍFICO POR TIPO  ---
+
+            # CASO 1: El objeto es el placeholder del QR.
+            if obj_type == 'image' and obj_fabric.get('isQrPlaceholder'):
+                titulo = "BOLETA DE PAGO - GADP"
+                nombre = datos_empleado.get('{{nombre_completo}}', 'N/A')
+                ci = datos_empleado.get('{{ci}}', 'N/A')
+                item = datos_empleado.get('{{item}}', 'N/A')
+                cargo = datos_empleado.get('{{cargo_nombre_cargo}}', 'N/A')
+                liquido = datos_empleado.get('{{liquido_pagable}}', '0.00')
+                mes = datos_empleado.get('{{mes_literal_actual}}', 'N/A')
+                anio = datos_empleado.get('{{planilla_anio}}', 'N/A')
+                datos_para_qr = (
+                    f"{titulo}\n"
+                    f"--------------------\n"
+                    f"Nombre: {nombre}\n"
+                    f"C.I.: {ci}\n"
+                    f"Ítem: {item}\n"
+                    f"Cargo: {cargo}\n"
+                    f"Líquido Pagable: Bs. {liquido}\n"
+                    f"Periodo: {mes} {anio}"
+                )
+                qr_image_reader = generar_imagen_qr(datos_para_qr)
+                if qr_image_reader:
+                    pdf_canvas.drawImage(qr_image_reader, draw_rel_x_bbox, draw_rel_y_bbox,
+                                         width=obj_visual_width, height=obj_visual_height,
+                                         mask='auto', preserveAspectRatio=True)
+            
+            # CASO 2: El objeto es un rectángulo (tu código original).
+            elif obj_type == 'rect':
                 fill_color_str = obj_fabric.get('fill', 'transparent')
                 stroke_color_str = obj_fabric.get('stroke', '#000000')
                 stroke_width_val = float(obj_fabric.get('strokeWidth', 1))
@@ -269,13 +343,14 @@ def dibujar_boleta_en_canvas(pdf_canvas, page_height, diseno_json_dict, datos_em
                 pdf_canvas.rect(draw_rel_x_bbox, draw_rel_y_bbox, obj_visual_width, obj_visual_height,
                                 stroke=(1 if stroke_width_val > 0 else 0), fill=has_fill)
 
+            # CASO 3: El objeto es texto (tu código original).
             elif obj_type == 'i-text':
                 text_content_original = obj_fabric.get('text', '')
                 rendered_text_raw = datos_empleado.get(text_content_original.strip(), text_content_original)
                 rendered_text_string = str(rendered_text_raw).strip()
 
                 f_font_family_raw = obj_fabric.get('fontFamily', 'Helvetica').lower()
-                f_font_size_base = float(obj_fabric.get('fontSize', 10)) # Tamaño base sin escala Y
+                f_font_size_base = float(obj_fabric.get('fontSize', 10))
                 f_fill_color_str = obj_fabric.get('fill', '#000000')
                 f_text_align_fabric = obj_fabric.get('textAlign', 'left')
                 f_font_weight_val = obj_fabric.get('fontWeight', 'normal')
@@ -289,7 +364,7 @@ def dibujar_boleta_en_canvas(pdf_canvas, page_height, diseno_json_dict, datos_em
                 
                 is_b = (f_font_weight_val=='bold' or (isinstance(f_font_weight_val,str) and f_font_weight_val.isdigit() and int(f_font_weight_val)>=700) or (isinstance(f_font_weight_val,(int,float)) and f_font_weight_val>=700))
                 is_i = (f_font_style == 'italic')
-                rl_fn = base_font_name # Nombre base de la fuente
+                rl_fn = base_font_name
                 if base_font_name == "Helvetica":
                     if is_b and is_i: rl_fn="Helvetica-BoldOblique"
                     elif is_b: rl_fn="Helvetica-Bold"
@@ -303,115 +378,71 @@ def dibujar_boleta_en_canvas(pdf_canvas, page_height, diseno_json_dict, datos_em
                     elif is_b: rl_fn="Courier-Bold"
                     elif is_i: rl_fn="Courier-Oblique"
                 
-                pdf_canvas.setFont(rl_fn, f_font_size_base) # Usar tamaño de fuente BASE
+                pdf_canvas.setFont(rl_fn, f_font_size_base)
                 rl_text_color = get_reportlab_color(f_fill_color_str)
                 if rl_text_color: pdf_canvas.setFillColor(rl_text_color)
 
-                # Aplicar escala X e Y al sistema de coordenadas ANTES de dibujar texto
-                # Esto estirará/comprimirá el texto.
-                pdf_canvas.saveState() # Estado para la escala del texto
+                pdf_canvas.saveState()
                 pdf_canvas.scale(f_scale_x, f_scale_y)
 
-                # Dimensiones para el texto ANTES de aplicar la escala del canvas.
-                # El texto se dibujará como si tuviera f_width_base y f_height_base.
                 width_for_text_layout = f_width_base
                 height_for_text_layout = f_height_base
 
-                if "\n" not in rendered_text_string and "\r" not in rendered_text_string: # Texto de una línea
+                if "\n" not in rendered_text_string and "\r" not in rendered_text_string:
                     text_width_natural = pdf_canvas.stringWidth(rendered_text_string, rl_fn, f_font_size_base)
                     
-                    # Coordenadas de dibujo para drawString, relativas al centro del objeto (0,0 local),
-                    # pero el origen del texto es abajo-izquierda.
-                    # Estas coordenadas son ANTES de la escala del canvas.
-                    text_draw_x = -width_for_text_layout / 2 # Default: izquierda
+                    text_draw_x = -width_for_text_layout / 2
                     if f_text_align_fabric == 'center':
                         text_draw_x = -text_width_natural / 2
                     elif f_text_align_fabric == 'right':
                         text_draw_x = width_for_text_layout / 2 - text_width_natural
                     
-                    # Posición Y: alinear la línea base del texto.
-                    # Si el centro del objeto es (0,0), y el texto tiene altura f_font_size_base,
-                    # y queremos que el texto esté centrado verticalmente en el f_height_base
-                    # La línea base estaría aproximadamente en -f_font_size_base / (factor ~2.5 a 3) desde el centro del texto.
-                    # Esta es la parte más tricky.
-                    # Si f_height_base es la altura del "cuadro" de texto, y f_font_size_base es la altura de la fuente:
-                    # Para centrar: -f_font_size_base / 2 (aproximado para la línea base desde el centro del texto)
-                    # Si queremos que la parte inferior del texto toque -height_for_text_layout / 2:
-                    text_draw_y = -height_for_text_layout / 2  # Coloca la línea base en la parte inferior del contenedor base
-                                                              # Podría necesitar ajuste: + (f_font_size_base * 0.2) por ejemplo para subir la línea base
+                    text_draw_y = -height_for_text_layout / 2
                     
                     pdf_canvas.drawString(text_draw_x, text_draw_y, rendered_text_string)
-
-                else: # Texto multilínea con Paragraph
+                else:
                     text_for_para = f"<u>{rendered_text_string}</u>" if f_underline else rendered_text_string
                     alignment_map = {'left':TA_LEFT, 'center':TA_CENTER, 'right':TA_RIGHT, 'justify':TA_JUSTIFY}
                     
                     para_s = ParagraphStyle(
-                        f'ParaStyle_{obj_fabric.get("id","txt")}',
-                        fontName=rl_fn,
-                        fontSize=f_font_size_base,
-                        leading=(f_font_size_base * f_line_height_factor),
-                        textColor=rl_text_color,
-                        alignment=alignment_map.get(f_text_align_fabric, TA_LEFT),
-                        splitLongWords=0,
-                        # backColor=colors.pink # Para depuración de límites
+                        f'ParaStyle_{obj_fabric.get("id","txt")}', fontName=rl_fn, fontSize=f_font_size_base,
+                        leading=(f_font_size_base * f_line_height_factor), textColor=rl_text_color,
+                        alignment=alignment_map.get(f_text_align_fabric, TA_LEFT), splitLongWords=0,
                     )
                     
                     para = Paragraph(text_for_para, para_s)
-                    # wrapOn con dimensiones base (width_for_text_layout, height_for_text_layout)
-                    pw_natural, ph_natural = para.wrapOn(pdf_canvas, width_for_text_layout, height_for_text_layout * 1.5) # Dar más alto para wrap
+                    pw_natural, ph_natural = para.wrapOn(pdf_canvas, width_for_text_layout, height_for_text_layout * 1.5)
 
-                    para_draw_x = -width_for_text_layout / 2 # Default: izquierda
-                    if f_text_align_fabric == 'center':
-                        para_draw_x = -pw_natural / 2
-                    elif f_text_align_fabric == 'right':
-                        para_draw_x = width_for_text_layout / 2 - pw_natural
+                    para_draw_x = -width_for_text_layout / 2
+                    if f_text_align_fabric == 'center': para_draw_x = -pw_natural / 2
+                    elif f_text_align_fabric == 'right': para_draw_x = width_for_text_layout / 2 - pw_natural
                     
-                    # Alinear la parte INFERIOR del Paragraph con la parte INFERIOR del contenedor base
                     para_draw_y = -height_for_text_layout / 2
                                         
                     para.drawOn(pdf_canvas, para_draw_x, para_draw_y)
                 
-                pdf_canvas.restoreState() # Restaurar estado después de la escala del texto
+                pdf_canvas.restoreState()
 
+            # CASO 4: El objeto es una línea (tu código original).
             elif obj_type == 'line':
                 rl_stroke_color = get_reportlab_color(obj_fabric.get('stroke', '#000000'))
                 rl_stroke_width = float(obj_fabric.get('strokeWidth', 1))
                 pdf_canvas.setStrokeColor(rl_stroke_color)
                 pdf_canvas.setLineWidth(rl_stroke_width)
 
-                # Coordenadas de la línea en Fabric (x1,y1,x2,y2) son relativas al centro de la línea.
-                # Y la escala del objeto (f_scale_x, f_scale_y) ya define obj_visual_width/height.
-                # El objeto ya está trasladado a su centro y rotado.
-                # Debemos dibujar la línea con sus coordenadas locales multiplicadas por su escala individual.
                 line_x1_fab_local = float(obj_fabric.get('x1', 0)) 
                 line_y1_fab_local = float(obj_fabric.get('y1', 0))
                 line_x2_fab_local = float(obj_fabric.get('x2', 0))
                 line_y2_fab_local = float(obj_fabric.get('y2', 0))
 
-                # Las coordenadas para pdf_canvas.line son relativas al origen actual (0,0),
-                # que es el centro del objeto línea.
-                # No necesitamos aplicar f_scale_x y f_scale_y aquí porque las transformaciones
-                # generales del objeto ya las consideraron para el obj_visual_width/height.
-                # Las coordenadas x1,y1,x2,y2 de Fabric definen la línea dentro de su propio
-                # bounding box no escalado. La escala ya se aplicó al transformar el canvas.
-                # NO, esto es incorrecto. La escala del objeto individual SÍ debe aplicarse a sus coordenadas locales.
-                
-                # Las coordenadas de la línea se dan DENTRO del bounding box del objeto línea,
-                # y este bounding box (definido por f_width_base, f_height_base) ya fue escalado por f_scale_x, f_scale_y
-                # para obtener obj_visual_width, obj_visual_height.
-                # Y el canvas ya está en el centro del objeto, con las escalas f_scale_x, f_scale_y aplicadas
-                # si hubiéramos hecho pdf_canvas.scale(f_scale_x, f_scale_y) para todos.
-                # PERO solo aplicamos scale para texto.
-                # Entonces, para la línea, SÍ necesitamos aplicar su escala a sus coordenadas.
-
-                p1_x = line_x1_fab_local * f_scale_x # Aplicar escala del objeto a sus coordenadas locales
+                p1_x = line_x1_fab_local * f_scale_x
                 p1_y = line_y1_fab_local * f_scale_y
                 p2_x = line_x2_fab_local * f_scale_x
                 p2_y = line_y2_fab_local * f_scale_y
                 
                 pdf_canvas.line(p1_x, p1_y, p2_x, p2_y)
-
+            
+            # CASO 5: El objeto es una imagen NORMAL (no el QR).
             elif obj_type == 'image':
                 img_src_fabric = obj_fabric.get('src', '')
                 img_reader = None
@@ -424,10 +455,11 @@ def dibujar_boleta_en_canvas(pdf_canvas, page_height, diseno_json_dict, datos_em
                         logger.error(f"PDF: Error B64 img: {e_b64}", exc_info=True)
 
                 if img_reader:
-                    # Dibuja la imagen en el bounding box visual ya calculado (draw_rel_x_bbox, etc.)
                     pdf_canvas.drawImage(img_reader, draw_rel_x_bbox, draw_rel_y_bbox,
                                          width=obj_visual_width, height=obj_visual_height,
                                          mask='auto', preserveAspectRatio=False)
+            
+            # CASO 6: Tipo de objeto no manejado.
             else:
                 logger.warning(f"PDF: Tipo objeto no manejado: {obj_type}")
 
@@ -435,6 +467,6 @@ def dibujar_boleta_en_canvas(pdf_canvas, page_height, diseno_json_dict, datos_em
             obj_id_log = obj_fabric.get("id", "SIN_ID") if isinstance(obj_fabric, dict) else "OBJ_INVALIDO"
             logger.error(f"PDF: Error dibujando objeto Fabric (ID: {obj_id_log}, Tipo: {obj_type}): {e_obj_draw}", exc_info=True)
         finally:
-            pdf_canvas.restoreState() # Restaura el estado global de este objeto
+            pdf_canvas.restoreState()
             
     logger.debug("PDF: Fin de dibujar_boleta_en_canvas para un empleado.")

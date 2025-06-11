@@ -9,7 +9,7 @@
     <div class="">
         <div class="page-title">
             <div class="title_left">
-                <h3>{{ titulo_pagina|default:"Editar Detalle de Sueldo" }}</h3>
+                <h3>EDITAR DETALLE SUELDO</h3>
             </div>
         </div>
         <div class="clearfix"></div>
@@ -27,9 +27,6 @@
         <div class="x_panel">
             <div class="x_title">
                 <h2>Información</h2>
-                <ul class="nav navbar-right panel_toolbox">
-                    <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
-                </ul>
                 <div class="clearfix"></div>
             </div>
             <div class="x_content">
@@ -57,10 +54,10 @@
             <div class="x_content">
                 <form method="post" class="form-horizontal form-label-left" novalidate> {# Ajustado class #}
                     {% csrf_token %}
-                    {# NO SE NECESITAN CAMPOS OCULTOS redirect_* #}
+                    
 
-                    {# Renderizar campos en filas/columnas para organizar #}
-                    {# Fila 1: Haber Básico, Categoría, Días Trab #}
+                    
+                    
                      <div class="row">
                         <div class="col-md-4 col-sm-6 item form-group mb-3">
                             <label class="col-form-label label-align" for="{{ form.haber_basico.id_for_label }}">{{ form.haber_basico.label }}</label>
@@ -77,10 +74,20 @@
                             {{ form.dias_trab }}
                             {% if form.dias_trab.errors %}<ul class="parsley-errors-list filled mt-1">{% for e in form.dias_trab.errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
                         </div>
+                        <div class="col-md-4 col-sm-6 item form-group mb-3">
+                            <label class="col-form-label label-align" for="{{ form.lactancia_prenatal.id_for_label }}">{{ form.lactancia_prenatal.label }}</label>
+                            {{ form.lactancia_prenatal }}
+                            {% if form.lactancia_prenatal.errors %}<ul class="parsley-errors-list filled mt-1">{% for e in form.lactancia_prenatal.errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
+                        </div>
+                        <div class="col-md-4 col-sm-6 item form-group mb-3">
+                            <label class="col-form-label label-align" for="{{ form.otros_ingresos.id_for_label }}">{{ form.otros_ingresos.label }}</label>
+                            {{ form.otros_ingresos }}
+                            {% if form.otros_ingresos.errors %}<ul class="parsley-errors-list filled mt-1">{% for e in form.otros_ingresos.errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
+                        </div>
                     </div>
 
                     <hr>
-                    <h5>Descuentos de Ley</h5>
+                    <h5>Descuentos</h5>
                     <div class="row">
                         <div class="col-md-4 col-sm-6 item form-group mb-3">
                             <label class="col-form-label label-align" for="{{ form.gestora_publica.id_for_label }}">{{ form.gestora_publica.label }}</label>
@@ -138,6 +145,11 @@
                          <div class="col-md-4 col-sm-6 item form-group mb-3">
                             <label class="col-form-label label-align" for="{{ form.liquido_pagable.id_for_label }}">{{ form.liquido_pagable.label }}</label>
                              {{ form.liquido_pagable }} {# Renderiza input (readonly si se definió en widget) #}
+                        </div>
+                        <div class="col-md-4 col-sm-6 item form-group mb-3">
+                            <label class="col-form-label label-align" for="{{ form.saldo_credito_fiscal.id_for_label }}">{{ form.saldo_credito_fiscal.label }}</label>
+                            {{ form.saldo_credito_fiscal }}
+                            {% if form.saldo_credito_fiscal.errors %}<ul class="parsley-errors-list filled mt-1">{% for e in form.saldo_credito_fiscal.errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
                         </div>
                     </div>
 

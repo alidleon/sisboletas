@@ -30,9 +30,6 @@
     <div class="x_panel">
         <div class="x_title">
             <h2>Filtros de Personal</h2>
-            <ul class="nav navbar-right panel_toolbox">
-                <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
-            </ul>
             <div class="clearfix"></div>
         </div>
         <div class="x_content">
@@ -40,7 +37,7 @@
                  <div class="form-group row mb-3">
                     <label class="control-label col-md-2 col-sm-3 ">Secretaría:</label>
                     <div class="col-md-8 col-sm-9 ">
-                        <select name="secretaria" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <select name="secretaria" class="form-control form-control-sm" onchange="this.form.submit()">
                             <option value="">--- Todas ---</option>
                             {% for sec in all_secretarias %}
                                 <option value="{{ sec.id }}" {% if sec.id == selected_secretaria_id %}selected{% endif %}>
@@ -53,7 +50,7 @@
                 <div class="form-group row mb-3">
                     <label class="control-label col-md-2 col-sm-3 ">Unidad:</label>
                     <div class="col-md-8 col-sm-9 ">
-                         <select name="unidad" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <select name="unidad" class="form-control form-control-sm" onchange="this.form.submit()">
                             {% if selected_secretaria_id %}
                                 <option value="">--- Todas las de esta Secretaría ---</option>
                             {% else %}
@@ -126,6 +123,8 @@
                                 <th class="column-title text-center">Días Trab.</th>
                                 <th class="column-title text-end">H. Básico</th>
                                 <th class="column-title text-end">Categoría</th>
+                                <th class="column-title text-end">Lact. Prenatal</th>
+                                <th class="column-title text-end">Otros Ingresos</th>
                                 <th class="column-title text-end">T. Ganado</th>
                                 <th class="column-title text-end">RC-IVA Ret.</th>
                                 <th class="column-title text-end">Gestora</th>
@@ -136,6 +135,7 @@
                                 <th class="column-title text-end">Otros Desc.</th>
                                 <th class="column-title text-end">T. Desctos</th>
                                 <th class="column-title text-end">L. Pagable</th>
+                                <th class="column-title text-end">Saldo RC-IVA</th>
                                 <th class="column-title no-link last text-center"><span class="nobr">Acciones</span></th>
                             </tr>
                         </thead>
@@ -152,6 +152,8 @@
                                     <td class="text-center">{{ detalle_obj.dias_trab|floatformat:0 }}</td>
                                     <td class="text-end">{{ detalle_obj.haber_basico|floatformat:2|intcomma }}</td>
                                     <td class="text-end">{{ detalle_obj.categoria|floatformat:2|intcomma }}</td>
+                                    <td class="text-end">{{ detalle_obj.lactancia_prenatal|floatformat:2|intcomma }}</td>
+                                    <td class="text-end">{{ detalle_obj.otros_ingresos|floatformat:2|intcomma }}</td>
                                     <td class="text-end">{{ detalle_obj.total_ganado|floatformat:2|intcomma }}</td>
                                     <td class="text-end">{{ detalle_obj.rc_iva_retenido|floatformat:2|intcomma }}</td>
                                     <td class="text-end">{{ detalle_obj.gestora_publica|floatformat:2|intcomma }}</td>
@@ -162,6 +164,7 @@
                                     <td class="text-end">{{ detalle_obj.otros_descuentos|floatformat:2|intcomma }}</td>
                                     <td class="text-end">{{ detalle_obj.total_descuentos|floatformat:2|intcomma }}</td>
                                     <td class="text-end"><strong>{{ detalle_obj.liquido_pagable|floatformat:2|intcomma }}</strong></td>
+                                    <td class="text-end">{{ detalle_obj.saldo_credito_fiscal|floatformat:2|intcomma }}</td>
                                     <td class=" last text-center text-nowrap">
                                         {% if perms.sueldos.change_detallesueldo or user.is_superuser %}
                                             {% if planilla_sueldo.estado != 'pagado' %}

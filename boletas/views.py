@@ -1,6 +1,7 @@
 import logging
 
 from django.shortcuts import render, redirect, get_object_or_404
+import locale
 
 from django.contrib import messages
 from django.urls import reverse
@@ -21,6 +22,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.views.decorators.csrf import csrf_exempt # Temporalmente para AJAX fácil, ¡OJO!
 from django.utils.html import escape # Para sanitizar
 from datetime import datetime
+from .utils import numero_a_literal
 import io
 import json
 import math # <--- AÑADIR ESTA LÍNEA
@@ -440,6 +442,13 @@ def preview_boleta_view(request):
 @login_required
 @permission_required('sueldos.view_planillasueldo', raise_exception=True)
 def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
+    try:
+        locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
+    except locale.Error:
+        try:
+            locale.setlocale(locale.LC_TIME, 'Spanish') # Alternativa común en Windows
+        except locale.Error:
+            logger.warning("Locale para español no encontrado.")
     logger.info(f"Solicitud para generar PDF para PlanillaSueldo ID: {planilla_sueldo_id}")
 
     # --- 1. Obtener Planilla de Sueldos y Detalles ---
@@ -603,10 +612,14 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
             # Usar locale para formato de número si es necesario o Decimal.quantize
             from decimal import Decimal, ROUND_HALF_UP
             quantizer = Decimal('0.01') # Para redondear a 2 decimales
-            
+
+            datos_empleado_actual['{{cargo_referencia}}'] = detalle.cargo_referencia or '' # Usamos 'or ""' por si el valor es None
             datos_empleado_actual['{{dias_trab}}'] = str((detalle.dias_trab or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
             datos_empleado_actual['{{haber_basico}}'] = str((detalle.haber_basico or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
             datos_empleado_actual['{{categoria}}'] = str((detalle.categoria or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
+            datos_empleado_actual['{{lactancia_prenatal}}'] = str((detalle.lactancia_prenatal or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
+            datos_empleado_actual['{{otros_ingresos}}'] = str((detalle.otros_ingresos or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
+            datos_empleado_actual['{{saldo_credito_fiscal}}'] = str((detalle.saldo_credito_fiscal or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
             datos_empleado_actual['{{total_ganado}}'] = str((detalle.total_ganado or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
             datos_empleado_actual['{{rc_iva_retenido}}'] = str((detalle.rc_iva_retenido or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
             datos_empleado_actual['{{gestora_publica}}'] = str((detalle.gestora_publica or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
@@ -623,16 +636,8 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
             datos_empleado_actual['{{fecha_emision_actual}}'] = datetime.now().strftime('%d/%m/%Y')
             # Necesitarás una función para convertir número a literal (num2words o similar)
             # from num2words import num2words
-            try:
-                 monto = detalle.liquido_pagable or Decimal(0)
-                 entero = int(monto)
-                 decimal_part = int((monto - entero) * 100)
-                 # literal = num2words(entero, lang='es').upper() + f" {decimal_part:02d}/100 BOLIVIANOS" # Instalar num2words
-                 literal = f"LITERAL DE {monto:.2f} (PENDIENTE)" # Placeholder temporal
-            except Exception as e_literal:
-                 logger.warning(f"Error generando literal para {monto}: {e_literal}")
-                 literal = "LITERAL PENDIENTE"
-            datos_empleado_actual['{{literal_liquido}}'] = literal
+            monto_liquido = detalle.liquido_pagable or Decimal(0)
+            datos_empleado_actual['{{literal_liquido}}'] = numero_a_literal(monto_liquido)
 
             try:
                 # Requiere configurar locale en el sistema o usar calendar
@@ -842,6 +847,14 @@ def vista_generar_boleta_individual_buscar(request):
 # Usa el mismo permiso que para generar el PDF masivo o uno más específico.
 @permission_required('sueldos.view_planillasueldo', raise_exception=True) 
 def vista_generar_pdf_boleta_unica(request, personal_externo_id, anio, mes):
+    try:
+        locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
+    except locale.Error:
+        try:
+            locale.setlocale(locale.LC_TIME, 'Spanish')
+        except locale.Error:
+            logger.warning("Locale para español no encontrado.")
+            
     logger.info(f"Solicitud para generar PDF de boleta única. Personal ID: {personal_externo_id}, Periodo: {mes}/{anio}")
 
     # --- 1. Obtener el Detalle de Sueldo Específico ---
@@ -986,9 +999,13 @@ def vista_generar_pdf_boleta_unica(request, personal_externo_id, anio, mes):
     from decimal import Decimal, ROUND_HALF_UP # Asegúrate que esté importado
     quantizer = Decimal('0.01')
     
+    datos_empleado_actual['{{cargo_referencia}}'] = detalle_sueldo.cargo_referencia or ''
     datos_empleado_actual['{{dias_trab}}'] = str((detalle_sueldo.dias_trab or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
     datos_empleado_actual['{{haber_basico}}'] = str((detalle_sueldo.haber_basico or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
     datos_empleado_actual['{{categoria}}'] = str((detalle_sueldo.categoria or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
+    datos_empleado_actual['{{lactancia_prenatal}}'] = str((detalle_sueldo.lactancia_prenatal or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
+    datos_empleado_actual['{{otros_ingresos}}'] = str((detalle_sueldo.otros_ingresos or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
+    datos_empleado_actual['{{saldo_credito_fiscal}}'] = str((detalle_sueldo.saldo_credito_fiscal or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
     datos_empleado_actual['{{total_ganado}}'] = str((detalle_sueldo.total_ganado or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
     datos_empleado_actual['{{rc_iva_retenido}}'] = str((detalle_sueldo.rc_iva_retenido or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
     datos_empleado_actual['{{gestora_publica}}'] = str((detalle_sueldo.gestora_publica or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))

@@ -79,6 +79,7 @@ $(document).ready(function() {
     // No guardar estado si es solo un renderizado o una selección sin cambio real
     // O si el nuevo estado es idéntico al anterior (evitar duplicados por renders)
         var newStateJSON = JSON.stringify(canvas.toJSON(propsToIncludeInHistory));
+        var propsToIncludeInHistory = ['isGridLine', 'isPlaceholder', 'placeholderOriginalLabel', 'isQrPlaceholder'];
         
         if (currentState === newStateJSON) {
             // console.log("Undo/Redo: Estado idéntico, no guardado.", actionType);
@@ -200,7 +201,7 @@ $(document).ready(function() {
     // --- 5. Guardado del Diseño (Al enviar el formulario) ---
     $('#formPlantilla').on('submit', function(e) {
         // Obtener el objeto JSON, pero EXCLUYENDO las líneas de la cuadrícula
-        var canvasJSON = canvas.toJSON(['isGridLine', /* otras propiedades personalizadas si las tienes */]);
+        var canvasJSON = canvas.toJSON(['isGridLine', 'isPlaceholder', 'placeholderOriginalLabel', 'isQrPlaceholder']);
 
         // Filtrar los objetos que son líneas de la cuadrícula ANTES de serializar
         if (canvasJSON && canvasJSON.objects) {
@@ -235,19 +236,70 @@ $(document).ready(function() {
         var selectedOption = $('#placeholderSelector option:selected');
         var placeholderId = selectedOption.val();
         var placeholderLabel = selectedOption.data('label') || placeholderId;
-        if (!placeholderId) { alert("Seleccione un campo."); return; }
+        
+        if (!placeholderId) { 
+            alert("Seleccione un campo."); 
+            return; 
+        }
+
         console.log(`Herramienta: Clic 'Añadir Placeholder'. ID: ${placeholderId}`);
-        var placeholderText = new fabric.IText(placeholderId, {
-            left: 70, top: 70, fontFamily: 'Courier New', fontSize: 11, fill: '#0000FF',
-            isPlaceholder: true, placeholderOriginalLabel: placeholderLabel, padding: 5,
-            borderColor: 'blue', cornerColor: 'blue'
-        });
-        canvas.add(placeholderText);
-        canvas.setActiveObject(placeholderText);
-        canvas.renderAll();
-        updatePropertiesPanel(placeholderText); // <-- LLAMADA EXPLÍCITA
-        console.log("Herramienta: Placeholder añadido.");
-        if (isSaveStateEnabled) saveCanvasState("addPlaceholder-setActive"); // ***** AÑADIR ESTA LÍNEA *****
+
+        // --- INICIO DE LA ADAPTACIÓN ---
+        // Usamos una estructura if/else para manejar los dos tipos de placeholders.
+        
+        if (placeholderId === '{{CODIGO_QR}}') {
+            
+            // --- CASO 1: El placeholder es el CÓDIGO QR ---
+            console.log("-> Se ha detectado el placeholder de QR. Creando objeto de IMAGEN.");
+            
+            // URL para una imagen de QR de ejemplo que se mostrará en el diseñador.
+            const qrImageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=Boleta%20de%20Pago';
+            
+            // Creamos un objeto de imagen de Fabric.js
+            fabric.Image.fromURL(qrImageUrl, function(img) {
+                img.set({
+                    left: 100,
+                    top: 150,
+                    isQrPlaceholder: true // Propiedad personalizada para reconocerlo en el backend
+                });
+                img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+
+                canvas.add(img);
+                canvas.setActiveObject(img);
+                canvas.renderAll();
+                updatePropertiesPanel(img); // Llamada a tu función original
+                console.log("Herramienta: Placeholder de QR (imagen) añadido.");
+                if (isSaveStateEnabled) saveCanvasState("addPlaceholder-image-setActive");
+
+            }, { crossOrigin: 'anonymous' });
+
+        } else {
+
+            // --- CASO 2: Es cualquier otro placeholder de TEXTO (TU CÓDIGO ORIGINAL INTACTO) ---
+            console.log("-> Se ha detectado un placeholder de TEXTO. Creando objeto i-text.");
+
+            var placeholderText = new fabric.IText(placeholderId, {
+                left: 70, 
+                top: 70, 
+                fontFamily: 'Courier New', 
+                fontSize: 11, 
+                fill: '#0000FF',
+                isPlaceholder: true, 
+                placeholderOriginalLabel: placeholderLabel, 
+                padding: 5,
+                borderColor: 'blue', 
+                cornerColor: 'blue'
+            });
+            
+            canvas.add(placeholderText);
+            canvas.setActiveObject(placeholderText);
+            canvas.renderAll();
+            updatePropertiesPanel(placeholderText); // <-- TU LLAMADA EXPLÍCITA ORIGINAL
+            console.log("Herramienta: Placeholder de texto añadido."); // Tu log original
+            if (isSaveStateEnabled) saveCanvasState("addPlaceholder-text-setActive"); // Tu guardado de estado original
+
+        }
+        // --- FIN DE LA ADAPTACIÓN ---
     });
 
     // Botón Línea

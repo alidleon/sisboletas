@@ -7,17 +7,7 @@
 <div class="right_col" role="main">
     <div class="page-title">
         <div class="title_left">
-            <h3>{% firstof titulo_vista "Lista de Planillas Bono TE Generadas" %}
-                {% if page_obj and page_obj.paginator.count > 0 %}
-                    <small class="text-muted"> | Mostrando 
-                        {% if page_obj.object_list %} 
-                            {{ page_obj.start_index }}-{{ page_obj.end_index }} 
-                        {% else %}
-                            0 
-                        {% endif %}
-                        de {{ page_obj.paginator.count }} planilla{{ page_obj.paginator.count|pluralize }}
-                    </small>
-                {% endif %}
+            <h3>BONO TE
             </h3>
         </div>
         <div class="title_right">
@@ -35,10 +25,6 @@
             <div class="x_panel">
                 <div class="x_title">
                     <h2>Planillas Registradas</h2>
-                    <ul class="nav navbar-right panel_toolbox">
-                        <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
-                        <li><a class="close-link"><i class="fa fa-close"></i></a></li>
-                    </ul>
                     <div class="clearfix"></div>
                 </div>
                 <div class="x_content">

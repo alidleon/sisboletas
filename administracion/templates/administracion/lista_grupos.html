@@ -3,7 +3,7 @@
 <div class="right_col" role="main">
     <div class="page-title">
         <div class="title_left">
-            <h3>{{ titulo_vista }}</h3>
+            <h3>GESTION DE GRUPOS Y PERMISOS</h3>
         </div>
     </div>
     <div class="clearfix"></div>
@@ -33,7 +33,7 @@
                             </a>
                             {% endif %}
                         </li>
-                        <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                        
                     </ul>
                     <div class="clearfix"></div>
                 </div>
@@ -71,13 +71,7 @@
 
                                         {# Botón Eliminar Grupo #}
                                         {% if perms.auth.delete_group or user.is_superuser %}
-                                            {# Ejemplo de protección extra en UI para grupos críticos.
-                                               La lógica principal de si un grupo se puede eliminar (ej. si tiene usuarios)
-                                               debe estar en la vista 'eliminar_grupo_view'.
-                                               Reemplaza "Administradores" y "NombreGrupoCriticoProtegido"
-                                               con nombres reales de grupos que quieras proteger en la UI, o elimina esta lógica interna
-                                               si la vista ya se encarga de todo.
-                                            #}
+                                            
                                             {% if grupo_actual.name != "Administradores" and grupo_actual.name != "NombreGrupoCriticoProtegido" %}
                                                 <a href="{% url 'eliminar_grupo' grupo_actual.id %}"
                                                    class="btn btn-sm btn-danger"

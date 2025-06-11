@@ -2,91 +2,156 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta http_equiv="Content-Type" content="text/html; charset=UTF-8">
-    <!-- Meta, title, CSS, favicons, etc. -->
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block page_title %}Acceso al Sistema{% endblock %} | GAD Potosí</title>
 
-    <title>{% block page_title %}Autenticación - Mi Sistema{% endblock %}</title>
+    <!-- Google Fonts: Raleway -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;700&display=swap" rel="stylesheet">
 
-    <!-- Bootstrap -->
-    <link href="{% static 'FrWork/admin_lte/vendors/bootstrap/dist/css/bootstrap.min.css' %}" rel="stylesheet">
-    <!-- Font Awesome -->
-    <link href="{% static 'FrWork/admin_lte/vendors/font-awesome/css/font-awesome.min.css' %}" rel="stylesheet">
-    <!-- NProgress -->
-    <link href="{% static 'FrWork/admin_lte/vendors/nprogress/nprogress.css' %}" rel="stylesheet">
-    <!-- Animate.css -->
-    <link href="{% static 'FrWork/admin_lte/vendors/animate.css/animate.min.css' %}" rel="stylesheet">
-
-    <!-- Estilos personalizados para la página de autenticación -->
     <style>
+        :root {
+            /* Colores extraídos de tu diseño */
+            --color-fondo: #E86A51;
+            --color-input-bg: #FFFFFF;
+            --color-input-texto: #A0A0A0;
+            --color-boton: #F8C170; /* Amarillo/Dorado del botón */
+            --color-boton-texto: #5A5A5A; /* Texto oscuro para mejor contraste en botón amarillo */
+            --color-texto-opciones: #f0e6e6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            height: 100%;
+            font-family: 'Raleway', sans-serif;
+        }
+
         body {
-            background: #F7F7F7; /* Color de fondo similar al de Gentelella login */
+            background-color: var(--color-fondo);
+            
+            /* ===== MODIFICA ESTA LÍNEA CON TU ARCHIVO .SVG ===== */
+            background-image: url("{% static 'img/Mesa_de_trabajo.svg' %}");
+            /* =================================================== */
+
+            background-size: cover;
+            background-position: center center;
+            background-repeat: no-repeat;
             display: flex;
-            align-items: center; /* Centrar verticalmente */
-            justify-content: center; /* Centrar horizontalmente */
-            min-height: 100vh;
+            align-items: center;
+            justify-content: center;
         }
-        .login_wrapper {
-            position: relative;
-            margin: 0 auto;
-            max-width: 380px; /* Ancho similar al login de Gentelella */
-        }
-        .login_form {
-            position: relative;
-            background: #fff;
-            padding: 20px 30px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        .login_form h1 {
-            font-size: 24px;
+
+        .login-wrapper {
+            width: 100%;
+            max-width: 380px;
             text-align: center;
-            margin-bottom: 25px;
-            font-weight: 500;
+            padding: 20px;
         }
-         .login_form .separator {
-             border-top: 1px solid #D8D8D8;
-             margin-top: 20px;
-             padding-top: 20px;
-             text-align: center;
-         }
-         .login_form .separator p {
-             color: #666;
-         }
-         .login_form .btn-primary {
-             width: 100%;
-         }
-         /* Puedes añadir el logo si tienes uno */
-         .login_form .logo-container {
-             text-align: center;
-             margin-bottom: 20px;
-         }
-         .login_form .logo-container img {
-             max-width: 150px; /* Ajusta según tu logo */
-         }
+
+        .logo {
+            max-width: 180px; /* Ajusta el tamaño del escudo */
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-control {
+            width: 100%;
+            background-color: var(--color-input-bg);
+            border: none;
+            border-radius: 30px; /* Bordes muy redondeados */
+            padding: 15px 25px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--color-input-texto);
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .form-control::placeholder {
+            color: var(--color-input-texto);
+        }
+        .form-control:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5);
+        }
+
+        .btn-submit {
+            width: 100%;
+            background-color: var(--color-boton);
+            border: none;
+            border-radius: 30px;
+            padding: 15px;
+            color: var(--color-boton-texto);
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+            margin-bottom: 25px;
+        }
+        .btn-submit:hover {
+            transform: scale(1.03);
+        }
+
+        .options {
+            color: var(--color-texto-opciones);
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+        .remember-me {
+            display: block;
+            margin-bottom: 10px;
+        }
+        .forgot-password {
+            color: var(--color-texto-opciones);
+            text-decoration: none;
+        }
+        .forgot-password:hover {
+            text-decoration: underline;
+        }
+        
+        .separator {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+        }
+        .change_link a {
+            color: #fff;
+            font-weight: 700;
+            text-decoration: none;
+        }
+        .change_link a:hover {
+            text-decoration: underline;
+        }
+
+        .error-message {
+            color: white;
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
     </style>
-    {% block extra_head_auth %}{% endblock %}
 </head>
-
-<body class="login"> {# Clase 'login' si tu CSS la usa #}
-    <div>
-        <a class="hiddenanchor" id="signup"></a>
-        <a class="hiddenanchor" id="signin"></a>
-
-        <div class="login_wrapper">
-            <div class="animate form login_form">
-                <section class="login_content">
-                    {% block auth_form_content %}
-                    {# El contenido específico del formulario (login, registro, etc.) irá aquí #}
-                    {% endblock %}
-                </section>
-            </div>
-
-            {% block other_auth_forms %}{% endblock %}
-        </div>
-    </div>
-    {% block extra_js_auth %}{% endblock %}
+<body>
+    <main class="login-wrapper">
+        {% block auth_content %}
+        {# El contenido de login.html se insertará aquí #}
+        {% endblock %}
+    </main>
 </body>
 </html>

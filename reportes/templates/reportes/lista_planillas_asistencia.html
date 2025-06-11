@@ -7,22 +7,22 @@
 <div class="right_col" role="main">
     <div class="page-title">
         <div class="title_left">
-            <h3>{% firstof titulo_vista "Reportes de Asistencia" %}
-                {# Mostrar conteo de registros si page_obj existe #}
-                {% if page_obj and page_obj.paginator.count > 0 %}
-                    <small class="text-muted"> | Mostrando 
-                        {% if page_obj.object_list %} 
-                            {{ page_obj.start_index }}-{{ page_obj.end_index }} 
-                        {% else %}
-                            0 
-                        {% endif %}
-                        de {{ page_obj.paginator.count }} reporte{{ page_obj.paginator.count|pluralize }}
-                    </small>
-                {% endif %}
+            <h3>{% firstof titulo_vista "REPORTES DE ASISTENCIA" %}    
             </h3>
         </div>
     </div>
-    <hr class="d-none d-sm-block">
+    <div class="mb-3 text-end">
+        <div class="title_right">
+            <div class="pull-right">
+                {% if perms.reportes.add_planillaasistencia or user.is_superuser %}
+                <a href="{% url 'crear_planilla_asistencia' %}" class="btn btn-success">
+                    <i class="fa fa-plus"></i> Crear Nuevo Reporte
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        
+    </div>
     <div class="clearfix"></div>
 
     {% if messages %}
@@ -36,20 +36,13 @@
         {% endfor %}
     {% endif %}
 
-    <div class="mb-3 text-end">
-        {% if perms.reportes.add_planillaasistencia or user.is_superuser %}
-        <a href="{% url 'crear_planilla_asistencia' %}" class="btn btn-success">
-            <i class="fa fa-plus"></i> Crear Nuevo Reporte
-        </a>
-        {% endif %}
-    </div>
+    
 
     <div class="card">
         <div class="card-header">
             Lista de Reportes Generados
         </div>
         <div class="card-body">
-            {# CAMBIO: Condición basada en page_obj #}
             {% if page_obj and page_obj.object_list %}
             <div class="table-responsive">
                 <table class="table table-striped table-hover table-sm table-bordered">

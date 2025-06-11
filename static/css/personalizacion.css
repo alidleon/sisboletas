@@ -1,0 +1,395 @@
+/*
+=================================================================
+==                                                             ==
+==         HOJA DE ESTILOS PERSONALIZADA PARA SISPLANILLAS     ==
+==                                                             ==
+=================================================================
+*/
+
+/* 
+ * =================================================================
+ * ===== 1. PALETA DE COLORES Y CONFIGURACIÓN BASE (TIPOGRAFÍA) - ACTUALIZADO =====
+ * =================================================================
+*/
+
+/* Definimos la paleta de colores como variables para reutilizarlas fácilmente */
+:root {
+  /* ... (tus variables de color no cambian) ... */
+  --color-principal: #DC5D44;
+  --color-secundario: #FB8257;
+  --color-acento: #F8C170;
+  --color-info: #87D4C8;
+  --color-exito: #AAC85F;
+  --color-fondo-suave: #D2E6EC;
+  --color-cuerpo-bg: #F7F7F7;
+  --color-gris-neutro: #6c757d;
+
+  /* NUEVA VARIABLE: Color de texto principal */
+  --color-texto-principal: #5A5A5A; /* Un gris oscuro, como en tu imagen de muestra */
+}
+
+/* Aplicamos la tipografía, el fondo y el NUEVO COLOR DE TEXTO */
+body {
+    font-family: 'Raleway', sans-serif;
+    background-color: var(--color-cuerpo-bg);
+    color: var(--color-texto-principal); /* ¡AQUÍ ESTÁ EL CAMBIO! */
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Raleway', sans-serif;
+    color: var(--color-texto-principal); /* Nos aseguramos de que los títulos también lo usen */
+}
+
+/* 
+ * =================================================================
+ * ===== 2. ESTILOS DE LA BARRA LATERAL (CON SOPORTE RESPONSIVO) =====
+ * =================================================================
+*/
+
+/* --- CONTENEDOR PRINCIPAL DE LA BARRA LATERAL --- */
+.nav-md .container.body .col-md-3.left_col,
+.nav-sm .container.body .col-md-3.left_col,
+.left_col.scroll-view,
+.navbar.nav_title,
+.sidebar-footer {
+    background: var(--color-principal);
+}
+
+.navbar.nav_title,
+.sidebar-footer {
+    background: var(--color-principal);
+}
+/* --- VISTA MÓVIL: ASEGURAR VISIBILIDAD DE SUBMENÚS --- */
+
+
+.nav-sm .navbar.nav_title {
+    background: var(--color-principal) !important;
+}
+
+/* --- OTROS ELEMENTOS --- */
+.nav-md .nav.child_menu {
+    background: #BF4A31;
+}
+
+.profile_info span, .profile_info h2,
+.menu_section h3,
+.nav.side-menu > li > a {
+    color: #FFFFFF;
+}
+.nav.side-menu > li > a:hover {
+    color: #FFFFFF !important;
+}
+
+.nav-md .nav.side-menu > li.active {
+    border-right: 5px solid var(--color-fondo-suave);
+}
+.nav-md .nav.side-menu > li.active > a {
+    background: linear-gradient(to right, rgba(0,0,0,0.15), rgba(0,0,0,0));
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.main_menu_side .nav.child_menu li:before {
+    background: #FFFFFF !important;
+    border-color: #FFFFFF !important;
+}
+.main_menu_side .nav.child_menu li:after,
+.nav.side-menu > li > a:after {
+    border-color: #FFFFFF !important;
+}
+
+/* --- ESTILOS PARA EL LOGO Y SU BARRA (SOLUCIÓN DEFINITIVA) --- */
+
+/* Aumentamos la altura de la barra para que quepa el logo de 70px */
+.nav-md .navbar.nav_title {
+  height: 70px !important;
+}
+
+/* Estilos para el logo dentro de la barra */
+.nav-md .site_title .logo-desktop {
+  width: 100%;
+  height: 100%; /* Ocupa el 100% de la nueva altura de la barra (70px) */
+  object-fit: contain;
+  object-position: left center;
+}
+
+/* En modo ESCRITORIO, ocultamos el icono móvil */
+.nav-md .site_title .logo-mobile {
+  display: none !important;
+}
+
+/* En modo MÓVIL, ocultamos el logo de escritorio */
+.nav-sm .site_title .logo-desktop {
+  display: none !important;
+}
+
+/* Y en modo MÓVIL, MOSTRAMOS y damos estilo al icono */
+.nav-sm .site_title .logo-mobile {
+  display: block !important;
+  width: 45px;
+  height: auto;
+  margin: 5px auto; /* Lo centra horizontal y verticalmente */
+}
+.nav-sm .nav.side-menu > li > a > span {
+    display: none !important;
+}
+
+/* Centramos el icono en su espacio */
+.nav-sm .nav.side-menu > li > a {
+    text-align: center !important;
+}
+
+/* Estilos para el SUBMENÚ que aparece al hacer hover (el panel flotante) */
+.nav-sm ul.nav.child_menu {
+    position: absolute;
+    left: 100%;
+    top: 0;
+    width: 210px;
+    z-index: 4000;
+    background: #BF4A31 !important; /* Usamos el color de tus submenús */
+    display: none;
+}
+
+/* Mostramos el submenú cuando el usuario pasa el ratón sobre el icono */
+.nav-sm .nav.side-menu li:hover > ul.child_menu {
+    display: block;
+}
+
+/* 
+ * =================================================================
+ * ===== 3. ESTILOS DEL ÁREA DE CONTENIDO (PANELES Y TÍTULOS)  =====
+ * =================================================================
+*/
+
+.x_title h2 {
+    color: var(--color-principal); /* Títulos de los paneles con el color principal */
+    font-weight: 600;
+}
+    
+.x_title {
+    /* Borde inferior del título con el color azul pálido */
+    border-bottom: 2px solid var(--color-fondo-suave);
+}
+
+
+/* 
+ * =================================================================
+ * ===== 4. ESTILOS PARA BOTONES Y ACCIONES                    =====
+ * =================================================================
+*/
+
+/* Estilo general para todos los botones */
+.btn {
+    border-radius: 5px;
+    font-weight: 500;
+    padding: 8px 15px;
+    transition: all 0.2s ease-in-out;
+    text-transform: none; /* Evitamos que Gentelella los ponga en mayúsculas */
+}
+
+/* Contenedor de botones de acción para espaciado */
+.btn-actions a.btn, .btn-actions button.btn {
+    margin: 0 2px;
+}
+
+/* Botón Primario (ej: Guardar Cambios) */
+.btn-primary {
+    background-color: var(--color-principal) !important;
+    border-color: var(--color-principal) !important;
+    color: white !important;
+}
+.btn-primary:hover {
+    background-color: #c94f3a !important; 
+    border-color: #c94f3a !important;
+}
+
+/* Botón de Éxito (ej: Crear Nuevo) */
+.btn-success {
+    background-color: var(--color-exito) !important;
+    border-color: var(--color-exito) !important;
+    color: white !important;
+}
+.btn-success:hover {
+    background-color: #96b251 !important;
+    border-color: #96b251 !important;
+}
+
+/* Botón de Información (ej: Ver Detalles) */
+.btn-info {
+    background-color: var(--color-info) !important;
+    border-color: var(--color-info) !important;
+    color: white !important;
+}
+.btn-info:hover {
+    background-color: #73bcae !important;
+    border-color: #73bcae !important;
+}
+
+/* Botón de Advertencia (ej: Editar) */
+.btn-warning {
+    background-color: var(--color-acento) !important;
+    border-color: var(--color-acento) !important;
+    color: #333 !important; /* Texto oscuro para buena legibilidad en fondo amarillo */
+}
+.btn-warning:hover {
+    background-color: #e0ac5b !important;
+    border-color: #e0ac5b !important;
+}
+
+/* Botón de Peligro (ej: Eliminar) */
+.btn-danger {
+    background-color: var(--color-secundario) !important;
+    border-color: var(--color-secundario) !important;
+    color: white !important;
+}
+.btn-danger:hover {
+    background-color: #e56e45 !important;
+    border-color: #e56e45 !important;
+}
+
+/* Botón Secundario (ej: Cancelar, Volver) */
+.btn-secondary, .btn-default {
+    background-color: var(--color-gris-neutro) !important;
+    border-color: var(--color-gris-neutro) !important;
+    color: white !important;
+}
+.btn-secondary:hover, .btn-default:hover {
+    background-color: #5a6268 !important;
+    border-color: #5a6268 !important;
+}
+
+
+/* 
+ * =================================================================
+ * ===== 5. ESTILOS PARA TABLAS - VERSIÓN PARA COLUMNAS FIJAS    =====
+ * =================================================================
+*/
+
+/*
+ * CORRECCIÓN CLAVE:
+ * Añadimos selectores adicionales para apuntar a los encabezados "clonados"
+ * que crean las librerías de JavaScript (como DataTables) para las
+ * cabeceras y columnas fijas.
+*/
+.table > thead > tr > th,                                     /* Selector original para tablas estándar */
+.dataTables_scrollHead .dataTables_scrollHeadInner table.dataTable thead th, /* Para cabecera fija de DataTables */
+.DTFC_RightWrapper table.dataTable thead th,                  /* Para columna derecha fija (versiones antiguas de DT) */
+.dtfc-right-clone table.dataTable thead th                    /* Para columna derecha fija (versiones nuevas de DT) */
+{
+    background-color: var(--color-principal) !important; /* Usamos !important por si la librería añade estilos en línea */
+    color: white;
+    font-weight: 600;
+    border-color: var(--color-principal); /* Asegura que los bordes también coincidan */
+    vertical-align: middle;
+}
+
+/* Opcional: Mejorar el aspecto de las filas de la tabla (sin cambios) */
+.table-striped > tbody > tr:nth-of-type(odd) {
+    background-color: #f9f9f9;
+}
+
+.table-hover > tbody > tr:hover {
+    background-color: var(--color-fondo-suave);
+}
+
+
+/* 
+ * =================================================================
+ * ===== 6. ESTILOS PARA LA PÁGINA DE BIENVENIDA (CORREGIDO)   =====
+ * =================================================================
+*/
+
+/* Contenedor para centrar la imagen de bienvenida */
+.welcome-image-container {
+    display: flex;
+    justify-content: center; /* Centra horizontalmente */
+    align-items: center;     /* Centra verticalmente */
+    padding: 20px 0;         /* Añade un poco de espacio arriba y abajo */
+}
+
+/* Estilos de la imagen de bienvenida */
+.welcome-image {
+    /* === LA CORRECCIÓN ESTÁ AQUÍ === */
+
+    /* Limitamos el ancho MÁXIMO al 50% de su contenedor */
+    max-width: 50%;
+
+    /* Y TAMBIÉN limitamos la altura MÁXIMA al 65% de la altura de la ventana */
+    max-height: 65vh; /* vh = Viewport Height */
+
+    /* Estas propiedades aseguran que la imagen escale correctamente sin deformarse */
+    height: auto;
+    width: auto;
+    
+    /* Estilos decorativos 
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);*/
+}
+
+/* Ajuste para pantallas más pequeñas (móviles) */
+@media (max-width: 768px) {
+    .welcome-image {
+        max-width: 85%; /* En pantallas pequeñas, permitimos que la imagen sea más ancha */
+        /* La regla de 'max-height: 65vh' se sigue aplicando aquí, lo cual es perfecto. */
+    }
+}
+
+
+
+
+/* 
+ * =================================================================
+ * ===== 7. CORRECCIÓN DE ALTURA Y RESPONSIVO DEL SIDEBAR (COMPLETO) =====
+ * =================================================================
+*/
+
+/*
+ * Primero, hacemos que el sidebar SIEMPRE ocupe toda la altura
+ * tanto en vista de escritorio (.nav-md) como en responsivo (.nav-sm).
+ * Usamos position: fixed para "pegarlo" al borde de la ventana.
+*/
+.nav-md .container.body .col-md-3.left_col,
+.nav-sm .container.body .col-md-3.left_col {
+    position: fixed; /* Fija el elemento a la ventana del navegador */
+    top: 0;          /* Lo pega a la parte superior */
+    bottom: 0;       /* Lo estira hasta la parte inferior */
+    overflow-y: auto;/* Añade scroll si el menú es muy largo para la pantalla */
+}
+
+
+/*
+ * Segundo, ajustamos el margen del contenido principal (.right_col)
+ * para cada una de las vistas, ya que el sidebar tiene anchos diferentes.
+*/
+
+/* --- Para VISTA DE ESCRITORIO (.nav-md) --- */
+.nav-md .right_col {
+    margin-left: 230px; /* Ancho estándar del sidebar en modo escritorio */
+}
+
+/* --- Para VISTA RESPONSIVA (.nav-sm) --- */
+.nav-sm .right_col {
+    margin-left: 70px;  /* Ancho estándar del sidebar colapsado */
+}
+.nav-sm .left_col {
+    overflow: visible !important;
+}
+
+/*
+ * NOTA IMPORTANTE:
+ * En modo responsivo (.nav-sm), Gentelella usualmente muestra una barra de navegación superior.
+ * Si en tu diseño el contenido queda oculto debajo de esa barra superior,
+ * descomenta la siguiente regla para añadir un relleno superior al contenido.
+*/
+/*
+.nav-sm .main_container .top_nav {
+    position: fixed;
+    width: calc(100% - 70px);
+    left: 70px;
+    z-index: 999;
+}
+.nav-sm .right_col {
+    padding-top: 57px;
+}
+*/
+
+

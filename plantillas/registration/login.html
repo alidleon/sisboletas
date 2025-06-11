@@ -1,82 +1,45 @@
-{% extends 'base_auth.html' %} {# Extiende la nueva base de autenticación #}
+{% extends 'base_auth.html' %}
 {% load static %}
 
-{% block page_title %}Iniciar Sesión - Sistema de Boletas{% endblock %}
+{% block page_title %}Acceso al Sistema{% endblock %}
 
-{% block auth_form_content %}
-    <form method="post" action="{% url 'login' %}">
-        {% csrf_token %}
-        <h1>Iniciar Sesión</h1>
-        
-        {# Mostrar errores generales del formulario de login (ej. credenciales incorrectas) #}
-        {% if form.non_field_errors %}
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                {% for error in form.non_field_errors %}
-                    {{ error }}
-                {% endfor %}
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">×</span>
-                </button>
-            </div>
-        {% elif form.errors and not form.non_field_errors %}
-             <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                Por favor, corrija los errores en los campos.
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">×</span>
-                </button>
-            </div>
-        {% endif %}
+{% block auth_content %}
+  <!-- El escudo va fuera del formulario, como el logo principal -->
+  <img src="{% static 'img/ESCUDO TEXTO BLANCO.png' %}" alt="Escudo de Potosí" class="logo">
+  
+  <!-- Comienza el formulario -->
+  <form method="post" action="{% url 'login' %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next|default:'' }}">
 
-        {# Mensaje si el usuario fue redirigido aquí por intentar acceder a una página protegida #}
-        {% if next %}
-            {% if user.is_authenticated %}
-                {# Esto no debería pasar en la página de login si ya está autenticado y es redirigido,
-                   pero lo mantenemos por si acaso. #}
-                <p class="alert alert-warning">Tu cuenta no tiene acceso a la página solicitada.
-                Para proceder, por favor inicie sesión con una cuenta que tenga acceso.</p>
-            {% else %}
-                <p class="alert alert-info">Por favor, inicie sesión para acceder a la página solicitada.</p>
-            {% endif %}
-        {% endif %}
-
-        {# Campo Username #}
-        <div class="form-group">
-            {# Si usas el form de Django directamente: {{ form.username.label_tag }} {{ form.username }} #}
-            {# O manualmente para más control del HTML: #}
-            <input type="text" name="username" id="id_username" class="form-control" placeholder="Nombre de Usuario" required autofocus />
-            {% for error in form.username.errors %}
-                <div class="text-danger" style="font-size: 0.875em;">{{ error }}</div>
+    <!-- Manejo de Errores -->
+    {% if form.non_field_errors %}
+        <div class="error-message">
+            {% for error in form.non_field_errors %}
+                {{ error }}
             {% endfor %}
         </div>
+    {% endif %}
 
-        {# Campo Contraseña #}
-        <div class="form-group">
-            <input type="password" name="password" id="id_password" class="form-control" placeholder="Contraseña" required />
-            {% for error in form.password.errors %}
-                <div class="text-danger" style="font-size: 0.875em;">{{ error }}</div>
-            {% endfor %}
-        </div>
-        
-        <div>
-            <button class="btn btn-primary submit" type="submit">Ingresar</button>
-            {# Opcional: Enlace para "¿Olvidó su contraseña?" #}
-            {# <a class="reset_pass" href="#">¿Olvidó su contraseña?</a> #}
-        </div>
+    <!-- Campos del Formulario -->
+    <div class="form-group">
+      <input type="text" name="username" id="id_username" class="form-control" placeholder="USUARIO" required autofocus>
+    </div>
+    
+    <div class="form-group">
+      <input type="password" name="password" id="id_password" class="form-control" placeholder="CONTRASEÑA" required>
+    </div>
+    
+    <!-- Botón de Envío -->
+    <button type="submit" class="btn-submit">INGRESAR</button>
+    
+    <!-- Opciones Adicionales -->
+    <div class="options">
+      <label class="remember-me">
+        <input type="checkbox" name="remember"> Mantener sesión iniciada
+      </label> 
 
-        <div class="clearfix"></div>
-
-        <div class="separator">
-            <p class="change_link">¿Nuevo en el sitio?
-                <a href="#signup" class="to_register"> Crear Cuenta </a> {# Si tienes página de registro #}
-            </p>
-            <div class="clearfix"></div>
-            <br />
-            <div>
-                <h1><i class="fa fa-money"></i> Sistema de Boletas</h1>
-                <p>©{% now "Y" %} Todos los derechos reservados. Alid</p>
-            </div>
-        </div>
-        {# Campo oculto 'next' para redirigir después del login si es necesario #}
-        <input type="hidden" name="next" value="{{ next|default:'' }}">
-    </form>
+    </div>
+  </form>
+  
 {% endblock %}

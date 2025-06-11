@@ -178,6 +178,8 @@ class EditarDetalleSueldoForm(forms.ModelForm):
             'dias_trab',
             'haber_basico',
             'categoria',
+            'lactancia_prenatal', 
+            'otros_ingresos',
             'total_ganado', # Podría ser readonly si se calcula
             'rc_iva_retenido',
             'gestora_publica',
@@ -188,12 +190,16 @@ class EditarDetalleSueldoForm(forms.ModelForm):
             'otros_descuentos',
             'total_descuentos', # Podría ser readonly si se calcula
             'liquido_pagable',  # Podría ser readonly si se calcula
+            'saldo_credito_fiscal',
         ]
         widgets = {
             # Aplicar clases y step para mejor UI (similar a reportes)
             'dias_trab': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control form-control-sm'}),
             'haber_basico': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control form-control-sm'}),
             'categoria': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control form-control-sm'}),
+            'lactancia_prenatal': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control form-control-sm', 'placeholder': '0.00'}),
+            'otros_ingresos': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control form-control-sm', 'placeholder': '0.00'}),
+            'saldo_credito_fiscal': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control form-control-sm', 'placeholder': '0.00'}),
             'total_ganado': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control form-control-sm', 'readonly':'readonly'}), # Ejemplo readonly
             'rc_iva_retenido': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control form-control-sm'}),
             'gestora_publica': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control form-control-sm'}),
@@ -205,31 +211,28 @@ class EditarDetalleSueldoForm(forms.ModelForm):
             'total_descuentos': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control form-control-sm', 'readonly':'readonly'}), # Ejemplo readonly
             'liquido_pagable': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control form-control-sm', 'readonly':'readonly'}), # Ejemplo readonly
         }
-        labels = {
-            # Puedes personalizar etiquetas si quieres que sean diferentes al verbose_name del modelo
-            'dias_trab': 'Días Trabajados',
-            'rc_iva_retenido': 'RC-IVA',
-            'gestora_publica': 'AFP/Gestora',
-            'aporte_nac_solidario': 'Ap. Solidario',
-            # ... otras etiquetas personalizadas ...
-        }
+        
 
     # Opcional: Método clean para convertir vacíos a 0 (similar a DetalleAsistenciaForm)
     def clean(self):
+        """
+        Asegura que los campos numéricos vacíos se guarden como 0 en lugar de NULL
+        para mantener la integridad de la base de datos.
+        """
         cleaned_data = super().clean()
-        campos_numericos = self.Meta.fields # Tomar todos los campos definidos
-        for field_name in campos_numericos:
+        for field_name in self.Meta.fields:
             valor = cleaned_data.get(field_name)
-            if valor is None or (isinstance(valor, str) and not valor.strip()):
-                 # Asignar Decimal(0) si el campo es DecimalField en el modelo
-                 try:
-                     model_field = self.instance._meta.get_field(field_name)
-                     if isinstance(model_field, models.DecimalField):
-                         cleaned_data[field_name] = Decimal('0.00')
-                     elif isinstance(model_field, models.IntegerField): # Por si añades IntegerFields editables
-                         cleaned_data[field_name] = 0
-                 except Exception: # Si el campo no existe o hay error
-                     pass # Ignorar si no se puede determinar el tipo
+            if valor is None:
+                try:
+                    model_field = self.instance._meta.get_field(field_name)
+                    if isinstance(model_field, models.DecimalField):
+                        cleaned_data[field_name] = Decimal('0.00')
+                    elif isinstance(model_field, (models.IntegerField, models.FloatField)):
+                        cleaned_data[field_name] = 0
+                except (AttributeError, KeyError):
+                    # Ignora si el campo no se encuentra o hay otro problema,
+                    # dejando que las validaciones estándar de Django actúen.
+                    pass
         return cleaned_data
 
     # Podrías añadir validaciones clean_<campo> si necesitas lógica específica

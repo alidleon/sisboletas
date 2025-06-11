@@ -114,7 +114,7 @@ class DetalleSueldo(models.Model):
     # --- Datos Numéricos (Nombres similares al Excel) ---
     # Columna G
     dias_trab = models.DecimalField(
-        max_digits=5, decimal_places=2, default=Decimal('0.00'), verbose_name="Días Trab.",
+        max_digits=5, decimal_places=2, default=Decimal('0.00'), verbose_name="DIAS TRAB.",
         help_text="Columna G del Excel"
     )
     # Columna H
@@ -124,47 +124,63 @@ class DetalleSueldo(models.Model):
     )
     # Columna I
     categoria = models.DecimalField( # Nombre directo del Excel
-        max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="CATEGORIA",
+        max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="CATEGORIA",
         help_text="Columna I del Excel (¿Bono Antigüedad?)"
+    )
+    lactancia_prenatal = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="LACTANCIA PRENATAL",
+        help_text="Bono de lactancia o prenatal. No proviene del Excel."
+    )
+    otros_ingresos = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="OTROS INGRESOS",
+        help_text="Otros ingresos adicionales no contemplados en el Excel."
     )
     # Columna J
     total_ganado = models.DecimalField( # Nombre directo del Excel
         max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="TOTAL GANADO",
         help_text="Columna J del Excel"
     )
+    saldo_credito_fiscal = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="SALDO CREDITO FISCAL.",
+        help_text="Columna T Saldo RC-IVA."
+    )
     # Columna K
     rc_iva_retenido = models.DecimalField( # Nombre un poco más descriptivo
-        max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="RC-IVA Retenido",
+        max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="RC-IVA RETENIDO",
         help_text="Columna K del Excel"
     )
     # Columna L
     gestora_publica = models.DecimalField( # Nombre directo del Excel
-        max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="GESTORA PUBLICA",
+        max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="GESTORA PUBLICA",
         help_text="Columna L del Excel (¿Aporte AFP?)"
     )
     # Columna M
     aporte_nac_solidario = models.DecimalField( # Nombre directo del Excel
-        max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="Aporte Nac. Solidario",
+        max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="APORTE SOLIDARIO NAL.",
         help_text="Columna M del Excel"
     )
     # Columna N
     cooperativa = models.DecimalField( # Nombre directo del Excel
-        max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="Cooperativa",
+        max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="COOPERATIVA",
         help_text="Columna N del Excel"
     )
     # Columna O
     faltas = models.DecimalField( # Nombre directo del Excel
-        max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="Faltas",
+        max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="FALTAS",
         help_text="Columna O del Excel (Monto de descuento)"
     )
     # Columna P
     memorandums = models.DecimalField( # Nombre directo del Excel
-        max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="Memorandums",
+        max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="MEMORANDUMS",
         help_text="Columna P del Excel (Monto de descuento)"
+    )
+    sanciones = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="SANCIONES",
+        help_text="Monto de descuento por sanciones (típico de planillas de contrato)"
     )
     # Columna Q
     otros_descuentos = models.DecimalField( # Nombre directo del Excel
-        max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="Otros Descuentos",
+        max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="OTROS DESCUENTOS",
         help_text="Columna Q del Excel"
     )
     # Columna R
@@ -233,7 +249,7 @@ class DetalleSueldo(models.Model):
             'dias_trab', 'haber_basico', 'categoria', 'total_ganado',
             'rc_iva_retenido', 'gestora_publica', 'aporte_nac_solidario',
             'cooperativa', 'faltas', 'memorandums', 'otros_descuentos',
-            'total_descuentos',
+            'total_descuentos', 'lactancia_prenatal', 'otros_ingresos', 'saldo_credito_fiscal',
             # 'liquido_pagable' # Podría ser negativo
         ]
         for campo in campos_no_negativos:

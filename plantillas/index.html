@@ -1,12 +1,37 @@
 {% extends 'index_master.html' %}
+{% load static %}
+
+{% block title_suffix %}
+    Página de Inicio
+{% endblock %}
 
 {% block content %}
+    <!-- Contenido específico de la página de inicio -->
+    <div class="right_col" role="main">
+        <div class="">
+            <div class="page-title">
+                <div class="title_left">
+                    <h3>SISTEMA DE BOLETAS</h3>
+                </div>
+            </div>
 
-    <!-- page content -->
-        <div class="right_col" role="main">
-            <h1>GADP</h1>
-          
-          
+            <div class="clearfix"></div>
+
+            <div class="row">
+                <div class="col-md-12 col-sm-12">
+                    <div class="x_panel">
+                        <div class="x_title">
+                            <h2>Bienvenido al Sistema de Boletas</h2>
+                            <div class="clearfix"></div>
+                        </div>
+                        <div class="x_content">
+                            <div class="welcome-image-container">
+                                <img src="{% static 'img/ESCUDO TEXTO NEGRO.png' %}" alt="Bienvenido al Sistema - Gobernación de Potosí" class="welcome-image">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <!-- /page content -->
+    </div>
 {% endblock %}
