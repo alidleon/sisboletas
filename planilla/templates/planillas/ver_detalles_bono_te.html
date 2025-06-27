@@ -83,7 +83,7 @@
                            {% else %}
                                title="Exportar Vista Actual a Excel"
                            {% endif %}>
-                            <i class="fa fa-download"></i> Exportar
+                            <i class="fa fa-file-excel-o"></i> Exportar Excel
                         </a>
                         {% endif %}
 
@@ -193,7 +193,7 @@
                                 <td class="sticky-col sticky-col-last text-nowrap">
                                     {% if planilla.estado == 'borrador' or planilla.estado == 'pendiente' %} {# O los estados que permitan edición #}
                                         {% if perms.planilla.change_detallebonote or user.is_superuser %}
-                                        <a href="{% url 'editar_bono_te' detalle_obj.id %}?secretaria={{ request.GET.secretaria|default:'' }}&unidad={{ request.GET.unidad|default:'' }}&q={{ request.GET.q|default:'' }}{% if request.GET.page %}&page={{ request.GET.page }}{% endif %}" class="btn btn-sm btn-primary" title="Editar Detalle Bono"><i class="fa fa-pencil"></i></a>
+                                        <a href="{% url 'editar_bono_te' detalle_obj.id %}?secretaria={{ request.GET.secretaria|default:'' }}&unidad={{ request.GET.unidad|default:'' }}&q={{ request.GET.q|default:'' }}{% if request.GET.page %}&page={{ request.GET.page }}{% endif %}" class="btn btn-sm btn-primary" title="Ver/Editar Bono Te"><i class="fa fa-pencil"></i></a>
                                         {% endif %}
                                         {% if perms.planilla.delete_detallebonote or user.is_superuser %}
                                         <a href="{% url 'borrar_bono_te' detalle_obj.id %}" class="btn btn-sm btn-danger" title="Borrar Detalle Bono" onclick="return confirm('¿Está seguro que desea borrar este detalle de bono para {{ detalle_obj.nombre_completo_externo|default:detalle_obj.ci_externo|escapejs }}? Esta acción no se puede deshacer.');">

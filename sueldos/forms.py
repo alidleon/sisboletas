@@ -4,9 +4,11 @@ from django import forms
 from .models import PlanillaSueldo # Importar el modelo de cabecera
 from django.core.exceptions import ValidationError
 import os
-from .models import DetalleSueldo
+from .models import DetalleSueldo, CierreMensual
 from decimal import Decimal
 from django.db import models
+from django.urls import reverse
+from django.db.models import Q
 
 class CrearPlanillaSueldoForm(forms.Form):
     # --- Campos Visibles para el Usuario ---
@@ -237,8 +239,75 @@ class EditarDetalleSueldoForm(forms.ModelForm):
 
     # Podrías añadir validaciones clean_<campo> si necesitas lógica específica
 
-class GenerarEstadoMensualForm(forms.Form):
-    mes = forms.IntegerField(label="Mes a Procesar", min_value=1, max_value=12, required=True, widget=forms.NumberInput(attrs={'class': 'form-control form-control-sm'}))
-    anio = forms.IntegerField(label="Año a Procesar", min_value=2000, max_value=2100, required=True, widget=forms.NumberInput(attrs={'class': 'form-control form-control-sm'}))
-    tipo_planilla = forms.ChoiceField(label="Tipo de Planilla", choices=PlanillaSueldo.TIPO_CHOICES, required=True, widget=forms.Select(attrs={'class': 'form-select form-select-sm'}))
-    # Podríamos añadir un checkbox tipo "Sobreescribir si ya existe?"
+#class GenerarEstadoMensualForm(forms.Form):
+#    mes = forms.IntegerField(label="Mes a Procesar", min_value=1, max_value=12, required=True, widget=forms.NumberInput(attrs={'class': 'form-control form-control-sm'}))
+#    anio = forms.IntegerField(label="Año a Procesar", min_value=2000, max_value=2100, required=True, widget=forms.NumberInput(attrs={'class': 'form-control form-control-sm'}))
+#    tipo_planilla = forms.ChoiceField(label="Tipo de Planilla", choices=PlanillaSueldo.TIPO_CHOICES, required=True, widget=forms.Select(attrs={'class': 'form-select form-select-sm'}))
+class SeleccionarPlanillaSueldoParaCierreForm(forms.Form):
+    """
+    Formulario para seleccionar una Planilla de Sueldos existente como base
+    para generar el estado mensual.
+    """
+    planilla_sueldo = forms.ModelChoiceField(
+        # El queryset ahora es dinámico, por lo que lo inicializamos vacío.
+        # Lo poblaremos en el método __init__.
+        queryset=PlanillaSueldo.objects.none(), 
+        
+        label="Seleccionar Planilla de Sueldos Base",
+        empty_label="-- Elija una planilla de sueldos --",
+        help_text="Solo se muestran planillas cuyo Excel ha sido cargado o validado y que aún no tienen un cierre mensual generado.",
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # 1. Obtener los periodos (mes, año, tipo) que YA tienen un CierreMensual.
+        #    Usamos values_list para obtener una lista de tuplas, que es muy eficiente.
+        periodos_con_cierre = CierreMensual.objects.values_list('anio', 'mes', 'tipo_planilla')
+
+        # 2. Construimos una lista de condiciones de exclusión con Q objects.
+        #    Cada Q object representa un periodo a excluir.
+        #    Ej: Q(anio=2024, mes=5, tipo='planta')
+        condiciones_exclusion = [
+            Q(anio=anio, mes=mes, tipo=tipo) for anio, mes, tipo in periodos_con_cierre
+        ]
+
+        # 3. Filtramos el queryset base de PlanillaSueldo.
+        queryset_base = PlanillaSueldo.objects.filter(
+            estado__in=['cargado', 'validado']
+        )
+
+        # 4. Si hay condiciones de exclusión, las aplicamos.
+        #    Usamos el operador | (OR) para combinar todas las condiciones de exclusión.
+        if condiciones_exclusion:
+            # Construimos una única consulta Q gigante con OR
+            query_exclusion_total = condiciones_exclusion[0]
+            for condicion in condiciones_exclusion[1:]:
+                query_exclusion_total |= condicion
+            
+            # Excluimos las planillas que coincidan con CUALQUIERA de los periodos ya cerrados.
+            queryset_filtrado = queryset_base.exclude(query_exclusion_total)
+        else:
+            # Si no hay cierres, no hay nada que excluir.
+            queryset_filtrado = queryset_base
+
+        # 5. Asignamos el queryset final y ordenado al campo del formulario.
+        self.fields['planilla_sueldo'].queryset = queryset_filtrado.order_by('-anio', '-mes', 'tipo')
+
+        # 6. La personalización de la etiqueta se mantiene igual.
+        self.fields['planilla_sueldo'].label_from_instance = lambda obj: (
+            f"{obj.mes}/{obj.anio} - {obj.get_tipo_display()} "
+            f"(Estado: {obj.get_estado_display()})"
+        )
+
+    # El método clean_planilla_sueldo ya no es estrictamente necesario para esta validación,
+    # porque el queryset ya no contiene las opciones problemáticas.
+    # Sin embargo, lo dejamos como una segunda capa de seguridad contra 'race conditions'
+    # (si alguien genera un cierre mientras este formulario está abierto).
+    def clean_planilla_sueldo(self):
+        planilla_seleccionada = self.cleaned_data.get('planilla_sueldo')
+        if planilla_seleccionada:
+            if CierreMensual.objects.filter(mes=planilla_seleccionada.mes, anio=planilla_seleccionada.anio, tipo_planilla=planilla_seleccionada.tipo).exists():
+                raise forms.ValidationError("Este periodo ya ha sido procesado. Por favor, recargue la página y seleccione otra planilla.")
+        return planilla_seleccionada

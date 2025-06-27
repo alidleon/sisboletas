@@ -23,6 +23,69 @@
         <div class="clearfix"></div>
 
         <div class="row">
+            <div class="col-md-12 col-sm-12">
+                <div class="x_panel">
+                    <div class="x_title">
+                        <h2><i class="fa fa-filter"></i> Filtros de Búsqueda</h2>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="x_content">
+                        <form method="get" action="{% url 'lista_planillas_sueldo' %}" class="form-horizontal">
+                            <div class="row">
+                                <!-- Campo Año -->
+                                <div class="col-md-3 col-sm-6 form-group">
+                                    <label for="filtro_anio" class="col-form-label">Año:</label>
+                                    <input type="number" name="anio" id="filtro_anio" class="form-control" 
+                                           placeholder="Ej: 2024" value="{{ valores_filtro.anio }}">
+                                </div>
+
+                                <!-- Campo Mes -->
+                                <div class="col-md-3 col-sm-6 form-group">
+                                    <label for="filtro_mes" class="col-form-label">Mes:</label>
+                                    <input type="number" name="mes" id="filtro_mes" class="form-control"
+                                           placeholder="Ej: 5" value="{{ valores_filtro.mes }}">
+                                </div>
+
+                                <!-- Campo Estado -->
+                                <div class="col-md-3 col-sm-6 form-group">
+                                    <label for="filtro_estado" class="col-form-label">Estado:</label>
+                                    <select name="estado" id="filtro_estado" class="form-control">
+                                        <option value="">-- Todos --</option>
+                                        {% for valor, texto in estados_disponibles %}
+                                            <option value="{{ valor }}" {% if valores_filtro.estado == valor %}selected{% endif %}>
+                                                {{ texto }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <!-- Campo Tipo de Planilla -->
+                                <div class="col-md-3 col-sm-6 form-group">
+                                    <label for="filtro_tipo" class="col-form-label">Tipo de Planilla:</label>
+                                    <select name="tipo" id="filtro_tipo" class="form-control">
+                                        <option value="">-- Todos --</option>
+                                        {% for valor, texto in tipos_disponibles %}
+                                            <option value="{{ valor }}" {% if valores_filtro.tipo == valor %}selected{% endif %}>
+                                                {{ texto }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="ln_solid my-2"></div>
+                            <div class="form-group row">
+                                <div class="col-md-9">
+                                    <button type="submit" class="btn btn-success"><i class="fa fa-search"></i> Filtrar</button>
+                                    <a href="{% url 'lista_planillas_sueldo' %}" class="btn btn-warning"><i class="fa fa-eraser"></i> Limpiar</a>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
             <div class="col-md-12 col-sm-12 ">
                 <div class="x_panel">
                     <div class="x_title">

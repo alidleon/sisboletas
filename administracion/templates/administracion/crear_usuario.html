@@ -5,15 +5,14 @@
 
 {% block extra_css %}
 <style>
-    /* Para asegurar que el botón del ojo esté bien alineado y tenga cursor pointer */
+    /* Estilos para el botón de mostrar/ocultar contraseña (sin cambios) */
     .input-group-append .btn {
-        border-left-width: 0; /* Evita doble borde si el input tiene borde */
+        border-left-width: 0;
         cursor: pointer;
     }
     .input-group-append .btn:hover {
-        background-color: #e9ecef; /* Un ligero hover para el botón */
+        background-color: #e9ecef;
     }
-    /* Ajuste para que el icono del ojo no se sienta tan pegado al borde del botón */
     .input-group-append .btn i {
         margin-left: 2px;
         margin-right: 2px;
@@ -30,32 +29,15 @@
     </div>
     <div class="clearfix"></div>
 
-    {# Mensajes de Django (éxito, error, etc.) #}
-    {% if messages %}
-        <div class="row">
-            <div class="col-md-12 col-sm-12">
-                {% for message in messages %}
-                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                        <span aria-hidden="true">×</span>
-                    </button>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    {% endif %}
-
     <div class="row">
         <div class="col-md-12 col-sm-12">
             <div class="x_panel">
                 <div class="x_title">
                     <h2>Datos del Nuevo Usuario</h2>
-                    
                     <div class="clearfix"></div>
                 </div>
                 <div class="x_content">
-                    <form method="post" enctype="multipart/form-data" class="form-horizontal form-label-left" novalidate>
+                    <form method="post" enctype="multipart/form-data" novalidate>
                         {% csrf_token %}
 
                         {% if form.non_field_errors %}
@@ -74,140 +56,123 @@
                              </div>
                         {% endif %}
 
-                        <h4>Datos de la Cuenta</h4>
-                        <div class="ln_solid my-2"></div>
-
-                        <div class="form-group row {% if form.username.errors %}bad{% endif %}">
-                            <label class="col-form-label col-md-3 col-sm-3 label-align text-md-right" for="{{ form.username.id_for_label }}">
-                                {{ form.username.label }} {% if form.username.field.required %}<span class="required">*</span>{% endif %}:
-                            </label>
-                            <div class="col-md-6 col-sm-9">
-                                {{ form.username }}
-                                {% for error in form.username.errors %}<div class="text-danger" style="font-size: 0.875em;">{{ error }}</div>{% endfor %}
-                                {% if form.username.help_text %}<small class="form-text text-muted">{{ form.username.help_text }}</small>{% endif %}
-                            </div>
-                        </div>
-
-                        <div class="form-group row {% if form.email.errors %}bad{% endif %}">
-                            <label class="col-form-label col-md-3 col-sm-3 label-align text-md-right" for="{{ form.email.id_for_label }}">
-                                {{ form.email.label }} {% if form.email.field.required %}<span class="required">*</span>{% endif %}:
-                            </label>
-                            <div class="col-md-6 col-sm-9">
-                                {{ form.email }}
-                                {% for error in form.email.errors %}<div class="text-danger" style="font-size: 0.875em;">{{ error }}</div>{% endfor %}
-                                {% if form.email.help_text %}<small class="form-text text-muted">{{ form.email.help_text }}</small>{% endif %}
-                            </div>
-                        </div>
-                        
-                        {# Contraseña (password1) con botón para mostrar/ocultar #}
-                        <div class="form-group row {% if form.password1.errors %}bad{% endif %}">
-                            <label class="col-form-label col-md-3 col-sm-3 label-align text-md-right" for="{{ form.password1.id_for_label }}">
-                                {{ form.password1.label }} {% if form.password1.field.required %}<span class="required">*</span>{% endif %}:
-                            </label>
-                            <div class="col-md-6 col-sm-9">
-                                <div class="input-group">
-                                    {{ form.password1 }}
-                                    <div class="input-group-append">
-                                        <button class="btn btn-outline-secondary" type="button" id="togglePassword1" title="Mostrar contraseña">
-                                            <i class="fa fa-eye" aria-hidden="true"></i>
-                                        </button>
+                        <!-- ===================== INICIO: ESTRUCTURA DE 2 COLUMNAS ===================== -->
+                        <div class="row">
+                            <!-- === Columna Izquierda: Datos de Cuenta === -->
+                            <div class="col-md-6">
+                                <h4>Datos de la Cuenta</h4>
+                                <div class="ln_solid my-2"></div>
+                                
+                                <div class="form-group row {% if form.username.errors %}bad{% endif %}">
+                                    <label class="col-form-label col-md-4" for="{{ form.username.id_for_label }}">{{ form.username.label }}{% if form.username.field.required %}<span class="required">*</span>{% endif %}:</label>
+                                    <div class="col-md-8">
+                                        {{ form.username }}
+                                        {% for error in form.username.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                                        {% if form.username.help_text %}<small class="form-text text-muted">{{ form.username.help_text }}</small>{% endif %}
                                     </div>
                                 </div>
-                                {% for error in form.password1.errors %}<div class="text-danger mt-1" style="font-size: 0.875em;">{{ error }}</div>{% endfor %}
-                                {% if form.password1.help_text %}<small class="form-text text-muted">{{ form.password1.help_text|safe }}</small>{% endif %}
-                            </div>
-                        </div>
 
-                        {# Confirmar Contraseña (password2) con botón para mostrar/ocultar #}
-                        <div class="form-group row {% if form.password2.errors %}bad{% endif %}">
-                            <label class="col-form-label col-md-3 col-sm-3 label-align text-md-right" for="{{ form.password2.id_for_label }}">
-                                {{ form.password2.label }} {% if form.password2.field.required %}<span class="required">*</span>{% endif %}:
-                            </label>
-                            <div class="col-md-6 col-sm-9">
-                                <div class="input-group">
-                                    {{ form.password2 }}
-                                    <div class="input-group-append">
-                                        <button class="btn btn-outline-secondary" type="button" id="togglePassword2" title="Mostrar contraseña">
-                                            <i class="fa fa-eye" aria-hidden="true"></i>
-                                        </button>
+                                <div class="form-group row {% if form.email.errors %}bad{% endif %}">
+                                    <label class="col-form-label col-md-4" for="{{ form.email.id_for_label }}">{{ form.email.label }}{% if form.email.field.required %}<span class="required">*</span>{% endif %}:</label>
+                                    <div class="col-md-8">
+                                        {{ form.email }}
+                                        {% for error in form.email.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                                        {% if form.email.help_text %}<small class="form-text text-muted">{{ form.email.help_text }}</small>{% endif %}
                                     </div>
                                 </div>
-                                {% for error in form.password2.errors %}<div class="text-danger mt-1" style="font-size: 0.875em;">{{ error }}</div>{% endfor %}
-                                {% if form.password2.help_text %}<small class="form-text text-muted">{{ form.password2.help_text|safe }}</small>{% endif %}
+                                
+                                <div class="form-group row {% if form.password1.errors %}bad{% endif %}">
+                                    <label class="col-form-label col-md-4" for="{{ form.password1.id_for_label }}">{{ form.password1.label }}{% if form.password1.field.required %}<span class="required">*</span>{% endif %}:</label>
+                                    <div class="col-md-8">
+                                        <div class="input-group">
+                                            {{ form.password1 }}
+                                            <div class="input-group-append">
+                                                <button class="btn btn-outline-secondary" type="button" id="togglePassword1" title="Mostrar contraseña"><i class="fa fa-eye"></i></button>
+                                            </div>
+                                        </div>
+                                        {% for error in form.password1.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                                        {% if form.password1.help_text %}<small class="form-text text-muted">{{ form.password1.help_text|safe }}</small>{% endif %}
+                                    </div>
+                                </div>
+
+                                <div class="form-group row {% if form.password2.errors %}bad{% endif %}">
+                                    <label class="col-form-label col-md-4" for="{{ form.password2.id_for_label }}">{{ form.password2.label }}{% if form.password2.field.required %}<span class="required">*</span>{% endif %}:</label>
+                                    <div class="col-md-8">
+                                        <div class="input-group">
+                                            {{ form.password2 }}
+                                            <div class="input-group-append">
+                                                <button class="btn btn-outline-secondary" type="button" id="togglePassword2" title="Mostrar contraseña"><i class="fa fa-eye"></i></button>
+                                            </div>
+                                        </div>
+                                        {% for error in form.password2.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                                        {% if form.password2.help_text %}<small class="form-text text-muted">{{ form.password2.help_text|safe }}</small>{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- === Columna Derecha: Datos Personales === -->
+                            <div class="col-md-6">
+                                <h4>Datos Personales Reales</h4>
+                                <div class="ln_solid my-2"></div>
+
+                                <div class="form-group row {% if form.first_name.errors %}bad{% endif %}">
+                                    <label class="col-form-label col-md-4" for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }}{% if form.first_name.field.required %}<span class="required">*</span>{% endif %}:</label>
+                                    <div class="col-md-8">
+                                        {{ form.first_name }}
+                                        {% for error in form.first_name.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                                    </div>
+                                </div>
+
+                                <div class="form-group row {% if form.last_name.errors %}bad{% endif %}">
+                                    <label class="col-form-label col-md-4" for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }}{% if form.last_name.field.required %}<span class="required">*</span>{% endif %}:</label>
+                                    <div class="col-md-8">
+                                        {{ form.last_name }}
+                                        {% for error in form.last_name.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                                    </div>
+                                </div>
+
+                                <div class="form-group row {% if form.ci.errors %}bad{% endif %}">
+                                    <label class="col-form-label col-md-4" for="{{ form.ci.id_for_label }}">{{ form.ci.label }}{% if form.ci.field.required %}<span class="required">*</span>{% endif %}:</label>
+                                    <div class="col-md-8">
+                                        {{ form.ci }}
+                                        {% for error in form.ci.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                                    </div>
+                                </div>
+
+                                <div class="form-group row {% if form.telefono.errors %}bad{% endif %}">
+                                    <label class="col-form-label col-md-4" for="{{ form.telefono.id_for_label }}">{{ form.telefono.label }}{% if form.telefono.field.required %}<span class="required">*</span>{% endif %}:</label>
+                                    <div class="col-md-8">
+                                        {{ form.telefono }}
+                                        {% for error in form.telefono.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                                    </div>
+                                </div>
+
+                                <div class="form-group row {% if form.foto.errors %}bad{% endif %}">
+                                    <label class="col-form-label col-md-4" for="{{ form.foto.id_for_label }}">{{ form.foto.label }}{% if form.foto.field.required %}<span class="required">*</span>{% endif %}:</label>
+                                    <div class="col-md-8">
+                                        {{ form.foto }}
+                                        {% for error in form.foto.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                                    </div>
+                                </div>
                             </div>
                         </div>
+                        <!-- ====================== FIN: ESTRUCTURA DE 2 COLUMNAS ======================= -->
 
-                        <h4 class="mt-4">Datos Personales Reales</h4>
-                        <div class="ln_solid my-2"></div>
-
-                        <div class="form-group row {% if form.first_name.errors %}bad{% endif %}">
-                            <label class="col-form-label col-md-3 col-sm-3 label-align text-md-right" for="{{ form.first_name.id_for_label }}">
-                                {{ form.first_name.label }} {% if form.first_name.field.required %}<span class="required">*</span>{% endif %}:
-                            </label>
-                            <div class="col-md-6 col-sm-9">
-                                {{ form.first_name }}
-                                {% for error in form.first_name.errors %}<div class="text-danger" style="font-size: 0.875em;">{{ error }}</div>{% endfor %}
-                            </div>
-                        </div>
-
-                        <div class="form-group row {% if form.last_name.errors %}bad{% endif %}">
-                            <label class="col-form-label col-md-3 col-sm-3 label-align text-md-right" for="{{ form.last_name.id_for_label }}">
-                                {{ form.last_name.label }} {% if form.last_name.field.required %}<span class="required">*</span>{% endif %}:
-                            </label>
-                            <div class="col-md-6 col-sm-9">
-                                {{ form.last_name }}
-                                {% for error in form.last_name.errors %}<div class="text-danger" style="font-size: 0.875em;">{{ error }}</div>{% endfor %}
-                            </div>
-                        </div>
-
-                        <div class="form-group row {% if form.ci.errors %}bad{% endif %}">
-                            <label class="col-form-label col-md-3 col-sm-3 label-align text-md-right" for="{{ form.ci.id_for_label }}">
-                                {{ form.ci.label }} {% if form.ci.field.required %}<span class="required">*</span>{% endif %}:
-                            </label>
-                            <div class="col-md-6 col-sm-9">
-                                {{ form.ci }}
-                                {% for error in form.ci.errors %}<div class="text-danger" style="font-size: 0.875em;">{{ error }}</div>{% endfor %}
-                            </div>
-                        </div>
-
-                        <div class="form-group row {% if form.telefono.errors %}bad{% endif %}">
-                            <label class="col-form-label col-md-3 col-sm-3 label-align text-md-right" for="{{ form.telefono.id_for_label }}">
-                                {{ form.telefono.label }} {% if form.telefono.field.required %}<span class="required">*</span>{% endif %}:
-                            </label>
-                            <div class="col-md-6 col-sm-9">
-                                {{ form.telefono }}
-                                {% for error in form.telefono.errors %}<div class="text-danger" style="font-size: 0.875em;">{{ error }}</div>{% endfor %}
-                            </div>
-                        </div>
-
-                        <div class="form-group row {% if form.foto.errors %}bad{% endif %}">
-                            <label class="col-form-label col-md-3 col-sm-3 label-align text-md-right" for="{{ form.foto.id_for_label }}">
-                                {{ form.foto.label }} {% if form.foto.field.required %}<span class="required">*</span>{% endif %}:
-                            </label>
-                            <div class="col-md-6 col-sm-9">
-                                {{ form.foto }}
-                                {# No necesitas mostrar imagen actual en 'crear_usuario', solo en 'editar_usuario' #}
-                                {% for error in form.foto.errors %}<div class="text-danger" style="font-size: 0.875em;">{{ error }}</div>{% endfor %}
-                            </div>
-                        </div>
-                        
+                        <!-- === Sección de Rol (ocupa todo el ancho) === -->
                         <h4 class="mt-4">Rol en el Sistema</h4>
                         <div class="ln_solid my-2"></div>
-
                         <div class="form-group row {% if form.rol.errors %}bad{% endif %}">
-                            <label class="col-form-label col-md-3 col-sm-3 label-align text-md-right" for="{{ form.rol.id_for_label }}">
-                                {{ form.rol.label }} {% if form.rol.field.required %}<span class="required">*</span>{% endif %}:
-                            </label>
-                            <div class="col-md-6 col-sm-9">
+                            <label class="col-form-label col-md-2" for="{{ form.rol.id_for_label }}">{{ form.rol.label }}{% if form.rol.field.required %}<span class="required">*</span>{% endif %}:</label>
+                            <div class="col-md-6">
                                 {{ form.rol }}
-                                {% for error in form.rol.errors %}<div class="text-danger" style="font-size: 0.875em;">{{ error }}</div>{% endfor %}
-                                {% if form.rol.help_text %}<small class="form-text text-muted">{{ form.rol.help_text }}</small>{% endif %}
+                                {% for error in form.rol.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
                             </div>
                         </div>
 
+                        <!-- === Botones de Acción (ocupa todo el ancho) === -->
                         <div class="ln_solid"></div>
                         <div class="form-group row">
-                            <div class="col-md-6 col-sm-9 offset-md-3">
+                            <div class="col-md-6 offset-md-2">
                                 <button type="submit" class="btn btn-success"><i class="fa fa-user-plus"></i> Crear Usuario</button>
                                 <a href="{% url 'lista_usuarios' %}" class="btn btn-secondary"><i class="fa fa-times"></i> Cancelar</a>
                             </div>
@@ -224,21 +189,24 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     function setupPasswordToggle(inputId, buttonId) {
+        // Obtenemos los elementos por su ID
         const passwordInput = document.getElementById(inputId);
         const toggleButton = document.getElementById(buttonId);
-        const toggleIcon = toggleButton.querySelector('i');
 
-        if (!passwordInput || !toggleButton || !toggleIcon) {
-            // console.warn(`Elementos para el toggle de contraseña no encontrados para input: ${inputId}, botón: ${buttonId}`);
+        // Si no encontramos los elementos, salimos para evitar errores
+        if (!passwordInput || !toggleButton) {
+            console.error(`Error: No se encontró el input '${inputId}' o el botón '${buttonId}'.`);
             return;
         }
 
+        const toggleIcon = toggleButton.querySelector('i');
+
         toggleButton.addEventListener('click', function() {
-            // Cambiar el tipo de input
+            // Cambiar el tipo de input entre 'password' y 'text'
             const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
             passwordInput.setAttribute('type', type);
 
-            // Cambiar el ícono y el título del botón
+            // Cambiar el ícono del ojo
             if (type === 'text') {
                 toggleIcon.classList.remove('fa-eye');
                 toggleIcon.classList.add('fa-eye-slash');
@@ -251,42 +219,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Configurar para el campo de contraseña
-    // Usamos {{ form.password1.id_for_label }} que Django genera como el ID del input
-    setupPasswordToggle('{{ form.password1.id_for_label }}', 'togglePassword1');
-
-    // Configurar para el campo de confirmación de contraseña
-    setupPasswordToggle('{{ form.password2.id_for_label }}', 'togglePassword2');
-
-    // Añadir la clase 'form-control' a los inputs si el widget no lo hace por defecto
-    // y si tu CustomUserCreationForm no está personalizando los widgets de contraseña
-    // para añadir la clase. UserCreationForm por defecto no añade 'form-control'.
-    const pwd1 = document.getElementById('{{ form.password1.id_for_label }}');
-    if (pwd1 && !pwd1.classList.contains('form-control')) {
-        pwd1.classList.add('form-control');
-    }
-    const pwd2 = document.getElementById('{{ form.password2.id_for_label }}');
-    if (pwd2 && !pwd2.classList.contains('form-control')) {
-        pwd2.classList.add('form-control');
-    }
-    // Esto también aplica a otros campos de UserCreationForm base como username
-    const usernameInput = document.getElementById('{{ form.username.id_for_label }}');
-    if (usernameInput && !usernameInput.classList.contains('form-control')) {
-        usernameInput.classList.add('form-control');
-    }
-     // ...y para los que tú añades si no lo haces en el form.py
-    const emailInput = document.getElementById('{{ form.email.id_for_label }}');
-    if (emailInput && !emailInput.classList.contains('form-control')) {
-        emailInput.classList.add('form-control');
-    }
-    // etc. para first_name, last_name, ci, telefono... si no tienen la clase ya desde forms.py
-    // Es mejor añadir las clases directamente en la definición del widget en forms.py si es posible.
-
-    // Por ejemplo, para first_name (aunque ya lo tienes con clase form-control por ser CharField simple)
-    // const firstNameInput = document.getElementById('{{ form.first_name.id_for_label }}');
-    // if (firstNameInput && !firstNameInput.classList.contains('form-control')) {
-    //     firstNameInput.classList.add('form-control');
-    // }
+    // Llamamos a la función usando los IDs que Django genera por defecto
+    // para los campos del formulario. Estos son 'id_password1' y 'id_password2'.
+    // Los botones ya tienen los IDs 'togglePassword1' y 'togglePassword2' en nuestro HTML.
+    setupPasswordToggle('id_password1', 'togglePassword1');
+    setupPasswordToggle('id_password2', 'togglePassword2');
 });
 </script>
 {% endblock %}

@@ -4,15 +4,11 @@
 {% block page_title %}Acceso al Sistema{% endblock %}
 
 {% block auth_content %}
-  <!-- El escudo va fuera del formulario, como el logo principal -->
   <img src="{% static 'img/ESCUDO TEXTO BLANCO.png' %}" alt="Escudo de Potosí" class="logo">
   
-  <!-- Comienza el formulario -->
   <form method="post" action="{% url 'login' %}">
     {% csrf_token %}
     <input type="hidden" name="next" value="{{ next|default:'' }}">
-
-    <!-- Manejo de Errores -->
     {% if form.non_field_errors %}
         <div class="error-message">
             {% for error in form.non_field_errors %}
@@ -20,8 +16,6 @@
             {% endfor %}
         </div>
     {% endif %}
-
-    <!-- Campos del Formulario -->
     <div class="form-group">
       <input type="text" name="username" id="id_username" class="form-control" placeholder="USUARIO" required autofocus>
     </div>
@@ -29,11 +23,7 @@
     <div class="form-group">
       <input type="password" name="password" id="id_password" class="form-control" placeholder="CONTRASEÑA" required>
     </div>
-    
-    <!-- Botón de Envío -->
     <button type="submit" class="btn-submit">INGRESAR</button>
-    
-    <!-- Opciones Adicionales -->
     <div class="options">
       <label class="remember-me">
         <input type="checkbox" name="remember"> Mantener sesión iniciada

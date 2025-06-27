@@ -28,15 +28,26 @@ def puede_ver_lista_usuarios(user):
         return False
     return user.is_superuser or user.groups.filter(name='Administradores').exists()
 
-def puede_ver_detalle_usuario(viewer_user, target_user): 
+def puede_ver_detalle_usuario(viewer_user, target_user):
+    # Condición 1: El usuario que mira debe estar autenticado.
     if not viewer_user.is_authenticated:
         return False
+    
+    # Condición 2: Si el usuario está viendo su propio perfil, siempre tiene permiso.
+    if viewer_user.pk == target_user.pk:
+        return True
+    
+    # Condición 3: Si el usuario es superusuario o del grupo Administradores, puede ver cualquier perfil.
     if viewer_user.is_superuser or viewer_user.groups.filter(name='Administradores').exists():
         return True
+    
+    # Si ninguna de las condiciones anteriores se cumple, se deniega el acceso.
     return False
 
 def puede_editar_usuario(editor, usuario_a_editar):
     if not editor.is_authenticated: return False
+    if editor.id == usuario_a_editar.id:
+        return True
     if editor.is_superuser: return True 
     if editor.groups.filter(name='Administradores').exists() and not usuario_a_editar.is_superuser:
         return True
@@ -73,14 +84,11 @@ def crear_usuario_view(request):
                 logger.error(f"Error inesperado en crear_usuario_view al guardar: {e}", exc_info=True)
     else: 
         form = CustomUserCreationForm()
-
     context = {
         'form': form,
         'titulo_vista': "Registrar Nuevo Usuario del Sistema"
     }
     return render(request, 'administracion/crear_usuario.html', context)
-
-
 #---------------------------------------------
 @login_required
 @permission_required('auth.view_user', raise_exception=True)
@@ -91,8 +99,6 @@ def lista_usuarios_view(request):
         'titulo_vista': "Gestión de Usuarios del Sistema"
     }
     return render(request, 'administracion/lista_usuarios.html', context)
-
-
 #------------------------------------------------
 @login_required
 @permission_required('auth.change_user', raise_exception=True)
@@ -227,13 +233,16 @@ def desactivar_usuario_view(request, user_id):
 
 #--------------------------------------------
 @login_required
-@permission_required('auth.view_user', raise_exception=True)
 def ver_detalle_usuario_view(request, user_id):
     usuario_a_ver = get_object_or_404(User, pk=user_id)
 
-    if not puede_ver_detalle_usuario(request.user, usuario_a_ver.id):
-        messages.error(request, "Acceso denegado. No tiene permiso para ver los detalles de este usuario.")
-        return redirect('lista_usuarios')
+    # Llamamos a nuestra función de permisos mejorada
+    if not puede_ver_detalle_usuario(request.user, usuario_a_ver):
+        # Este mensaje es más específico
+        messages.error(request, "No tiene permisos para ver los detalles de este usuario.")
+        # Redirigir a la página de inicio es más amigable que a la lista de usuarios
+        # para un usuario normal que no debería ver esa lista.
+        return redirect('index')
 
     user_profile, created = UserProfile.objects.get_or_create(user=usuario_a_ver)
     if created:
@@ -242,7 +251,7 @@ def ver_detalle_usuario_view(request, user_id):
     grupos_del_usuario = usuario_a_ver.groups.all()
     permiso_para_editar = puede_editar_usuario(request.user, usuario_a_ver)
     permiso_para_eliminar = puede_eliminar_usuario(request.user, usuario_a_ver)
-
+    es_perfil_propio = (request.user.id == usuario_a_ver.id)
     context = {
         'usuario_detalle': usuario_a_ver,
         'perfil_detalle': user_profile,
@@ -250,27 +259,41 @@ def ver_detalle_usuario_view(request, user_id):
         'titulo_vista': f"Detalles del Usuario: {usuario_a_ver.username}",
         'puede_editar_este_usuario': permiso_para_editar,
         'puede_eliminar_este_usuario': permiso_para_eliminar,
+        'es_perfil_propio': es_perfil_propio, # <-- AÑADIMOS LA NUEVA VARIABLE
     }
+    if es_perfil_propio:
+        context['titulo_vista'] = "Mi Perfil"
     return render(request, 'administracion/ver_detalle_usuario.html', context)
 
+
 #----------------------------------------------
+
+@login_required
+def ver_perfil_propio(request):
+    """
+    Muestra la página de perfil del usuario actualmente logueado.
+    Esta vista simplemente redirige a la vista de detalle de usuario
+    existente, pasándole el ID del usuario actual.
+    """
+    # Obtenemos el ID del usuario que ha iniciado sesión
+    usuario_actual_id = request.user.id
+    
+    # Llamamos a la otra vista internamente y devolvemos su respuesta
+    return ver_detalle_usuario_view(request, user_id=usuario_actual_id)
+
+#-------------------------------------------------
 @login_required
 @permission_required('auth.view_group', raise_exception=True)
 def lista_grupos_view(request):
-    
-
     grupos = Group.objects.all().order_by('name')
     context = {
         'grupos': grupos,
         'titulo_vista': "Gestión de Grupos (Roles)"
     }
     return render(request, 'administracion/lista_grupos.html', context)
-
 @login_required
 @permission_required('auth.add_group', raise_exception=True)
 def crear_grupo_view(request):
-    
-
     if request.method == 'POST':
         form = GroupForm(request.POST)
         if form.is_valid():
@@ -282,20 +305,17 @@ def crear_grupo_view(request):
                 messages.error(request, f"Error al crear el grupo: {e}")
     else:
         form = GroupForm()
-
     todos_los_permisos = Permission.objects.all().select_related('content_type').order_by(
         'content_type__app_label', 
         'content_type__model',
         'name'
     )
-
     context = {
         'form': form,
         'titulo_vista': "Crear Nuevo Grupo (Rol)",
         'todos_los_permisos_para_template': todos_los_permisos
     }
     return render(request, 'administracion/form_grupo.html', context)
-
 @login_required
 @permission_required('auth.change_group', raise_exception=True)
 def editar_grupo_view(request, group_id):

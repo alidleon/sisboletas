@@ -124,23 +124,9 @@ EXTERNAL_TYPE_MAP = {
         'contrato': 'CONTRATO',
         'consultor': 'CONSULTOR EN LINEA',
     }
-# planilla/views.py
-
-
-
-
-
-
-
-
 
 logger = logging.getLogger(__name__)
 
-# Ya no se necesita EXTERNAL_TYPE_MAP aquí si el tipo viene de PlanillaAsistencia
-# EXTERNAL_TYPE_MAP = { ... }
-
-# planilla/views.py
-# ... (importaciones como en el mensaje anterior) ...
 
 @login_required
 @permission_required('planilla.add_planilla', raise_exception=True)
@@ -280,34 +266,68 @@ def crear_planilla_bono_te(request):
 @login_required
 @permission_required('planilla.view_planilla', raise_exception=True)
 def lista_planillas(request):
+    """
+    Muestra una lista PAGINADA y FILTRABLE de todas las Planillas de Bono TE.
+    """
     logger.debug(f"Vista lista_planillas (Bono TE) llamada. GET params: {request.GET.urlencode()}")
 
-    # 1. Obtener el queryset completo de planillas, ordenadas
-    planillas_list_completa = Planilla.objects.all().order_by('-anio', '-mes', 'tipo') # Tu orden original
-    
-    # 2. Configurar paginación
-    items_por_pagina = 10 # O el número que prefieras para esta lista
-    paginator = Paginator(planillas_list_completa, items_por_pagina)
-    
+    # 1. Inicializamos 'queryset' con la lista completa
+    queryset = Planilla.objects.all().order_by('-anio', '-mes', 'tipo')
+
+    # 2. Leemos los filtros de la URL
+    filtro_anio = request.GET.get('anio', '').strip()
+    filtro_mes = request.GET.get('mes', '').strip()
+    filtro_tipo = request.GET.get('tipo', '').strip()
+    filtro_estado = request.GET.get('estado', '').strip()
+
+    # 3. Aplicamos los filtros al queryset
+    if filtro_anio:
+        try:
+            queryset = queryset.filter(anio=int(filtro_anio))
+        except (ValueError, TypeError):
+            pass
+
+    if filtro_mes:
+        try:
+            queryset = queryset.filter(mes=int(filtro_mes))
+        except (ValueError, TypeError):
+            pass
+
+    if filtro_tipo:
+        queryset = queryset.filter(tipo=filtro_tipo)
+
+    if filtro_estado:
+        queryset = queryset.filter(estado=filtro_estado)
+
+    # 4. Paginación sobre el queryset ya filtrado
+    items_por_pagina = 10
+    paginator = Paginator(queryset, items_por_pagina)
     page_number_str = request.GET.get('page', '1')
-    logger.debug(f"Número de página solicitado: '{page_number_str}'")
-
+    
     try:
-        page_obj_planillas = paginator.page(page_number_str)
+        page_obj = paginator.page(page_number_str)
     except PageNotAnInteger:
-        logger.warning(f"Número de página inválido ('{page_number_str}'). Mostrando página 1.")
-        page_obj_planillas = paginator.page(1)
+        page_obj = paginator.page(1)
     except EmptyPage:
-        logger.warning(f"Página '{page_number_str}' fuera de rango. Mostrando última página {paginator.num_pages}.")
-        page_obj_planillas = paginator.page(paginator.num_pages)
-
-    logger.info(f"Mostrando página {page_obj_planillas.number} de {paginator.num_pages} para Planillas Bono TE (Total: {paginator.count}).")
-
+        page_obj = paginator.page(paginator.num_pages)
+        
+    logger.info(f"Mostrando página {page_obj.number} de {paginator.num_pages} para Planillas Bono TE (Total filtrado: {paginator.count}).")
+    
+    # 5. Preparamos el querystring para la paginación
+    querystring = request.GET.copy()
+    if 'page' in querystring:
+        del querystring['page']
+        
+    # 6. Creamos el contexto completo
     context = {
-        'page_obj': page_obj_planillas, # <--- CAMBIO: Pasar el objeto Page
-        # 'planillas': planillas, # Ya no se pasa la lista completa directamente
-        'titulo_vista': "Lista de Planillas Bono TE Generadas" # Opcional, si tu base lo usa
+        'page_obj': page_obj,
+        'titulo_vista': "Lista de Planillas Bono TE Generadas",
+        'valores_filtro': request.GET,
+        'querystring': querystring.urlencode(),
+        'tipos_disponibles': Planilla.TIPO_CHOICES,
+        'estados_disponibles': Planilla.ESTADO_CHOICES,
     }
+    
     return render(request, 'planillas/lista_planillas.html', context)
 
 @login_required
@@ -326,20 +346,17 @@ def lista_bono_te(request):
 @login_required
 @permission_required('planilla.change_detallebonote', raise_exception=True)
 def editar_bono_te(request, detalle_id):
-    # Obtener detalle interno
     detalle_bono_te = get_object_or_404(
-        DetalleBonoTe.objects.select_related('id_planilla'), # Solo planilla es interna
+        DetalleBonoTe.objects.select_related('id_planilla'), 
         pk=detalle_id
     )
     planilla = detalle_bono_te.id_planilla
     dias_habiles_planilla = planilla.dias_habiles if planilla else None
-
     # --- Obtener datos externos (BD 'personas_db') ---
     persona_externa = None
     item_externo = 'N/A'
     cargo_externo = 'N/A'
     personal_externo_id = detalle_bono_te.personal_externo_id
-
     if personal_externo_id:
         try:
             persona_externa = PrincipalPersonalExterno.objects.using('personas_db').get(pk=personal_externo_id)
@@ -347,13 +364,11 @@ def editar_bono_te(request, detalle_id):
             logger.warning(f"No se encontró PrincipalPersonalExterno ID {personal_externo_id} en 'personas_db'")
         except Exception as e_pers:
             logger.error(f"Error consultando PrincipalPersonalExterno ID {personal_externo_id}: {e_pers}", exc_info=True)
-
-        # Buscar designación externa (asumiendo estado='ACTIVO')
         try:
             designacion = PrincipalDesignacionExterno.objects.using('personas_db') \
                 .select_related('cargo') \
                 .filter(personal_id=personal_externo_id, estado='ACTIVO') \
-                .order_by('-id').first() # O la lógica original que tuvieras
+                .order_by('-id').first() 
 
             if designacion:
                 item_externo = designacion.item if designacion.item is not None else 'N/A'
@@ -434,61 +449,40 @@ def borrar_bono_te(request, detalle_id):
 @login_required
 @permission_required('planilla.change_planilla', raise_exception=True)
 def editar_planilla(request, planilla_id):
-    # Obtener la instancia de la planilla que se va a editar
     planilla_instancia = get_object_or_404(Planilla, pk=planilla_id)
-
-    # Opcional: Lógica para restringir la edición basada en el estado actual
-    # if planilla_instancia.estado == 'aprobado':
-    #     messages.error(request, "No se puede editar una planilla que ya ha sido aprobada.")
-    #     return redirect('lista_planillas')
-
     if request.method == 'POST':
-        # Crear una instancia del formulario con los datos del POST y la instancia de la planilla
         form = EditarPlanillaForm(request.POST, instance=planilla_instancia)
         if form.is_valid():
             try:
-                # Guardar los cambios en la planilla
                 planilla_editada = form.save(commit=False)
-                
-                # Lógica adicional si la edición de 'dias_habiles' debe recalcular detalles:
-                # Esto es CRUCIAL. Si cambias dias_habiles, los DetalleBonoTe deben recalcularse.
                 if 'dias_habiles' in form.changed_data:
                     logger.info(f"Días hábiles cambiados para Planilla ID {planilla_editada.id}. Se recalcularán los detalles.")
-                    # Necesitas guardar la planilla_editada primero para que los detalles tengan la FK correcta
-                    # y los nuevos días hábiles.
-                    planilla_editada.save() # Guardar cabecera primero
-
+                    planilla_editada.save()
                     detalles_a_recalcular = DetalleBonoTe.objects.filter(id_planilla=planilla_editada)
                     detalles_a_actualizar_bulk = []
                     for detalle in detalles_a_recalcular:
-                        detalle.calcular_valores() # Asume que calcular_valores() usa self.id_planilla.dias_habiles
+                        detalle.calcular_valores()
                         detalles_a_actualizar_bulk.append(detalle)
-                    
                     if detalles_a_actualizar_bulk:
                         campos_calculados = ['dias_no_pagados', 'dias_pagados', 'total_ganado', 'liquido_pagable']
                         DetalleBonoTe.objects.bulk_update(detalles_a_actualizar_bulk, campos_calculados)
                         logger.info(f"Recalculados {len(detalles_a_actualizar_bulk)} detalles para Planilla ID {planilla_editada.id}.")
-                    
-                    form.save_m2m() # Si tuvieras campos ManyToMany
+                    form.save_m2m() 
                 else:
-                    planilla_editada.save() # Guardar si no hubo cambios en dias_habiles que requieran recalcular
+                    planilla_editada.save() 
                     form.save_m2m()
-
                 messages.success(request, f'Planilla "{planilla_editada}" actualizada correctamente.')
-                return redirect('lista_planillas') # O a 'ver_detalles_bono_te' para esta planilla
+                return redirect('lista_planillas')
             except Exception as e:
                 logger.error(f"Error al guardar la planilla editada ID {planilla_instancia.id}: {e}", exc_info=True)
                 messages.error(request, f"Ocurrió un error al guardar los cambios: {e}")
         else:
-            # El formulario no es válido, se re-renderizará con errores
             messages.error(request, 'Por favor, corrige los errores en el formulario.')
-    else: # Método GET
-        # Crear una instancia del formulario con los datos de la planilla existente
+    else: 
         form = EditarPlanillaForm(instance=planilla_instancia)
-
     context = {
         'form': form,
-        'planilla': planilla_instancia, # Pasar la instancia completa para mostrar datos no editables
+        'planilla': planilla_instancia, 
         'titulo_vista': f"Editar Planilla Bono TE: {planilla_instancia.mes}/{planilla_instancia.anio} ({planilla_instancia.get_tipo_display()})"
     }
     return render(request, 'planillas/editar_planilla.html', context)

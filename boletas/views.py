@@ -22,7 +22,8 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.views.decorators.csrf import csrf_exempt # Temporalmente para AJAX fácil, ¡OJO!
 from django.utils.html import escape # Para sanitizar
 from datetime import datetime
-from .utils import numero_a_literal
+from .utils import numero_a_literal, numero_a_literal_con_decimal_y_salto
+ 
 import io
 import json
 import math # <--- AÑADIR ESTA LÍNEA
@@ -446,50 +447,32 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
         locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
     except locale.Error:
         try:
-            locale.setlocale(locale.LC_TIME, 'Spanish') # Alternativa común en Windows
+            locale.setlocale(locale.LC_TIME, 'Spanish')
         except locale.Error:
             logger.warning("Locale para español no encontrado.")
     logger.info(f"Solicitud para generar PDF para PlanillaSueldo ID: {planilla_sueldo_id}")
-
     # --- 1. Obtener Planilla de Sueldos y Detalles ---
     try:
-        # Usamos select_related para optimizar el acceso a usuario_creacion si lo necesitaras
         planilla_sueldo = PlanillaSueldo.objects.select_related('usuario_creacion').get(pk=planilla_sueldo_id)
         logger.debug(f"Planilla de sueldos encontrada: {planilla_sueldo}")
-
-        # Obtener TODOS los detalles de sueldo para esta planilla
-        # Usamos select_related para traer los datos del personal externo en una sola consulta
-        # ¡OJO! Esto solo funciona si la relación ForeignKey está definida correctamente y
-        # la base de datos externa está configurada en settings.py para permitir consultas JOIN.
-        # Si no funciona, quitamos select_related y hacemos consultas individuales después.
-        detalles_sueldo = DetalleSueldo.objects.filter(planilla_sueldo=planilla_sueldo) #.select_related('personal_externo') <--- Quitar si da error cross-database
-
+        detalles_sueldo = DetalleSueldo.objects.filter(planilla_sueldo=planilla_sueldo) 
         if not detalles_sueldo.exists():
             logger.warning(f"No se encontraron detalles de sueldo para la PlanillaSueldo ID: {planilla_sueldo_id}")
             messages.warning(request, f"La planilla de sueldos {planilla_sueldo.mes}/{planilla_sueldo.anio} ({planilla_sueldo.get_tipo_display()}) no tiene empleados cargados.")
-            # Redirigir a la lista de planillas de sueldo (necesitarás esa URL)
-            # return redirect('lista_planillas_sueldo') # Ajusta el nombre de la URL
-            return HttpResponse("No hay detalles para generar.", status=404) # O un error simple
-
+            return HttpResponse("No hay detalles para generar.", status=404) 
         logger.info(f"Encontrados {detalles_sueldo.count()} detalles de sueldo para procesar.")
-
     except PlanillaSueldo.DoesNotExist:
         logger.error(f"PlanillaSueldo con ID={planilla_sueldo_id} no encontrada.")
         raise Http404(f"Planilla de Sueldos no encontrada.")
     except Exception as e:
         logger.error(f"Error obteniendo datos de PlanillaSueldo/DetalleSueldo: {e}", exc_info=True)
         messages.error(request, "Error al obtener los datos de la planilla de sueldos.")
-        # return redirect('lista_planillas_sueldo')
         return HttpResponse("Error interno al obtener datos.", status=500)
-
-
     # --- 2. Obtener la Plantilla de Boleta a Usar ---
     try:
-        # Buscar la plantilla marcada como predeterminada, o la primera si no hay predeterminada
         plantilla_boleta = PlantillaBoleta.objects.filter(es_predeterminada=True).first()
         if not plantilla_boleta:
-            plantilla_boleta = PlantillaBoleta.objects.first() # Fallback a la primera que encuentre
-
+            plantilla_boleta = PlantillaBoleta.objects.first() 
         if not plantilla_boleta:
             logger.error("No se encontró ninguna Plantilla de Boleta en el sistema.")
             messages.error(request, "No hay plantillas de boleta configuradas para generar el PDF.")
@@ -638,7 +621,7 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
             # from num2words import num2words
             monto_liquido = detalle.liquido_pagable or Decimal(0)
             datos_empleado_actual['{{literal_liquido}}'] = numero_a_literal(monto_liquido)
-
+            datos_empleado_actual['{{literal_liquido_extendido}}'] = numero_a_literal_con_decimal_y_salto(monto_liquido)
             try:
                 # Requiere configurar locale en el sistema o usar calendar
                 import calendar
@@ -764,8 +747,6 @@ def obtener_diseno_plantilla_json(request, plantilla_id):
 
 
 @login_required
-# Ajusta el permiso según necesites. Podrías crear uno nuevo como 'boletas.generar_boleta_individual'
-# o usar uno existente si es apropiado, por ejemplo, el de ver plantillas o generar PDFs.
 @permission_required('boletas.view_plantillaboleta', raise_exception=True) 
 def vista_generar_boleta_individual_buscar(request):
     context = {
@@ -774,41 +755,28 @@ def vista_generar_boleta_individual_buscar(request):
         'detalles_sueldo_empleado': None,
         'termino_busqueda': '',
     }
-    
     if request.method == 'GET' and 'termino_busqueda' in request.GET:
         termino = request.GET.get('termino_busqueda', '').strip()
         context['termino_busqueda'] = termino
-
         if not termino:
             messages.warning(request, "Por favor, ingrese un C.I. o Ítem para buscar.")
             return render(request, 'boletas/generar_boleta_individual_buscar.html', context)
-
         if not PLANILLA_APP_AVAILABLE_FOR_SEARCH:
             messages.error(request, "La funcionalidad de búsqueda de personal no está disponible (Error de configuración).")
             return render(request, 'boletas/generar_boleta_individual_buscar.html', context)
-
         personal_encontrado = None
-        
-        # Intentar buscar por CI
-        # Asumimos que el CI en PrincipalPersonalExterno no tiene puntos ni guiones y puede tener extensión.
-        # Normalizamos un poco el término de búsqueda para CI (ej. quitar espacios)
         ci_busqueda = termino.replace(" ", "").upper()
         try:
             personal_encontrado = PrincipalPersonalExterno.objects.using('personas_db').filter(ci__iexact=ci_busqueda).first()
         except Exception as e:
             logger.error(f"Error buscando PrincipalPersonalExterno por CI '{ci_busqueda}': {e}")
             messages.error(request, f"Ocurrió un error al buscar por C.I.: {e}")
-            # Continuar para intentar buscar por Ítem si no se encontró por CI o hubo error
-
-        # Si no se encontró por CI y el término es numérico, intentar buscar por Ítem
         if not personal_encontrado and termino.isdigit():
             try:
                 item_busqueda = int(termino)
-                # Buscar la designación activa (o más reciente) con ese ítem
                 designacion = PrincipalDesignacionExterno.objects.using('personas_db').filter(
                     item=item_busqueda
                 ).order_by('-fecha_ingreso', '-id').select_related('personal').first() # '-id' para desempate si hay misma fecha
-
                 if designacion and designacion.personal:
                     personal_encontrado = designacion.personal
                 else:
@@ -818,26 +786,20 @@ def vista_generar_boleta_individual_buscar(request):
             except Exception as e:
                 logger.error(f"Error buscando PrincipalDesignacionExterno por Ítem '{termino}': {e}")
                 messages.error(request, f"Ocurrió un error al buscar por Ítem: {e}")
-        
         if personal_encontrado:
             context['empleado_encontrado'] = personal_encontrado
-            # Buscar todos los detalles de sueldo para esta persona
-            # Necesitamos acceder a planilla_sueldo.mes, planilla_sueldo.anio, planilla_sueldo.tipo
-            # y también a liquido_pagable del DetalleSueldo.
             detalles = DetalleSueldo.objects.filter(
                 personal_externo_id=personal_encontrado.id
             ).select_related('planilla_sueldo').order_by(
                 '-planilla_sueldo__anio', 
                 '-planilla_sueldo__mes'
             )
-            
             if detalles.exists():
                 context['detalles_sueldo_empleado'] = detalles
             else:
                 messages.info(request, f"El empleado '{personal_encontrado.nombre_completo}' fue encontrado, pero no tiene registros de sueldo en el sistema.")
         else:
             messages.error(request, f"No se encontró ningún empleado con el C.I. o Ítem: '{termino}'.")
-
     return render(request, 'boletas/generar_boleta_individual_buscar.html', context)
 
 
@@ -1024,6 +986,7 @@ def vista_generar_pdf_boleta_unica(request, personal_externo_id, anio, mes):
     from .utils import numero_a_literal # Asumiendo que tienes esta función en utils.py
     monto_liquido = detalle_sueldo.liquido_pagable or Decimal(0)
     datos_empleado_actual['{{literal_liquido}}'] = numero_a_literal(monto_liquido)
+    datos_empleado_actual['{{literal_liquido_extendido}}'] = numero_a_literal_con_decimal_y_salto(monto_liquido)
 
     # Mes literal
     import calendar # Asegúrate de importarlo

@@ -128,6 +128,7 @@ PLACEHOLDERS_BOLETA_DEFINICION = [
     {'id': '{{fecha_emision_actual}}', 'label': 'Fecha Emisión Boleta', 'fuente': 'Calculado'},
     {'id': '{{mes_literal_actual}}', 'label': 'Mes Emisión (Literal)', 'fuente': 'Calculado'},
     {'id': '{{CODIGO_QR}}', 'label': 'Código QR de Validación', 'fuente': 'Calculado'}, 
+    {'id': '{{literal_liquido_extendido}}', 'label': 'Líquido Pagable (Literal con Decimal)', 'fuente': 'Calculado'},
     
 ]
 
@@ -172,10 +173,6 @@ def numero_a_literal(numero):
     try:
         numero_dec = Decimal(str(numero)) # No necesitamos redondear si solo usamos la parte entera
         entero = int(numero_dec) # Obtenemos solo la parte entera del número
-        # La parte decimal ya no es necesaria
-        # decimal_part = int((numero_dec - entero) * 100)
-        
-        # NUEVA LÍNEA DE RETURN MODIFICADA
         return f"{num2words(entero, lang='es').upper()} BOLIVIANOS"
         
     except Exception as e: 
@@ -183,7 +180,39 @@ def numero_a_literal(numero):
         return f"ERROR LIT ({Decimal(str(numero)):.2f})"
 #-------------------------------------------
 
+def numero_a_literal_con_decimal_y_salto(numero):
+    """
+    Convierte un número a su representación literal, incluyendo la parte decimal
+    y añadiendo un salto de línea antes de la descripción del decimal.
+    Ej: 6713.47 -> "SEIS MIL SETECIENTOS TRECE\nCON CUARENTA Y SIETE"
+    """
+    from decimal import Decimal, ROUND_HALF_UP
 
+    if not NUM2WORDS_AVAILABLE:
+        # Fallback si num2words no está instalado
+        return f"LITERAL EXTENDIDO\n({Decimal(str(numero)):.2f})"
+    try:
+        # Asegurarnos de trabajar con Decimal para precisión
+        numero_dec = Decimal(str(numero)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        # Separar la parte entera y la parte decimal
+        parte_entera = int(numero_dec)
+        parte_decimal = int((numero_dec - parte_entera) * 100)
+        # Convertir la parte entera a palabras
+        literal_entero = num2words(parte_entera, lang='es').upper()
+        # Construir la cadena final con el salto de línea
+        # \n es el carácter de salto de línea que ReportLab entenderá
+        if parte_decimal> 0:
+            literal_decimal = num2words(parte_decimal, lang='es').upper()
+            resultado_final = f"{literal_entero}\nCON {literal_decimal}"
+        else:
+            resultado_final = literal_entero
+        
+        return resultado_final
+
+    except Exception as e: 
+        logger.error(f"Error en numero_a_literal_con_decimal_y_salto ({numero}): {e}")
+        return f"ERROR LITERAL\n({Decimal(str(numero)):.2f})"
+#------------------------------------------------------------
 def generar_imagen_qr(datos_a_codificar):
     """
     Genera una imagen de código QR en memoria a partir de una cadena de texto,

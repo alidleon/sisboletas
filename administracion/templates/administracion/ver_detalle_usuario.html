@@ -1,5 +1,7 @@
 {% extends 'index_master.html' %}
-{% load static %} {# Si usas la etiqueta static para la foto, por ejemplo #}
+{% load static %}
+
+{% block title_suffix %} - {{ titulo_vista }}{% endblock %}
 
 {% block content %}
 <div class="right_col" role="main">
@@ -10,99 +12,110 @@
     </div>
     <div class="clearfix"></div>
 
-    {% if messages %}
-        {# ... (bloque de mensajes) ... #}
-    {% endif %}
-
     <div class="row">
-        <div class="col-md-12 col-sm-12">
+        <div class="col-md-12 col-sm-12 ">
             <div class="x_panel">
                 <div class="x_title">
                     <h2>Información del Usuario</h2>
-                    <ul class="nav navbar-right panel_toolbox">
-                        <li><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
-                    </ul>
                     <div class="clearfix"></div>
                 </div>
                 <div class="x_content">
                     <div class="row">
-                        {# Columna para la foto y acciones principales #}
-                        <div class="col-md-3 col-sm-4">
-                            <h4>Foto de Perfil</h4>
-                            {% if perfil_detalle.foto %}
-                                <img src="{{ perfil_detalle.foto.url }}" alt="Foto de {{ usuario_detalle.username }}" class="img-fluid img-thumbnail mb-3" style="max-height: 200px;">
-                            {% else %}
-                                <p>No hay foto de perfil disponible.</p>
-                                {# Puedes poner una imagen placeholder si quieres #}
-                                {# <img src="{% static 'images/default_avatar.png' %}" alt="Avatar por defecto" class="img-fluid img-thumbnail mb-3" style="max-height: 200px;"> #}
-                            {% endif %}
+
+                        <!-- ============================================= -->
+                        <!-- ====== Columna Izquierda: Foto y Acciones ====== -->
+                        <!-- ============================================= -->
+                        <div class="col-md-3 col-sm-4 profile_left">
+                            <div class="profile_img">
+                                <div id="crop-avatar">
+                                    {% if perfil_detalle.foto %}
+                                        <img class="img-fluid img-thumbnail mb-3" src="{{ perfil_detalle.foto.url }}" alt="Foto de {{ usuario_detalle.username }}" style="max-height: 200px;">
+                                    {% else %}
+                                        <img class="img-fluid img-thumbnail mb-3" src="{% static 'img/avatar_por_defecto.png' %}" alt="Avatar por defecto" style="max-height: 200px;">
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <h3 class="text-center">{{ usuario_detalle.get_full_name|default:usuario_detalle.username }}</h3>
+                            <p class="text-muted text-center">
+                                {% for group in grupos_del_usuario %}
+                                    {{ group.name }}
+                                {% empty %}
+                                    Sin rol asignado
+                                {% endfor %}
+                            </p>
                             
-                            {% if puede_editar_este_usuario %}
-                                <a href="{% url 'editar_usuario' usuario_detalle.id %}" class="btn btn-info btn-block mb-2">
-                                    <i class="fa fa-pencil"></i> Editar Usuario
+                            <!-- Lógica de Botones -->
+                            {% if es_perfil_propio %}
+                                <a href="{% url 'index' %}" class="btn btn-secondary btn-block mt-3">
+                                    <i class="fa fa-home"></i> Volver al Inicio
+                                </a>
+                            {% else %}
+                                {% if puede_editar_este_usuario %}
+                                    <a href="{% url 'editar_usuario' usuario_detalle.id %}" class="btn btn-info btn-block mb-2">
+                                        <i class="fa fa-pencil"></i> Editar Usuario
+                                    </a>
+                                {% endif %}
+                                {% if puede_eliminar_este_usuario %}
+                                    <a href="{% url 'eliminar_usuario' usuario_detalle.id %}" class="btn btn-danger btn-block mb-2">
+                                        <i class="fa fa-trash"></i> Eliminar Usuario
+                                    </a>
+                                {% endif %}
+                                <a href="{% url 'lista_usuarios' %}" class="btn btn-secondary btn-block">
+                                    <i class="fa fa-arrow-left"></i> Volver a la Lista
                                 </a>
                             {% endif %}
-
-                            {% if puede_eliminar_este_usuario %}
-                               
-                                <a href="{% url 'eliminar_usuario' usuario_detalle.id %}" class="btn btn-danger btn-block mb-2">
-                                    <i class="fa fa-trash"></i> Eliminar Usuario
-                                </a>
-                            {% endif %}
-
-                            <a href="{% url 'lista_usuarios' %}" class="btn btn-secondary btn-block">
-                                <i class="fa fa-arrow-left"></i> Volver a la Lista
-                            </a>
                         </div>
 
-                        {# Columna para los detalles del usuario y perfil #}
+                        <!-- ============================================= -->
+                        <!-- ====== Columna Derecha: Detalles del Usuario ====== -->
+                        <!-- ============================================= -->
                         <div class="col-md-9 col-sm-8">
-                            <h4>Datos de la Cuenta</h4>
-                            <table class="table table-striped">
-                                <tbody>
-                                    <tr><th scope="row" style="width:30%;">Username:</th><td>{{ usuario_detalle.username }}</td></tr>
-                                    <tr><th scope="row">Email:</th><td>{{ usuario_detalle.email|default:"N/A" }}</td></tr>
-                                    <tr><th scope="row">Estado:</th>
-                                        <td>
-                                            {% if usuario_detalle.is_active %}
-                                                <span class="badge badge-success">Activo</span>
-                                            {% else %}
-                                                <span class="badge badge-danger">Inactivo (Dado de Baja)</span>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    <tr><th scope="row">Staff (Acceso Admin Django):</th>
-                                        <td>{% if usuario_detalle.is_staff %}Sí{% else %}No{% endif %}</td>
-                                    </tr>
-                                    <tr><th scope="row">Superusuario:</th>
-                                        <td>{% if usuario_detalle.is_superuser %}Sí{% else %}No{% endif %}</td>
-                                    </tr>
-                                    <tr><th scope="row">Fecha de Registro:</th><td>{{ usuario_detalle.date_joined|date:"d/m/Y H:i" }}</td></tr>
-                                    <tr><th scope="row">Último Inicio de Sesión:</th><td>{{ usuario_detalle.last_login|date:"d/m/Y H:i"|default:"Nunca" }}</td></tr>
-                                    <tr>
-                                        <th scope="row">Roles/Grupos Asignados:</th>
-                                        <td>
-                                            {% for group in grupos_del_usuario %}
-                                                <span class="badge badge-info">{{ group.name }}</span>
-                                            {% empty %}
-                                                Ninguno
-                                            {% endfor %}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                            
+                            <h4>Datos Personales</h4>
+                            <div class="row profile-details">
+                                <div class="col-md-6">
+                                    <p><strong>Nombres Reales:</strong> {{ usuario_detalle.first_name|default:"N/A" }}</p>
+                                    <p><strong>Apellidos Reales:</strong> {{ usuario_detalle.last_name|default:"N/A" }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Cédula de Identidad (CI):</strong> {{ perfil_detalle.ci|default:"N/A" }}</p>
+                                    <p><strong>Teléfono:</strong> {{ perfil_detalle.telefono|default:"N/A" }}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="ln_solid"></div>
 
-                            <h4 class="mt-4">Datos Personales (Perfil)</h4>
-                            <table class="table table-striped">
-                                <tbody>
-                                    <tr><th scope="row" style="width:30%;">Nombres Reales:</th><td>{{ usuario_detalle.first_name|default:"N/A" }}</td></tr>
-                                    <tr><th scope="row">Apellidos Reales:</th><td>{{ usuario_detalle.last_name|default:"N/A" }}</td></tr>
-                                    <tr><th scope="row">Cédula de Identidad (CI):</th><td>{{ perfil_detalle.ci|default:"N/A" }}</td></tr>
-                                    <tr><th scope="row">Teléfono:</th><td>{{ perfil_detalle.telefono|default:"N/A" }}</td></tr>
-                                    {# Añade aquí más campos del UserProfile que quieras mostrar #}
-                                    {# Ejemplo: <tr><th scope="row">Puesto:</th><td>{{ perfil_detalle.puesto_laboral|default:"N/A" }}</td></tr> #}
-                                </tbody>
-                            </table>
+                            <h4>Datos de la Cuenta</h4>
+                            <div class="row profile-details">
+                                <div class="col-md-6">
+                                    <p><strong>Username:</strong> {{ usuario_detalle.username }}</p>
+                                    <p><strong>Email:</strong> {{ usuario_detalle.email|default:"N/A" }}</p>
+                                    <p><strong>Estado:</strong>
+                                        {% if usuario_detalle.is_active %}
+                                            <span class="badge badge-success">Activo</span>
+                                        {% else %}
+                                            <span class="badge badge-danger">Inactivo</span>
+                                        {% endif %}
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Staff (Acceso Admin):</strong> {% if usuario_detalle.is_staff %}Sí{% else %}No{% endif %}</p>
+                                    <p><strong>Superusuario:</strong> {% if usuario_detalle.is_superuser %}Sí{% else %}No{% endif %}</p>
+                                </div>
+                            </div>
+
+                            <div class="ln_solid"></div>
+
+                            <h4>Actividad</h4>
+                             <div class="row profile-details">
+                                <div class="col-md-6">
+                                    <p><strong>Fecha de Registro:</strong> {{ usuario_detalle.date_joined|date:"d/m/Y H:i" }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Último Inicio de Sesión:</strong> {{ usuario_detalle.last_login|date:"d/m/Y H:i"|default:"Nunca" }}</p>
+                                </div>
+                            </div>
+
                         </div>
                     </div>
                 </div>
@@ -110,4 +123,17 @@
         </div>
     </div>
 </div>
+
+<style>
+    /* Pequeño ajuste de CSS para mejorar el espaciado */
+    .profile-details p {
+        margin-bottom: 1rem;
+        font-size: 14px;
+    }
+    .profile-details strong {
+        color: #333;
+        min-width: 150px;
+        display: inline-block;
+    }
+</style>
 {% endblock %}

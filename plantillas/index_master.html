@@ -79,7 +79,6 @@
             <!-- sidebar menu -->
             <div id="sidebar-menu" class="main_menu_side hidden-print main_menu">
               <div class="menu_section">
-                <h3>General</h3>
                 <ul class="nav side-menu">
                   <li><a href="{% url 'index' %}"><i class="fa fa-home"></i> Inicio </a></li>
                   {# Añadir lógica de permisos si es necesario #}
@@ -100,16 +99,16 @@
                   {% endif %}
 
                   {% if perms.reportes.view_planillaasistencia or perms.reportes.add_planillaasistencia or user.is_superuser %}
-                  <li><a><i class="fa fa-calendar-check-o"></i> Reportes Asistencia <span class="fa fa-chevron-down"></span></a>
+                  <li><a><i class="fa fa-calendar-check-o"></i> Reportes de Asistencia <span class="fa fa-chevron-down"></span></a>
                     <ul class="nav child_menu">
                       {# Sub-opción Crear Reporte: visible si tiene permiso para añadir Planillas de Asistencia o es superusuario #}
                       {% if perms.reportes.add_planillaasistencia or user.is_superuser %}
-                      <li><a href="{% url 'crear_planilla_asistencia' %}">Crear Reporte</a></li>
+                      <li><a href="{% url 'crear_planilla_asistencia' %}">Crear Reporte de Asistencia</a></li>
                       {% endif %}
 
                       {# Sub-opción Ver Reportes: visible si tiene permiso para ver Planillas de Asistencia o es superusuario #}
                       {% if perms.reportes.view_planillaasistencia or user.is_superuser %}
-                      <li><a href="{% url 'lista_planillas_asistencia' %}">Ver Reportes</a></li>
+                      <li><a href="{% url 'lista_planillas_asistencia' %}">Ver Reportes de Asistencias</a></li>
                       {% endif %}
                     </ul>
                   </li>
@@ -120,12 +119,12 @@
                      <ul class="nav child_menu">
                       {# Sub-opción Crear Planilla Bono: visible si tiene permiso para añadir Planillas o es superusuario #}
                       {% if perms.planilla.add_planilla or user.is_superuser %}
-                      <li><a href="{% url 'crear_planilla_bono_te' %}">Crear Planilla Bono</a></li>
+                      <li><a href="{% url 'crear_planilla_bono_te' %}">Crear Planilla Bono Te</a></li>
                       {% endif %}
 
                       {# Sub-opción Ver Planillas Bono: visible si tiene permiso para ver Planillas o es superusuario #}
                       {% if perms.planilla.view_planilla or user.is_superuser %}
-                      <li><a href="{% url 'lista_planillas' %}">Ver Planillas Bono</a></li>
+                      <li><a href="{% url 'lista_planillas' %}">Ver Planillas Bono Te</a></li>
                       {% endif %}
                     </ul>
                   </li>
@@ -210,8 +209,7 @@
                     {# <img src="{% static 'images/user.png' %}" alt=""> #}{{ user.get_full_name|default:user.username }}
                   </a>
                   <div class="dropdown-menu dropdown-usermenu pull-right" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item"  href="javascript:;"> Perfil</a>
-                      
+                    <a class="dropdown-item" href="{% url 'ver_perfil_propio' %}">Perfil</a>                      
                   
                     {# Enlace real de logout #}
                     <form id="logout-form" method="post" action="{% url 'logout' %}" style="display: none;">
