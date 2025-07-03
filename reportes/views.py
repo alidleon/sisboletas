@@ -473,13 +473,7 @@ EXTERNAL_TYPE_MAP = {
 }
 
 
-
-# reportes/views.py
-# ... (imports: JsonResponse, json) ...
-
-# reportes/views.py
-# ... (imports como antes: JsonResponse, json, Decimal, models, etc.) ...
-from urllib.parse import urlencode # <-- Asegúrate de tener esta importación
+from urllib.parse import urlencode 
 
 @login_required
 @permission_required('reportes.change_detalleasistencia', raise_exception=True)
@@ -597,10 +591,6 @@ def editar_detalle_asistencia(request, detalle_id):
     return render(request, 'reportes/editar_detalle_asistencia.html', context)
 #----------------------------------------------
 
-# reportes/views.py
-
-# ... (imports existentes: logging, render, redirect, messages, login_required, get_object_or_404, Http404, reverse) ...
-# ... (modelos, formularios, otras vistas) ...
 
 @login_required
 @permission_required('reportes.delete_detalleasistencia', raise_exception=True)
@@ -780,11 +770,7 @@ def add_detalle_asistencia(request, planilla_asistencia_id):
     }
     return render(request, 'reportes/add_detalle_asistencia.html', context)
 
-
-
-
-# reportes/views.py
-# ... (después de tus otras vistas) ...
+#-----------------------------------------
 
 @login_required
 @permission_required('reportes.change_detalleasistencia', raise_exception=True)

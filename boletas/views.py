@@ -7,26 +7,22 @@ from django.contrib import messages
 from django.urls import reverse
 from .models import PlantillaBoleta
 from .forms import PlantillaBoletaForm
-from sueldos.models import PlanillaSueldo, DetalleSueldo # Importar modelos de sueldos
-# Importar modelos externos si necesitas info extra no referenciada en DetalleSueldo
-#from planilla.models import PrincipalPersonalExterno, PrincipalDesignacionExterno, PrincipalCargoExterno, PrincipalUnidadExterna
-from django.http import HttpResponse, JsonResponse # Necesitamos HttpResponse
-# ReportLab
-
+from sueldos.models import PlanillaSueldo, DetalleSueldo 
+from django.http import HttpResponse, JsonResponse 
 from .utils import dibujar_boleta_en_canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas as pdf_canvas_gen 
-from django.views.decorators.http import require_POST, require_GET# Para asegurar que sea POST
+from django.views.decorators.http import require_POST, require_GET
 from django.contrib.auth.decorators import login_required, permission_required
-from django.views.decorators.csrf import csrf_exempt # Temporalmente para AJAX fácil, ¡OJO!
-from django.utils.html import escape # Para sanitizar
+from django.views.decorators.csrf import csrf_exempt 
+from django.utils.html import escape 
 from datetime import datetime
 from .utils import numero_a_literal, numero_a_literal_con_decimal_y_salto
  
 import io
 import json
-import math # <--- AÑADIR ESTA LÍNEA
+import math 
 from decimal import Decimal
 from django.http import Http404
 logger = logging.getLogger(__name__)
@@ -34,7 +30,6 @@ try:
     from planilla.models import PrincipalPersonalExterno, PrincipalDesignacionExterno, PrincipalCargoExterno, PrincipalUnidadExterna, PrincipalSecretariaExterna
     PLANILLA_APP_AVAILABLE = True
 except ImportError:
-    # Clases dummy o None si no está disponible (manejar errores después)
     PrincipalPersonalExterno, PrincipalDesignacionExterno, PrincipalCargoExterno = None, None, None
     PrincipalUnidadExterna, PrincipalSecretariaExterna = None, None
     PLANILLA_APP_AVAILABLE = False
@@ -42,7 +37,7 @@ except ImportError:
 
 try:
     from planilla.models import PrincipalPersonalExterno, PrincipalDesignacionExterno
-    PLANILLA_APP_AVAILABLE_FOR_SEARCH = True # Nueva variable específica para esta funcionalidad
+    PLANILLA_APP_AVAILABLE_FOR_SEARCH = True 
 except ImportError:
     PrincipalPersonalExterno, PrincipalDesignacionExterno = None, None
     PLANILLA_APP_AVAILABLE_FOR_SEARCH = False
@@ -52,23 +47,15 @@ except ImportError:
 try:
     from .utils import PLACEHOLDERS_BOLETA_DEFINICION
 except ImportError:
-    # Definición de fallback si no existe utils.py o la constante no está definida
-    # Es mejor tenerla en utils.py o constants.py
+    
     print("ADVERTENCIA: No se encontró PLACEHOLDERS_BOLETA_DEFINICION en utils.py, usando definición de fallback.")
     PLACEHOLDERS_BOLETA_DEFINICION = [
         {'id': '{{PLACEHOLDER_EJEMPLO}}', 'label': 'Placeholder Ejemplo'},
     ]
-# from .forms import PlantillaBoletaForm # Crearemos este formulario después
-import json # Para pasar datos a la plantilla JS
+import json 
 
-# Importar LogEntry para registro manual
 from auditlog.models import LogEntry
 from django.contrib.contenttypes.models import ContentType # Para obtener el ContentType
-
-# Lista de placeholders (temporalmente aquí, podría ir a utils.py)
-# Deberás refinar esta lista basada en los campos exactos que necesites
-
-
 
 @login_required
 @permission_required('boletas.view_plantillaboleta', raise_exception=True)
@@ -195,16 +182,10 @@ def eliminar_plantilla_boleta(request, plantilla_id):
     if request.method == 'POST':
         plantilla.delete()
         messages.success(request, f"Plantilla '{nombre_plantilla}' eliminada exitosamente.")
-        # CORRECCIÓN:
         return redirect('lista_plantillas_boleta') # Sin 'boletas:'
-        # O puedes usar reverse si prefieres ser explícito:
-        # return redirect(reverse('lista_plantillas_boleta'))
-
     context = {
         'plantilla': plantilla,
         'titulo_pagina': f"Eliminar Plantilla: {plantilla.nombre}"
-        # Si el template de confirmación tuviera un botón de cancelar que usa una URL generada en la vista:
-        # 'cancel_url': reverse('lista_plantillas_boleta') # Sin 'boletas:'
     }
     return render(request, 'boletas/eliminar_plantilla_confirmacion.html', context)
 
@@ -229,13 +210,13 @@ def render_object_to_html(obj, sample_data):
     origin_x_fabric = obj.get('originX', 'left')
     origin_y_fabric = obj.get('originY', 'top')
 
-    css_transform_origin_x = "0" # Default a 'left'
+    css_transform_origin_x = "0" 
     if origin_x_fabric == 'center':
         css_transform_origin_x = "50%"
     elif origin_x_fabric == 'right':
         css_transform_origin_x = "100%"
 
-    css_transform_origin_y = "0" # Default a 'top'
+    css_transform_origin_y = "0" 
     if origin_y_fabric == 'center':
         css_transform_origin_y = "50%"
     elif origin_y_fabric == 'bottom':
@@ -243,23 +224,17 @@ def render_object_to_html(obj, sample_data):
     
     css_transform_origin = f"{css_transform_origin_x} {css_transform_origin_y}"
 
-    # Para el div contenedor, usar las dimensiones base de Fabric
-    # La transformación de escala se encargará del tamaño visual.
     div_width_css = fabric_width_base
     div_height_css = fabric_height_base
     
     obj_type = obj.get('type')
 
-    # AJUSTE PARA LÍNEAS: Asegurar que el div contenedor tenga un tamaño mínimo
     if obj_type == 'line':
         stroke_w = float(obj.get('strokeWidth', 1))
-        # Si el width base es casi cero (línea vertical), darle un ancho mínimo al div
         if abs(fabric_width_base) < stroke_w :
             div_width_css = stroke_w
-        # Si el height base es casi cero (línea horizontal), darle un alto mínimo al div
         if abs(fabric_height_base) < stroke_w :
             div_height_css = stroke_w
-        # Si ambos son muy pequeños (un punto), darles un tamaño mínimo a ambos
         if abs(fabric_width_base) < stroke_w and abs(fabric_height_base) < stroke_w:
             div_width_css = stroke_w
             div_height_css = stroke_w
@@ -327,7 +302,6 @@ def render_object_to_html(obj, sample_data):
                    f"<line x1='{svg_x1}' y1='{svg_y1}' x2='{svg_x2}' y2='{svg_y2}' "
                    f"stroke='{stroke_color}' stroke-width='{ensure_string(stroke_width_val)}'/>" 
                    f"</svg>")
-        # styles.append("border: 1px dotted red;") # Descomentar para ver el contenedor SVG si es necesario
 
     elif obj_type == 'rect':
         styles.extend([
@@ -518,9 +492,6 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
             if PLANILLA_APP_AVAILABLE and detalle.personal_externo_id:
                 # Obtener datos de PrincipalPersonalExterno
                 try:
-                    # Si select_related funcionó antes, ya estaría cargado
-                    # personal_ext = detalle.personal_externo
-                    # Si no, hacer consulta individual:
                     personal_ext = PrincipalPersonalExterno.objects.using('personas_db').get(pk=detalle.personal_externo_id)
                     datos_empleado_actual['{{nombre}}'] = personal_ext.nombre or ''
                     datos_empleado_actual['{{apellido_paterno}}'] = personal_ext.apellido_paterno or ''
@@ -538,9 +509,7 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
 
                 # Obtener datos de la Designación ACTIVA (o la más relevante)
                 try:
-                    # Buscar la designación activa para el tipo y periodo de la planilla
-                    # Esto podría necesitar una lógica más compleja si el estado cambia a mitad de mes
-                    # Por ahora, buscamos la ACTIVA con el mismo TIPO
+                    
                     tipo_externo_map = {
                         'planta': 'ASEGURADO',
                         'contrato': 'CONTRATO',
@@ -807,7 +776,7 @@ def vista_generar_boleta_individual_buscar(request):
 
 @login_required
 # Usa el mismo permiso que para generar el PDF masivo o uno más específico.
-@permission_required('sueldos.view_planillasueldo', raise_exception=True) 
+@permission_required('boletas.view_plantillaboleta', raise_exception=True) 
 def vista_generar_pdf_boleta_unica(request, personal_externo_id, anio, mes):
     try:
         locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
