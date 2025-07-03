@@ -7,7 +7,7 @@ class AdministracionConfig(AppConfig):
 
     def ready(self):
         import administracion.models
-
+        import administracion.signals
         from django.contrib.auth.models import User, Group 
         from .models import UserProfile 
         

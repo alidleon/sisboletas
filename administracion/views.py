@@ -305,15 +305,10 @@ def crear_grupo_view(request):
                 messages.error(request, f"Error al crear el grupo: {e}")
     else:
         form = GroupForm()
-    todos_los_permisos = Permission.objects.all().select_related('content_type').order_by(
-        'content_type__app_label', 
-        'content_type__model',
-        'name'
-    )
+    
     context = {
         'form': form,
-        'titulo_vista': "Crear Nuevo Grupo (Rol)",
-        'todos_los_permisos_para_template': todos_los_permisos
+        'titulo_vista': "Crear Nuevo Grupo (Rol)"   
     }
     return render(request, 'administracion/form_grupo.html', context)
 @login_required
@@ -334,18 +329,12 @@ def editar_grupo_view(request, group_id):
     else:
         form = GroupForm(instance=grupo)
     
-    todos_los_permisos = Permission.objects.all().select_related('content_type').order_by(
-        'content_type__app_label', 
-        'content_type__model',
-        'name'
-        
-    )
+    
 
     context = {
         'form': form,
         'grupo': grupo,
         'titulo_vista': f"Editar Grupo (Rol): {grupo.name}",
-        'todos_los_permisos_para_template': todos_los_permisos,
     }
     return render(request, 'administracion/form_grupo.html', context)
 #-----------------------------------------------------------

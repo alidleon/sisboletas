@@ -17,8 +17,7 @@
             <div class="col-md-8 col-sm-10 offset-md-2 offset-sm-1">
                 <div class="x_panel">
                     <div class="x_title">
-                        <h2>Datos de la Planilla: {{ planilla }}</h2>
-
+                        <h2>Información de la planilla sueldos</h2>
                         <div class="clearfix"></div>
                     </div>
                     <div class="x_content">
@@ -29,31 +28,44 @@
                         <form method="post" class="form-horizontal form-label-left" novalidate>
                             {% csrf_token %}
 
-                            <!-- Django renderizará todos los campos definidos en el form -->
-                            <!-- Los que marcamos como 'disabled' en forms.py se mostrarán bloqueados -->
+                            <!-- ===== SECCIÓN DE INFORMACIÓN (NO EDITABLE) ===== -->
                             
-                            <div class="item form-group mb-3">
-                                <label class="col-form-label col-md-3 col-sm-3 label-align">{{ form.mes.label }}</label>
-                                <div class="col-md-6 col-sm-6">{{ form.mes }}</div>
+                            <div class="form-group row">
+                                <label class="col-form-label col-md-3 col-sm-3 label-align"><strong>Mes / Año:</strong></label>
+                                <div class="col-md-9 col-sm-9">
+                                    <p class="form-control-static" style="padding-top: 8px;">{{ planilla.mes }} / {{ planilla.anio }}</p>
+                                </div>
                             </div>
-                            <div class="item form-group mb-3">
-                                <label class="col-form-label col-md-3 col-sm-3 label-align">{{ form.anio.label }}</label>
-                                <div class="col-md-6 col-sm-6">{{ form.anio }}</div>
-                            </div>
-                            <div class="item form-group mb-3">
-                                <label class="col-form-label col-md-3 col-sm-3 label-align">{{ form.tipo.label }}</label>
-                                <div class="col-md-6 col-sm-6">{{ form.tipo }}</div>
+
+                            <div class="form-group row">
+                                <label class="col-form-label col-md-3 col-sm-3 label-align"><strong>Tipo:</strong></label>
+                                <div class="col-md-9 col-sm-9">
+                                    <p class="form-control-static" style="padding-top: 8px;">{{ planilla.get_tipo_display }}</p>
+                                </div>
                             </div>
 
                             <div class="ln_solid"></div>
 
-                            <div class="item form-group mb-3">
-                                <label class="col-form-label col-md-3 col-sm-3 label-align">{{ form.estado.label }} <span class="required">*</span></label>
-                                <div class="col-md-6 col-sm-6">{{ form.estado }}</div>
+                            <!-- ===== SECCIÓN DE CAMPOS EDITABLES ===== -->
+
+                            <div class="item form-group">
+                                <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.estado.id_for_label }}">
+                                    {{ form.estado.label }} <span class="required">*</span>
+                                </label>
+                                <div class="col-md-6 col-sm-6">
+                                    {{ form.estado }}
+                                    {% if form.estado.errors %}<div class="text-danger">{{ form.estado.errors|first }}</div>{% endif %}
+                                </div>
                             </div>
-                            <div class="item form-group mb-3">
-                                <label class="col-form-label col-md-3 col-sm-3 label-align">{{ form.observaciones.label }}</label>
-                                <div class="col-md-6 col-sm-6">{{ form.observaciones }}</div>
+                            
+                            <div class="item form-group">
+                                <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.observaciones.id_for_label }}">
+                                    {{ form.observaciones.label }}
+                                </label>
+                                <div class="col-md-6 col-sm-6">
+                                    {{ form.observaciones }}
+                                    {% if form.observaciones.errors %}<div class="text-danger">{{ form.observaciones.errors|first }}</div>{% endif %}
+                                </div>
                             </div>
 
                             <div class="ln_solid"></div>

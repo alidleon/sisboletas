@@ -4,78 +4,85 @@
 
 {% block content %}
 <div class="right_col" role="main">
-    <div class="page-title">
-        <div class="title_left">
-            <h3>CREAR REPORTE DE ASISTENCIA</h3>
-        </div>
-    </div>
-    
-    <div class="clearfix"></div>
-
-    {% if messages %}
-        {% for message in messages %}
-            <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button> 
+    <div class="">
+        <div class="page-title">
+            <div class="title_left">
+                <h3>CREAR REPORTE DE ASISTENCIA</h3>
             </div>
-        {% endfor %}
-    {% endif %}
+        </div>
+        <div class="clearfix"></div>
 
-    <div class="card">
-        <div class="card-body">
-            <h5 class="card-title">Seleccione Periodo y Tipo</h5>
-            <form method="post" novalidate>
-                {% csrf_token %}
+        <div class="row">
+            {# Centramos el panel principal para que coincida con tu otro formulario #}
+            <div class="col-md-8 col-sm-10 offset-md-2 offset-sm-1">
+                <div class="x_panel">
+                    <div class="x_title">
+                        <h2>Seleccione Periodo y Tipo</h2>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="x_content">
+                        {% if messages %}
+                            <div class="my-2">
+                            {% for message in messages %}
+                                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                                    {{ message|safe }}
+                                    <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button>
+                                </div>
+                            {% endfor %}
+                            </div>
+                        {% endif %}
 
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <label for="{{ form.anio.id_for_label }}" class="form-label">{{ form.anio.label }}</label>
-                        {{ form.anio }} {# Renderizará el <input type="number"> #}
-                        {% if form.anio.help_text %}
-                            <small class="form-text text-muted d-block">{{ form.anio.help_text }}</small> {# d-block para que help_text ocupe su línea #}
-                        {% endif %}
-                        {% if form.anio.errors %}
-                            <div class="text-danger mt-1">
-                                <small>{{ form.anio.errors|first }}</small>
+                        <form method="post" class="form-horizontal form-label-left" novalidate>
+                            {% csrf_token %}
+                            
+                            <!-- CAMPO AÑO -->
+                            <div class="item form-group">
+                                <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.anio.id_for_label }}">
+                                    {{ form.anio.label }} <span class="required">*</span>
+                                </label>
+                                <div class="col-md-6 col-sm-6">
+                                    {{ form.anio }}
+                                    {% if form.anio.help_text %}<p class="help-block">{{ form.anio.help_text }}</p>{% endif %}
+                                    {% if form.anio.errors %}<div class="text-danger">{{ form.anio.errors|first }}</div>{% endif %}
+                                </div>
                             </div>
-                        {% endif %}
-                    </div>
-                    <div class="col-md-4">
-                        <label for="{{ form.mes.id_for_label }}" class="form-label">{{ form.mes.label }}</label>
-                        {{ form.mes }} {# Renderizará el <select> #}
-                        {% if form.mes.help_text %}
-                            <small class="form-text text-muted d-block">{{ form.mes.help_text }}</small>
-                        {% endif %}
-                        {% if form.mes.errors %}
-                            <div class="text-danger mt-1">
-                                <small>{{ form.mes.errors|first }}</small>
+
+                            <!-- CAMPO MES -->
+                            <div class="item form-group">
+                                <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.mes.id_for_label }}">
+                                    {{ form.mes.label }} <span class="required">*</span>
+                                </label>
+                                <div class="col-md-6 col-sm-6">
+                                    {{ form.mes }}
+                                    {% if form.mes.errors %}<div class="text-danger">{{ form.mes.errors|first }}</div>{% endif %}
+                                </div>
                             </div>
-                        {% endif %}
-                    </div>
-                    <div class="col-md-4">
-                        <label for="{{ form.tipo.id_for_label }}" class="form-label">{{ form.tipo.label }}</label>
-                        {{ form.tipo }} {# Renderizará el <select> #}
-                        {% if form.tipo.help_text %}
-                            <small class="form-text text-muted d-block">{{ form.tipo.help_text }}</small>
-                        {% endif %}
-                        {% if form.tipo.errors %}
-                            <div class="text-danger mt-1">
-                                <small>{{ form.tipo.errors|first }}</small>
+
+                            <!-- CAMPO TIPO -->
+                            <div class="item form-group">
+                                <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.tipo.id_for_label }}">
+                                    {{ form.tipo.label }} <span class="required">*</span>
+                                </label>
+                                <div class="col-md-6 col-sm-6">
+                                    {{ form.tipo }}
+                                    {% if form.tipo.errors %}<div class="text-danger">{{ form.tipo.errors|first }}</div>{% endif %}
+                                </div>
                             </div>
-                        {% endif %}
+
+                            <div class="ln_solid"></div>
+                            <div class="item form-group">
+                                <div class="col-md-6 col-sm-6 offset-md-3">
+                                    <button type="submit" class="btn btn-danger"> {# Botón rojo como en tu captura de pantalla #}
+                                        <i class="fa fa-plus-circle"></i> Crear Reporte e Inicializar Personal
+                                    </button>
+                                    <a href="{% url 'lista_planillas_asistencia' %}" class="btn btn-secondary" type="button">Cancelar</a>
+                                </div>
+                            </div>
+                        </form>
                     </div>
                 </div>
-
-                <button type="submit" class="btn btn-primary">
-                    <i class="fa fa-plus-circle me-1"></i> Crear Reporte e Inicializar Personal
-                </button>
-                <a href="{% url 'lista_planillas_asistencia' %}" class="btn btn-secondary">Cancelar</a>
-            </form>
+            </div>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-{# Ya no es necesario el JS para añadir clases si se definen en los widgets del form #}
 {% endblock %}

@@ -75,7 +75,7 @@
                             <div class="col-md-9 col-sm-9">
                                 <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px;">
                                     
-                                    {% regroup todos_los_permisos_para_template by content_type.app_label as permisos_por_app %}
+                                    {% regroup form.permissions.field.queryset by content_type.app_label as permisos_por_app %}
                                     
                                     {% for app_data in permisos_por_app %}
                                         <div class="app-permissions-group mb-3">

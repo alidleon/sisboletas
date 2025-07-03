@@ -69,53 +69,27 @@ class PlanillaForm(forms.ModelForm):
         help_text="Solo se muestran planillas de asistencia validadas y no usadas para el tipo seleccionado."
     )
 
-    # dias_habiles se toma de los fields del modelo en Meta, pero definimos su 'required' aquí
-    # para que sea False si el selector de asistencia está deshabilitado.
-    # Alternativamente, se puede dejar required=True y el form solo validará si no está disabled.
-    # La lógica en clean() es más robusta.
     dias_habiles = forms.DecimalField(
         label='Días Hábiles del Mes para Bono TE',
         required=False, # Inicialmente no es requerido; se ajusta en clean()
         max_digits=5,
         decimal_places=2,
         min_value=0, # Validación básica a nivel de campo
-        # widget=forms.NumberInput(attrs={'step': '0.01'}) # Opcional para UX
     )
 
     class Meta:
         model = Planilla
-        fields = [
-            # Nota: 'planilla_asistencia_base_selector' NO es un campo del modelo Planilla.
-            # Es un campo del FORMULARIO. El campo del modelo es 'planilla_asistencia_base'.
-            # Por lo tanto, no se lista en 'fields' si queremos definirlo explícitamente arriba.
-            # Si lo listáramos aquí Y lo definiéramos arriba, el de arriba tomaría precedencia.
-            # Lo correcto es definirlo arriba y NO listarlo aquí, o listarlo aquí y
-            # modificar self.fields['nombre_campo_modelo'] en __init__.
-            # Para claridad, lo definimos explícitamente y no lo ponemos en fields.
-            # Los campos que SÍ son del modelo y queremos en el form son:
-            'dias_habiles',
-            # 'ufvi', # Si los tenías y son manuales, añádelos aquí.
-            # 'ufvf',
-            # 'smn',
-        ]
-        # No incluimos 'mes', 'anio', 'tipo', 'planilla_asistencia_base' aquí
-        # ya que se derivan/asignan en la vista.
+        fields = ['dias_habiles']
 
     def __init__(self, *args, **kwargs):
-        # Obtener 'tipo_filtro' pasado desde la vista ANTES de llamar al super()
-        # para que no interfiera con los campos del ModelForm.
+        # Obtener 'tipo_filtro' pasado desde la vista
         self.tipo_filtro = kwargs.pop('tipo_filtro', None)
         super().__init__(*args, **kwargs)
 
-        # Configurar el campo del formulario 'planilla_asistencia_base_selector'
-        # (que es diferente del campo del modelo 'planilla_asistencia_base')
-        
-        # Por defecto, el selector de asistencia está deshabilitado.
+        # Configurar el campo 'planilla_asistencia_base_selector'
         self.fields['planilla_asistencia_base_selector'].widget.attrs['disabled'] = True
-        # 'required' ya es False por la definición del campo arriba.
 
         if self.tipo_filtro:
-            # Si se proporcionó un tipo_filtro, intentar poblar el queryset
             self.fields['planilla_asistencia_base_selector'].empty_label = "--- Elija una Planilla de Asistencia ---"
             try:
                 planillas_asistencia_usadas_ids = Planilla.objects.filter(
@@ -124,64 +98,65 @@ class PlanillaForm(forms.ModelForm):
 
                 qs = PlanillaAsistencia.objects.filter(
                     estado='validado',
-                    tipo=self.tipo_filtro # Filtrar por el tipo proporcionado
+                    tipo=self.tipo_filtro
                 ).exclude(
                     id__in=planillas_asistencia_usadas_ids
-                ).order_by('-anio', '-mes') # Ya no es necesario ordenar por 'tipo' aquí
+                ).order_by('-anio', '-mes')
 
                 self.fields['planilla_asistencia_base_selector'].queryset = qs
 
                 if qs.exists():
-                    # Si hay opciones, habilitar el selector
                     del self.fields['planilla_asistencia_base_selector'].widget.attrs['disabled']
-                    self.fields['planilla_asistencia_base_selector'].required = True # Ahora es obligatorio
+                    self.fields['planilla_asistencia_base_selector'].required = True
                 else:
-                    # Si no hay opciones para el tipo filtrado, mantener deshabilitado
                     tipo_display = dict(Planilla.TIPO_CHOICES).get(self.tipo_filtro, self.tipo_filtro)
                     self.fields['planilla_asistencia_base_selector'].empty_label = f"No hay asistencias disponibles para el tipo '{tipo_display}'"
             
             except Exception as e:
-                # En caso de error al construir el queryset (ej. DB no disponible)
-                print(f"ERROR en PlanillaForm __init__ (al poblar selector con tipo_filtro='{self.tipo_filtro}'): {e}") # Usar logging
-                # Mantener el selector deshabilitado y con mensaje de error
+                print(f"ERROR en PlanillaForm __init__: {e}")
                 self.fields['planilla_asistencia_base_selector'].queryset = PlanillaAsistencia.objects.none()
                 self.fields['planilla_asistencia_base_selector'].empty_label = "Error al cargar asistencias"
                 self.fields['planilla_asistencia_base_selector'].widget.attrs['disabled'] = True
-        # else: Si no hay tipo_filtro, el selector permanece deshabilitado con su mensaje inicial.
 
         # Configurar el campo 'dias_habiles'
-        # Por defecto, está deshabilitado si el selector de asistencia lo está.
         if self.fields['planilla_asistencia_base_selector'].widget.attrs.get('disabled', False):
             self.fields['dias_habiles'].widget.attrs['disabled'] = True
             self.fields['dias_habiles'].required = False
         else:
-            # Si el selector de asistencia está habilitado, días hábiles también debería estarlo
-            # y ser requerido (ya lo es por su definición si no se pone disabled).
             if 'disabled' in self.fields['dias_habiles'].widget.attrs:
                  del self.fields['dias_habiles'].widget.attrs['disabled']
             self.fields['dias_habiles'].required = True
 
+        # ==========================================================
+        # =====           MODIFICACIÓN PARA ESTILOS            =====
+        # ==========================================================
+        # Asignar la clase CSS 'form-control' a los widgets para que
+        # coincidan con el tema visual (ej. Gentelella/Bootstrap).
+        self.fields['planilla_asistencia_base_selector'].widget.attrs.update(
+            {'class': 'form-control'}
+        )
+        self.fields['dias_habiles'].widget.attrs.update(
+            {'class': 'form-control'}
+        )
+        # ==========================================================
 
     def clean(self):
         cleaned_data = super().clean()
         
-        # Validaciones condicionales basadas en el estado de los campos
         asistencia_selector_disabled = self.fields['planilla_asistencia_base_selector'].widget.attrs.get('disabled', False)
         pa_base_seleccionada = cleaned_data.get('planilla_asistencia_base_selector')
         dias_habiles_valor = cleaned_data.get('dias_habiles')
 
-        # Si el selector de asistencia NO está deshabilitado (es decir, se esperaba una selección)
         if not asistencia_selector_disabled:
             if not pa_base_seleccionada:
                 self.add_error('planilla_asistencia_base_selector', "Debe seleccionar una Planilla de Asistencia base.")
             
-            # Si se seleccionó una asistencia, entonces días hábiles es obligatorio y debe ser válido
-            if pa_base_seleccionada: # Implica que el selector estaba habilitado y se eligió algo
-                if dias_habiles_valor is None: # Si es None (porque el campo es opcional y se dejó vacío)
+            if pa_base_seleccionada:
+                if dias_habiles_valor is None:
                     self.add_error('dias_habiles', "Debe ingresar los días hábiles.")
                 elif dias_habiles_valor < 0:
                     self.add_error('dias_habiles', "Los días hábiles no pueden ser un número negativo.")
-                elif dias_habiles_valor > 31: # O un límite más específico si lo tienes
+                elif dias_habiles_valor > 31:
                     self.add_error('dias_habiles', "Los días hábiles no pueden ser mayores a 31.")
         
         return cleaned_data

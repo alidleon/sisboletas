@@ -2,131 +2,116 @@
 
 {% block content %}
 <div class="right_col" role="main">
-    <h2>{{ titulo_vista }}</h2>
-
-    {# Mostrar Mensajes de Django #}
-    {% if messages %}
-        <div style="margin-top: 10px;">
-        {% for message in messages %}
-            <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">×</span>
-                </button>
+    <div class="">
+        <div class="page-title">
+            <div class="title_left">
+                <h3>Editar Planilla Bono Te</h3>
             </div>
-        {% endfor %}
         </div>
-    {% endif %}
+        <div class="clearfix"></div>
 
-    <div class="x_panel">
-        <div class="x_title">
-            <h2>Información de la Planilla (No Editable)</h2>
-            
-            <div class="clearfix"></div>
-        </div>
-        <div class="x_content">
-            <table class="table table-striped">
-                <tbody>
-                    <tr>
-                        <th scope="row" style="width: 30%;">Mes / Año:</th>
-                        <td>{{ planilla.mes }} / {{ planilla.anio }}</td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Tipo de Planilla:</th>
-                        <td>{{ planilla.get_tipo_display }}</td>
-                    </tr>
-                    {% if planilla.planilla_asistencia_base %}
-                    <tr>
-                        <th scope="row">Planilla Asistencia Base:</th>
-                        <td>
-                            ID: {{ planilla.planilla_asistencia_base.id }} - 
-                            {{ planilla.planilla_asistencia_base.get_tipo_display }} 
-                            {{ planilla.planilla_asistencia_base.mes }}/{{ planilla.planilla_asistencia_base.anio }}
-                            (Estado: {{ planilla.planilla_asistencia_base.get_estado_display }})
-                        </td>
-                    </tr>
-                    {% endif %}
-                    <tr>
-                        <th scope="row">Fecha Elaboración:</th>
-                        <td>{{ planilla.fecha_elaboracion|date:"d/m/Y" }}</td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Elaborado por:</th>
-                        <td>{{ planilla.usuario_elaboracion.get_full_name|default:planilla.usuario_elaboracion.username|default:"N/A" }}</td>
-                    </tr>
-                    {# Puedes añadir más campos informativos aquí como UFVs, SMN si están guardados #}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <div class="x_panel">
-        <div class="x_title">
-            <h2>Editar Campos de la Planilla</h2>
-            <div class="clearfix"></div>
-        </div>
-        <div class="x_content">
-            <form method="post" class="form-horizontal">
-                {% csrf_token %}
-
-                {# Mostrar errores generales del formulario #}
-                {% if form.non_field_errors %}
-                    <div class="alert alert-danger">
-                        {% for error in form.non_field_errors %}
-                            <p>{{ error }}</p>
-                        {% endfor %}
+        <div class="row">
+            <div class="col-md-8 col-sm-10 offset-md-2 offset-sm-1">
+                <div class="x_panel">
+                    <div class="x_title">
+                        <h2>Información Planilla Bono Te</h2>
+                        <div class="clearfix"></div>
                     </div>
-                {% endif %}
-
-                {# Campo Días Hábiles #}
-                <div class="form-group row">
-                    <label for="{{ form.dias_habiles.id_for_label }}" class="col-form-label col-md-3 col-sm-3">
-                        {{ form.dias_habiles.label }}:
-                    </label>
-                    <div class="col-md-9 col-sm-9">
-                        {{ form.dias_habiles }}
-                        {% if form.dias_habiles.help_text %}
-                            <small class="form-text text-muted">{{ form.dias_habiles.help_text }}</small>
-                        {% endif %}
-                        {% if form.dias_habiles.errors %}
-                            <div class="invalid-feedback d-block">
-                                {% for error in form.dias_habiles.errors %} {{ error }} {% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                {# Campo Estado #}
-                <div class="form-group row">
-                    <label for="{{ form.estado.id_for_label }}" class="col-form-label col-md-3 col-sm-3">
-                        {{ form.estado.label }}:
-                    </label>
-                    <div class="col-md-9 col-sm-9">
-                        {{ form.estado }}
-                        {% if form.estado.help_text %}
-                            <small class="form-text text-muted">{{ form.estado.help_text }}</small>
-                        {% endif %}
-                        {% if form.estado.errors %}
-                            <div class="invalid-feedback d-block">
-                                {% for error in form.estado.errors %} {{ error }} {% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="ln_solid"></div>
-                <div class="form-group row">
-                    <div class="col-md-9 col-sm-9 offset-md-3">
-                        <button type="submit" class="btn btn-success">
-                            <i class="fa fa-save"></i> Guardar Cambios
-                        </button>
-                        <a href="{% url 'lista_planillas' %}" class="btn btn-secondary">
-                            <i class="fa fa-times"></i> Cancelar
-                        </a>
+                    <div class="x_content">
                         
+                        {% if messages %}
+                            <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                    <span aria-hidden="true">×</span>
+                                </button>
+                            </div>
+                        {% endif %}
+
+                        <form method="post" class="form-horizontal form-label-left" novalidate>
+                            {% csrf_token %}
+                            
+                            {% if form.non_field_errors %}
+                                <div class="alert alert-danger">
+                                    {% for error in form.non_field_errors %}
+                                        <p>{{ error }}</p>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+
+                            <!-- MES Y AÑO -->
+                            <div class="form-group row">
+                                <label class="col-form-label col-md-3 col-sm-3 label-align"><strong>Mes / Año:</strong></label>
+                                <div class="col-md-9 col-sm-9">
+                                    <p class="form-control-static" style="padding-top: 8px;"><strong>{{ planilla.mes }} / {{ planilla.anio }}</strong></p>
+                                </div>
+                            </div>
+
+                            <!-- TIPO DE PLANILLA -->
+                            <div class="form-group row">
+                                <label class="col-form-label col-md-3 col-sm-3 label-align"><strong>Tipo de Planilla:</strong></label>
+                                <div class="col-md-9 col-sm-9">
+                                    <p class="form-control-static" style="padding-top: 8px;">{{ planilla.get_tipo_display }}</p>
+                                </div>
+                            </div>
+                            
+                            <!-- PLANILLA ASISTENCIA BASE -->
+                            {% if planilla.planilla_asistencia_base %}
+                            <div class="form-group row">
+                                <label class="col-form-label col-md-3 col-sm-3 label-align"><strong>Planilla Asistencia Base:</strong></label>
+                                <div class="col-md-9 col-sm-9">
+                                    <p class="form-control-static" style="padding-top: 8px;">
+                                        {{ planilla.planilla_asistencia_base.get_tipo_display }} {{ planilla.planilla_asistencia_base.mes }}/{{ planilla.planilla_asistencia_base.anio }} (Estado: {{ planilla.planilla_asistencia_base.get_estado_display }})
+                                    </p>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {# Separador para distinguir la información de los campos editables #}
+                            <div class="ln_solid"></div>
+
+                            <!-- ===== SECCIÓN DE CAMPOS EDITABLES ===== -->
+                            {# ... (el resto del formulario no ha cambiado) ... #}
+
+                            <!-- CAMPO DÍAS HÁBILES -->
+                            <div class="item form-group">
+                                <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.dias_habiles.id_for_label }}">
+                                    {{ form.dias_habiles.label }} <span class="required">*</span>
+                                </label>
+                                <div class="col-md-6 col-sm-6">
+                                    {{ form.dias_habiles }}
+                                    {% if form.dias_habiles.help_text %}<p class="help-block">{{ form.dias_habiles.help_text }}</p>{% endif %}
+                                    {% if form.dias_habiles.errors %}<div class="text-danger">{{ form.dias_habiles.errors|first }}</div>{% endif %}
+                                </div>
+                            </div>
+
+                            <!-- CAMPO ESTADO -->
+                            <div class="item form-group">
+                                <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.estado.id_for_label }}">
+                                    {{ form.estado.label }} <span class="required">*</span>
+                                </label>
+                                <div class="col-md-6 col-sm-6">
+                                    {{ form.estado }}
+                                    {% if form.estado.help_text %}<p class="help-block">{{ form.estado.help_text }}</p>{% endif %}
+                                    {% if form.estado.errors %}<div class="text-danger">{{ form.estado.errors|first }}</div>{% endif %}
+                                </div>
+                            </div>
+
+                            <div class="ln_solid"></div>
+                            <div class="item form-group">
+                                <div class="col-md-6 col-sm-6 offset-md-3">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fa fa-save"></i> Guardar Cambios
+                                    </button>
+                                    <a href="{% url 'lista_planillas' %}" class="btn btn-secondary" type="button">
+                                        <i class="fa fa-times"></i> Cancelar
+                                    </a>
+                                </div>
+                            </div>
+                        </form>
                     </div>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>

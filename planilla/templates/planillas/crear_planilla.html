@@ -27,7 +27,7 @@
     {% endif %}
 
     <div class="row">
-        <div class="col-md-12 col-sm-12">
+        <div class="col-md-8 col-sm-10 offset-md-2 offset-sm-1">
             {# --- INICIO PANEL ÚNICO --- #}
             <div class="x_panel">
                 <div class="x_title">
@@ -41,7 +41,7 @@
                     {# Sigue siendo un <form> separado para el GET, pero visualmente dentro del mismo panel #}
                     <form method="get" action="{% url 'crear_planilla_bono_te' %}" id="tipoFilterForm" class="form-horizontal form-label-left">
                         <div class="form-group row">
-                            <label for="tipo_filtro_select" class="col-form-label col-md-3 col-sm-3 label-align text-md-right">Paso 1: Filtrar Asistencias por Tipo:</label>
+                            <label for="tipo_filtro_select" class="col-form-label col-md-3 col-sm-3 label-align text-md-right">Tipo:</label>
                             <div class="col-md-6 col-sm-9">
                                 <select name="tipo_filtro" id="tipo_filtro_select" class="form-control"
                                         onchange="this.form.submit();">
@@ -82,7 +82,7 @@
                         {# Campo: Planilla de Asistencia Base Selector #}
                         <div class="form-group row {% if planilla_form.planilla_asistencia_base_selector.errors %}bad{% endif %}">
                             <label for="{{ planilla_form.planilla_asistencia_base_selector.id_for_label }}" class="col-form-label col-md-3 col-sm-3 label-align text-md-right">
-                                Paso 2: {{ planilla_form.planilla_asistencia_base_selector.label }} <span class="required">*</span>:
+                                {{ planilla_form.planilla_asistencia_base_selector.label }} <span class="required">*</span>:
                             </label>
                             <div class="col-md-6 col-sm-9">
                                 {{ planilla_form.planilla_asistencia_base_selector }}
@@ -98,7 +98,7 @@
                         {# Campo: Días Hábiles #}
                         <div class="form-group row {% if planilla_form.dias_habiles.errors %}bad{% endif %}">
                             <label for="{{ planilla_form.dias_habiles.id_for_label }}" class="col-form-label col-md-3 col-sm-3 label-align text-md-right">
-                                Paso 3: {{ planilla_form.dias_habiles.label }} <span class="required">*</span>:
+                                {{ planilla_form.dias_habiles.label }} <span class="required">*</span>:
                             </label>
                             <div class="col-md-6 col-sm-9">
                                 {{ planilla_form.dias_habiles }}

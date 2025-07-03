@@ -24,7 +24,7 @@ class PrincipalPersonalExterno(models.Model):
     class Meta:
         managed = False # No gestionar esta tabla con migraciones Django
         db_table = 'principal_personal' # Nombre exacto de la tabla externa
-        # app_label = 'planilla' # Opcional si está en la app correcta
+        permissions = []
 
     @property
     def nombre_completo(self):
@@ -43,7 +43,7 @@ class PrincipalCargoExterno(models.Model):
     class Meta:
         managed = False
         db_table = 'principal_cargo'
-        # app_label = 'planilla'
+        permissions = []
 
     def __str__(self):
         return self.nombre_cargo or f"Cargo Externo ID {self.id}"
@@ -61,7 +61,7 @@ class PrincipalSecretariaExterna(models.Model):
     class Meta:
         managed = False
         db_table = 'principal_secretaria' # Ajusta nombre tabla
-        # app_label = 'planilla'
+        permissions = []
 
     def __str__(self):
         return self.nombre_secretaria or f"Secretaria Externa ID {self.id}"
@@ -88,7 +88,7 @@ class PrincipalUnidadExterna(models.Model):
     class Meta:
         managed = False
         db_table = 'principal_unidad' # Ajusta nombre tabla
-        # app_label = 'planilla'
+        permissions = []
 
     def __str__(self):
         return self.nombre_unidad or f"Unidad Externa ID {self.id}"
@@ -148,7 +148,7 @@ class PrincipalDesignacionExterno(models.Model):
     class Meta:
         managed = False
         db_table = 'principal_designacion' # Ajusta nombre tabla
-        # app_label = 'planilla'
+        permissions = []
 
     def __str__(self):
         return (f"Designacion Externa ID {self.id} (Tipo: {self.tipo_designacion}, Estado: {self.estado}, "

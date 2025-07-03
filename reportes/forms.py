@@ -116,7 +116,7 @@ class EditarPlanillaAsistenciaForm(forms.ModelForm):
         fields = ['anio', 'mes', 'tipo', 'estado', 'observaciones_generales']
         widgets = {
             # Los widgets para anio, mes, tipo se definirán/modificarán en __init__
-            'estado': forms.Select(attrs={'class': 'form-select'}),
+            'estado': forms.Select(attrs={'class': 'form-control'}),
             'observaciones_generales': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
         }
 

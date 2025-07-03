@@ -70,11 +70,12 @@ INSTALLED_APPS = [
     'auditlog', 
     'administracion.apps.AdministracionConfig',
     'widget_tweaks',
-    'planilla.apps.PlanillaConfig', # <--- ASÍ para la app planilla
+    'planilla.apps.PlanillaConfig', 
     'reportes.apps.ReportesConfig',
     'sueldos.apps.SueldosConfig',
     'boletas.apps.BoletasConfig',
     'bitacora.apps.BitacoraConfig',
+    'core',
 
 ]
 

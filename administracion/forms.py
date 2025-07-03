@@ -7,7 +7,7 @@ from django.core.validators import RegexValidator # Para validaciones con regex
 import re # Módulo de expresiones regulares de Python
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _ 
-
+from django.contrib.contenttypes.models import ContentType
 class MinimumLengthValidator:
     def __init__(self, min_length=8):
         self.min_length = min_length
@@ -260,16 +260,7 @@ class UserProfileForm(forms.ModelForm):
 
 #------------------------------------------
 class GroupForm(forms.ModelForm):
-    permissions = forms.ModelMultipleChoiceField(
-        queryset=Permission.objects.all().select_related('content_type').order_by(
-            'content_type__app_label', 
-            'content_type__model',
-            'name'
-        ),
-        widget=forms.CheckboxSelectMultiple,
-        required=False,
-        label="Permisos para este Grupo"
-    )
+    
 
     class Meta:
         model = Group
@@ -287,6 +278,20 @@ class GroupForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        excluded_apps = ['admin', 'auth', 'contenttypes', 'sessions', 'auditlog']
+        filtered_permissions = Permission.objects.exclude(content_type__app_label__in=excluded_apps).select_related('content_type').order_by('content_type__app_label', 'content_type__model', 'name')
+
+        self.fields['permissions'] = forms.ModelMultipleChoiceField(
+            queryset=filtered_permissions,
+            widget=forms.CheckboxSelectMultiple,
+            required=False,
+            label="Permisos para este grupo"
+        )
+
+
         if self.instance and self.instance.pk:
-            print(f"DEBUG (Form __init__): Editando grupo: {self.instance.name}")
-            self.fields['permissions'].initial = list(self.instance.permissions.values_list('pk', flat=True)) 
+            initial_permissions = self.instance.permissions.filter(
+                id__in=filtered_permissions.values_list('id', flat=True)
+            )
+            self.fields['permissions'].initial = initial_permissions
