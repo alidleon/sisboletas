@@ -1,4 +1,3 @@
-# sisboletas/administracion/apps.py
 from django.apps import AppConfig
 
 class AdministracionConfig(AppConfig):

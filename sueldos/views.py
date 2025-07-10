@@ -1,5 +1,3 @@
-# sueldos/views.py (COMPLETO Y MODIFICADO)
-
 import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, permission_required
@@ -8,23 +6,20 @@ from django.db import transaction, IntegrityError
 from django.utils import timezone
 from .models import PlanillaSueldo, DetalleSueldo, EstadoMensualEmpleado, CierreMensual
 from .forms import CrearPlanillaSueldoForm, EditarPlanillaSueldoForm, SubirExcelSueldosForm, EditarDetalleSueldoForm, SeleccionarPlanillaSueldoParaCierreForm
-from decimal import Decimal, InvalidOperation # Importar Decimal e InvalidOperation
-from .utils import get_processed_sueldo_details # Importar la nueva utilidad
+from decimal import Decimal, InvalidOperation 
+from .utils import get_processed_sueldo_details 
 from django.urls import reverse
 from .excel_config import PROCESADORES_EXCEL
 from urllib.parse import urlencode
-from django.db.models import Q # Para consultas complejas si son necesarias
-from collections import defaultdict # Para agrupar designaciones
+from django.db.models import Q 
+from collections import defaultdict 
 from django.core.exceptions import ValidationError, FieldDoesNotExist
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-# --- Imports para django-auditlog ---
 from auditlog.models import LogEntry
 from django.contrib.contenttypes.models import ContentType
-# --- Fin Imports para django-auditlog ---
 
-# --- Importar modelos externos y librerías ---
 try:
     from planilla.models import PrincipalPersonalExterno, PrincipalDesignacionExterno
     PLANILLA_APP_AVAILABLE = True
@@ -35,8 +30,8 @@ except ImportError:
     logging.error("SUELDOS VIEWS: No se pudo importar PrincipalPersonalExterno.")
 
 try:
-    import pandas as pd # Importar pandas
-    from openpyxl.utils.exceptions import InvalidFileException # Para error de archivo corrupto
+    import pandas as pd 
+    from openpyxl.utils.exceptions import InvalidFileException 
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
@@ -49,46 +44,36 @@ except ImportError:
     PlanillaAsistencia, DetalleAsistencia = None, None
     REPORTES_APP_AVAILABLE = False
     logging.warning("SUELDOS VIEWS: No se pudo importar modelos de 'reportes'. La comparación con asistencia no estará disponible.")
-# --- Fin Importaciones ---
 
 logger = logging.getLogger(__name__)
 
-# --- Vistas para la Cabecera (PlanillaSueldo) ---
-# (Estas vistas permanecen igual que antes)
 @login_required
 @permission_required('sueldos.add_planillasueldo', raise_exception=True)
 def crear_planilla_sueldo(request):
-    # La generación de sugerencias no cambia
     hoy = datetime.now()
-    anios_sugeridos = sorted(list(set([hoy.year - 1, hoy.year, hoy.year + 1])))
+    anios_sugeridos = sorted(list(set([hoy.year - 1, hoy.year, hoy.year + 1, hoy.year + 2, hoy.year + 3, hoy.year + 4, hoy.year + 5])))
     meses_sugeridos = list(range(1, 13))
 
     if request.method == 'POST':
-        # Pasamos las listas al form también en el POST para que pueda construir los 'choices' y validar
         form = CrearPlanillaSueldoForm(request.POST, meses_sugeridos=meses_sugeridos, anios_sugeridos=anios_sugeridos)
         if form.is_valid():
-            # Obtenemos los datos desde cleaned_data, donde el método 'clean' ya los puso
             mes = form.cleaned_data['mes']
             anio = form.cleaned_data['anio']
             tipo = form.cleaned_data['tipo']
             
             if REPORTES_APP_AVAILABLE:
                 try:
-                    # Buscamos la planilla de asistencia correspondiente
                     asistencia_requerida = PlanillaAsistencia.objects.get(
                         mes=mes,
                         anio=anio,
                         tipo=tipo
                     )
-                    # Verificamos si su estado es 'validado'
                     if asistencia_requerida.estado != 'validado':
                         messages.error(request, f"Acción denegada: El reporte de asistencia para {mes}/{anio} ({dict(PlanillaSueldo.TIPO_CHOICES).get(tipo)}) existe, pero su estado es '{asistencia_requerida.get_estado_display()}'. Debe estar 'Validado'.")
-                        # Devolvemos el control, recargando el formulario para que el usuario vea el mensaje
                         return render(request, 'sueldos/crear_planilla_sueldo.html', {'form': form, 'titulo_pagina': 'Crear Nueva Planilla de Sueldos'})
 
                 except PlanillaAsistencia.DoesNotExist:
                     messages.error(request, f"Acción denegada: No existe un reporte de asistencia para el periodo {mes}/{anio} ({dict(PlanillaSueldo.TIPO_CHOICES).get(tipo)}). Por favor, créelo y valídelo primero.")
-                    # Devolvemos el control
                     return render(request, 'sueldos/crear_planilla_sueldo.html', {'form': form, 'titulo_pagina': 'Crear Nueva Planilla de Sueldos'})
             else:
                 messages.warning(request, "Advertencia: No se pudo verificar la existencia de un reporte de asistencia (app 'reportes' no disponible).")
@@ -110,7 +95,6 @@ def crear_planilla_sueldo(request):
                 except Exception as e:
                     messages.error(request, f"Ocurrió un error inesperado: {e}")
     else:
-        # Pasamos las listas al form en el GET para la renderización inicial
         form = CrearPlanillaSueldoForm(meses_sugeridos=meses_sugeridos, anios_sugeridos=anios_sugeridos)
 
     context = {
@@ -173,8 +157,8 @@ def lista_planillas_sueldo(request):
         
     # 6. Creamos el contexto completo
     context = {
-        'planillas_sueldo': page_obj, # Tu template usa 'planillas_sueldo'
-        'page_obj': page_obj, # Pasamos page_obj también para la paginación
+        'planillas_sueldo': page_obj, 
+        'page_obj': page_obj, 
         'titulo_pagina': 'Planillas de Sueldos Generadas',
         'valores_filtro': request.GET,
         'querystring': querystring.urlencode(),
@@ -227,24 +211,15 @@ def subir_excel_sueldos(request, planilla_id):
                     s_value = str(value).strip()
                     if not s_value:
                         return default
-
-                    # Contar puntos y comas para determinar el formato
                     num_dots = s_value.count('.')
                     num_commas = s_value.count(',')
 
-                    # Formato latino/europeo: 1.234,56
                     if num_dots > 0 and num_commas == 1:
-                        # Eliminar separadores de miles (puntos) y reemplazar coma decimal
                         s_value = s_value.replace('.', '').replace(',', '.')
-                    # Formato latino/europeo sin miles: 1234,56
                     elif num_dots == 0 and num_commas == 1:
                         s_value = s_value.replace(',', '.')
-                    # Formato estándar/americano: 1,234.56 o 1234.56 (la coma es separador de miles)
                     elif num_commas > 0:
                         s_value = s_value.replace(',', '')
-                    
-                    # En este punto, s_value debería ser un número con '.' como separador decimal
-                    # y sin separadores de miles. Ej: "1234.56"
                     try:
                         return Decimal(s_value)
                     except InvalidOperation:
@@ -282,10 +257,8 @@ def subir_excel_sueldos(request, planilla_id):
                         advertencias_carga.append(f"Fila {numero_fila_excel}: Omitida (ADVERTENCIA: CI '{ci_excel}' duplicado archivo)."); filas_omitidas_datos += 1; continue
                     personal_procesado_en_archivo.add(personal_externo.id)
                     
-                    # El bloque de comparación con asistencia se mantiene igual
                     if planilla_asistencia_validada and personal_externo:
-                        # ...
-                        pass # Tu lógica de comparación va aquí si la necesitas
+                        pass 
 
                     try:
                         def get_col_value(col_name):
@@ -377,7 +350,6 @@ def subir_excel_sueldos(request, planilla_id):
         else:
             messages.error(request, "Error en formulario. Seleccione un archivo .xlsx válido.")
     
-    # Este bloque se ejecuta para peticiones GET o si el formulario no es válido
     form = SubirExcelSueldosForm()
     context = {'form': form, 'planilla_sueldo': planilla, 'titulo_pagina': f'Cargar Excel Sueldos - {planilla}'}
     return render(request, 'sueldos/subir_excel.html', context)
@@ -414,56 +386,35 @@ def editar_planilla_sueldo(request, planilla_id):
 def borrar_planilla_sueldo(request, planilla_id):
     """ Permite borrar una PlanillaSueldo (cabecera) y sus detalles asociados. """
     planilla = get_object_or_404(PlanillaSueldo, pk=planilla_id)
-
-    # --- NUEVO: Verificación de dependencias ---
-    # Asumiendo que tienes una app 'boletas' con un modelo 'BoletaPago'
-    # que apunta a DetalleSueldo. ¡AJUSTA ESTO A TUS MODELOS REALES!
     try:
         from boletas.models import BoletaPago
-        # Contamos si alguna boleta apunta a alguno de los detalles de esta planilla
         boletas_generadas = BoletaPago.objects.filter(detalle_sueldo__planilla_sueldo=planilla).exists()
         if boletas_generadas:
             messages.error(request, f"No se puede borrar la planilla '{planilla}' porque ya tiene boletas de pago generadas y asociadas.")
             return redirect('lista_planillas_sueldo')
     except ImportError:
-        # Si la app boletas no existe, no hacemos nada.
         pass
-    # Puedes añadir más verificaciones aquí para otros modelos si es necesario
-    # --- FIN DE LA VERIFICACIÓN ---
-    # Guardar datos para el mensaje antes de borrar
+    
     planilla_str = str(planilla)
-    # Contar detalles asociados (CASCADE los borrará automáticamente)
     num_detalles = planilla.detalles_sueldo.count()
-
-    # No permitir borrar si ya está en estados avanzados (opcional)
-    # if planilla.estado in ['pagado', 'archivado']:
-    #     messages.warning(request, f"No se puede borrar una planilla en estado '{planilla.get_estado_display()}'.")
-    #     return redirect('lista_planillas_sueldo')
 
     if request.method == 'POST':
         try:
-            # Eliminar la planilla. CASCADE se encargará de los DetalleSueldo.
             planilla.delete()
             messages.success(request, f"Planilla '{planilla_str}' y sus {num_detalles} detalles asociados han sido borrados exitosamente.")
-            return redirect('lista_planillas_sueldo') # Volver a la lista
+            return redirect('lista_planillas_sueldo') 
         except Exception as e_del:
             logger.error(f"Error borrando PlanillaSueldo ID {planilla_id}: {e_del}", exc_info=True)
             messages.error(request, f"Ocurrió un error al intentar borrar la planilla: {e_del}")
-            # Redirigir de vuelta a la lista incluso si hay error
             return redirect('lista_planillas_sueldo')
 
-    # Si es método GET, mostrar la página de confirmación
     context = {
         'planilla': planilla,
-        'num_detalles': num_detalles, # Para mostrar en la confirmación
+        'num_detalles': num_detalles, 
         'titulo_pagina': f"Confirmar Borrado: {planilla}"
     }
     return render(request, 'sueldos/borrar_planilla_sueldo.html', context)
 
-
-
-# --- Vistas Pendientes ---
-# ... (código comentado para ver_detalles_sueldo, etc.) ...
 
 
 @login_required
@@ -472,8 +423,6 @@ def ver_detalles_sueldo(request, planilla_id):
     """ Muestra los detalles de sueldo paginados para una planilla. """
     logger.debug(f"Vista ver_detalles_sueldo llamada para planilla_id={planilla_id}")
     try:
-        # 1. Llamamos a la utilidad, que ahora se encarga de paginar.
-        #    Podemos pasar cuántos ítems queremos por página.
         processed_data = get_processed_sueldo_details(request, planilla_id, items_por_pagina=15)
 
         # 2. Manejo de errores (esta parte no cambia)
@@ -492,8 +441,6 @@ def ver_detalles_sueldo(request, planilla_id):
             'selected_unidad_id': processed_data.get('selected_unidad_id'),
             'search_term': processed_data.get('search_term', ''),
             'search_active': processed_data.get('search_active', False),
-
-            # CAMBIO CLAVE: Ahora pasamos el objeto 'page_obj' directamente
             'page_obj': processed_data.get('page_obj'),
 
             'titulo_pagina': f"Detalles Sueldos - {processed_data.get('planilla_sueldo')}" if processed_data.get('planilla_sueldo') else "Detalles Sueldos"
@@ -502,7 +449,6 @@ def ver_detalles_sueldo(request, planilla_id):
         # 4. Renderizar la plantilla
         return render(request, 'sueldos/ver_detalles_sueldo.html', context)
 
-    # Manejo de excepciones (no cambia)
     except Exception as e_view:
         logger.error(f"Error inesperado en vista ver_detalles_sueldo ID {planilla_id}: {e_view}", exc_info=True)
         messages.error(request, "Ocurrió un error inesperado al mostrar los detalles de sueldo.")
@@ -521,8 +467,6 @@ def editar_detalle_sueldo(request, detalle_id):
         pk=detalle_id
     )
     planilla_sueldo = detalle.planilla_sueldo
-
-    # Obtener información externa para mostrar
     persona_externa = None
     item_cargo_externo = {"item": "N/A", "cargo": "N/A"}
     if PLANILLA_APP_AVAILABLE and detalle.personal_externo_id:
@@ -539,18 +483,14 @@ def editar_detalle_sueldo(request, detalle_id):
             logger.warning(f"Personal externo ID {detalle.personal_externo_id} no encontrado (Editar Detalle Sueldo)")
         except Exception as e_ext:
             logger.error(f"Error consultando datos externos para DetalleSueldo ID {detalle_id}: {e_ext}", exc_info=True)
-            # No añadir mensaje flash aquí para no interferir con mensajes de formulario
-
-    # --- CONSTRUIR URL DE RETORNO (para Cancelar y Éxito) ---
-    # Usar los parámetros GET que llegaron a esta vista de edición
     redirect_params = {
         'secretaria': request.GET.get('secretaria', ''),
         'unidad': request.GET.get('unidad', ''),
         'q': request.GET.get('q', ''),
     }
-    if request.GET.get('buscar'): # Preservar el flag 'buscar'
+    if request.GET.get('buscar'): 
         redirect_params['buscar'] = 'true'
-    redirect_params = {k: v for k, v in redirect_params.items() if v} # Limpiar vacíos
+    redirect_params = {k: v for k, v in redirect_params.items() if v} 
 
     base_url = reverse('ver_detalles_sueldo', kwargs={'planilla_id': planilla_sueldo.pk})
     if redirect_params:
@@ -558,26 +498,21 @@ def editar_detalle_sueldo(request, detalle_id):
         return_url = f"{base_url}?{query_string}"
     else:
         return_url = base_url
-    # --- FIN CONSTRUCCIÓN URL RETORNO ---
 
     if request.method == 'POST':
         form = EditarDetalleSueldoForm(request.POST, instance=detalle)
         if form.is_valid():
             try:
                 detalle_guardado = form.save()
-                # Obtener nombre para mensaje (reutilizando lógica)
                 nombre_display = persona_externa.nombre_completo if persona_externa else f"ID Externo {detalle_guardado.personal_externo_id}"
                 messages.success(request, f"Detalle de sueldo para '{nombre_display}' actualizado.")
-                # Redirigir a la URL de retorno construida
                 return redirect(return_url)
             except Exception as e_save:
                 logger.error(f"Error guardando DetalleSueldo ID {detalle_id}: {e_save}", exc_info=True)
                 messages.error(request, f"Ocurrió un error al guardar los cambios: {e_save}")
-                # Si hay error, se renderiza el form de nuevo abajo
         else:
             messages.error(request, "El formulario contiene errores. Por favor, corrígelos.")
-            # El form con errores se renderiza abajo
-    else: # Método GET
+    else: 
         form = EditarDetalleSueldoForm(instance=detalle)
 
     context = {
@@ -587,7 +522,7 @@ def editar_detalle_sueldo(request, detalle_id):
         'persona_externa': persona_externa,
         'item_externo': item_cargo_externo["item"],
         'cargo_externo': item_cargo_externo["cargo"],
-        'cancel_url': return_url, # <-- Pasar URL para botón Cancelar
+        'cancel_url': return_url, 
         'titulo_pagina': f"Editar Detalle Sueldo - {persona_externa.nombre_completo if persona_externa else f'ID Ext {detalle.personal_externo_id}'}"
     }
     return render(request, 'sueldos/editar_detalle_sueldo.html', context)
@@ -603,19 +538,14 @@ def borrar_detalle_sueldo(request, detalle_id):
         pk=detalle_id
     )
     planilla_sueldo = detalle.planilla_sueldo
-    planilla_sueldo_id = planilla_sueldo.pk # Guardar ID antes de posible borrado
-
-    # Obtener nombre para el mensaje de confirmación
-    persona_nombre = f"ID Externo {detalle.personal_externo_id}" # Fallback
+    planilla_sueldo_id = planilla_sueldo.pk 
+    persona_nombre = f"ID Externo {detalle.personal_externo_id}" 
     if PLANILLA_APP_AVAILABLE and detalle.personal_externo_id:
         try:
             persona = PrincipalPersonalExterno.objects.using('personas_db').get(pk=detalle.personal_externo_id)
             persona_nombre = persona.nombre_completo or persona_nombre
         except Exception:
-            pass # Ignorar errores al obtener nombre para el mensaje
-
-    # --- CONSTRUIR URL DE RETORNO (para Cancelar y Éxito) ---
-    # Usar los parámetros GET que llegaron a esta vista de borrado
+            pass 
     redirect_params = {
         'secretaria': request.GET.get('secretaria', ''),
         'unidad': request.GET.get('unidad', ''),
@@ -631,45 +561,32 @@ def borrar_detalle_sueldo(request, detalle_id):
         return_url = f"{base_url}?{query_string}"
     else:
         return_url = base_url
-    # --- FIN CONSTRUCCIÓN URL RETORNO ---
 
     if request.method == 'POST':
         try:
-            nombre_para_mensaje = persona_nombre # Guardar antes de borrar
+            nombre_para_mensaje = persona_nombre 
             detalle.delete()
             messages.success(request, f"Detalle de sueldo para '{nombre_para_mensaje}' borrado exitosamente.")
-            # Redirigir a la URL de retorno construida
             return redirect(return_url)
         except Exception as e_del:
              logger.error(f"Error borrando DetalleSueldo ID {detalle_id}: {e_del}", exc_info=True)
              messages.error(request, f"Ocurrió un error al intentar borrar el registro: {e_del}")
-             # Fallback: ir a la lista general si falla el borrado
              return redirect('lista_planillas_sueldo')
 
-    # Método GET: Mostrar la página de confirmación
     context = {
         'detalle': detalle,
         'planilla_sueldo': planilla_sueldo,
         'persona_nombre': persona_nombre,
-        'cancel_url': return_url, # <-- Pasar URL para botón Cancelar
+        'cancel_url': return_url, 
         'titulo_pagina': f"Confirmar Borrado Detalle Sueldo: {persona_nombre}"
     }
     return render(request, 'sueldos/borrar_detalle_sueldo.html', context)
 
 
-
-# sueldos/views.py
-# ... (importaciones existentes: logging, render, redirect, etc.) ...
-
-
-
-
-
-
 EXTERNAL_TYPE_MAP = {
     'planta': 'ASEGURADO',
-    'contrato': 'CONTRATO', # Ajusta si el valor real es diferente
-    'consultor': 'CONSULTOR EN LINEA', # Ajusta si el valor real es diferente
+    'contrato': 'CONTRATO', 
+    'consultor': 'CONSULTOR EN LINEA', 
 }
 
 @login_required
@@ -751,8 +668,6 @@ def generar_estado_mensual_form(request):
                     desig_relevante = designaciones_map.get(id_personal, [None])[0]
                     estado_anterior = estados_anteriores_map.get(id_personal)
                     
-                    # --- Aquí va toda tu lógica compleja para determinar el estado ---
-                    # (Esta es una versión simplificada, tu lógica original es más detallada)
                     if id_personal in ids_ingresan:
                         estado_final = 'NUEVO_INGRESO'
                         notas_proceso_actual.append("Detectado como nuevo ingreso.")
@@ -760,13 +675,12 @@ def generar_estado_mensual_form(request):
                         estado_final = 'RETIRO_DETECTADO'
                         notas_proceso_actual.append("Detectado como retiro.")
                     elif id_personal in ids_permanecen:
-                        estado_final = 'ACTIVO' # Podría ser CAMBIO_PUESTO según tu lógica detallada
-                        # (Aquí iría la comparación de item, cargo, etc.)
+                        estado_final = 'ACTIVO' 
+
                     
-                    # Recolectar datos finales
                     if desig_relevante:
                         item_final, cargo_final, unidad_final = desig_relevante.item, (desig_relevante.cargo.nombre_cargo if desig_relevante.cargo else None), (desig_relevante.unidad.nombre_unidad if desig_relevante.unidad else None)
-                    elif estado_anterior: # Si no hay designación pero sí estado anterior
+                    elif estado_anterior: 
                         item_final, cargo_final, unidad_final = estado_anterior.item, estado_anterior.cargo, estado_anterior.unidad_nombre
 
                     estado_obj_data = {
@@ -798,7 +712,6 @@ def generar_estado_mensual_form(request):
                 messages.error(request, f"Error crítico durante la generación: {e_proc}")
                 return redirect('generar_estado_mensual_form')
     
-    # Este bloque solo se alcanza en un GET o si el form no es válido
     else: 
         form = SeleccionarPlanillaSueldoParaCierreForm()
 
@@ -808,10 +721,6 @@ def generar_estado_mensual_form(request):
     }
     return render(request, 'sueldos/generar_estado_mensual_form.html', context)
 #-------------------------------
-
-
-
-
 
 
 @login_required
@@ -824,7 +733,7 @@ def lista_cierres_mensuales(request):
     # 1. Inicializamos queryset
     queryset = CierreMensual.objects.all().order_by('-anio', '-mes', 'tipo_planilla')
 
-    # 2. Lógica de filtros (sin cambios)
+    # 2. Lógica de filtros 
     filtro_anio = request.GET.get('anio', '').strip()
     filtro_mes = request.GET.get('mes', '').strip()
     filtro_tipo = request.GET.get('tipo_planilla', '').strip()
@@ -843,25 +752,25 @@ def lista_cierres_mensuales(request):
     if filtro_estado:
         queryset = queryset.filter(estado_proceso=filtro_estado)
 
-    # 3. Paginación (sin cambios)
+    # 3. Paginación 
     paginator = Paginator(queryset, 25)
     page_number = request.GET.get('page', '1')
     try:
-        page_obj = paginator.page(page_number) # La variable se llama 'page_obj'
+        page_obj = paginator.page(page_number) 
     except PageNotAnInteger:
         page_obj = paginator.page(1)
     except EmptyPage:
         page_obj = paginator.page(paginator.num_pages)
 
-    # 4. Preparamos el querystring (sin cambios)
+    # 4. Preparamos el querystring 
     querystring = request.GET.copy()
     if 'page' in querystring:
         del querystring['page']
 
-    # 5. Creamos el contexto (AQUÍ ESTÁ EL AJUSTE CLAVE)
+ 
     context = {
-        'cierres_mensuales': page_obj,  # Pasamos el objeto de página
-        'page_obj': page_obj,          # Pasamos 'page_obj' explícitamente para el parcial
+        'cierres_mensuales': page_obj,  
+        'page_obj': page_obj,          
         'titulo_pagina': 'Historial de Generación de Estados Mensuales',
         'valores_filtro': request.GET,
         'querystring': querystring.urlencode(),
@@ -881,25 +790,18 @@ def borrar_cierre_mensual(request, cierre_id):
     Muestra una página de confirmación antes de borrar.
     """
     cierre = get_object_or_404(CierreMensual, pk=cierre_id)
-    # Contar cuántos detalles se borrarán para mostrar en la confirmación
     num_estados_asociados = cierre.estados_empleados.count()
 
     if request.method == 'POST':
         try:
-            cierre_str = str(cierre) # Guardar descripción para el mensaje
-            # Borrar el CierreMensual. La BD se encargará de borrar los
-            # EstadoMensualEmpleado asociados por el CASCADE.
+            cierre_str = str(cierre) 
             cierre.delete()
             messages.success(request, f"Cierre Mensual '{cierre_str}' y sus {num_estados_asociados} estados asociados han sido borrados exitosamente.")
-            # Redirigir a la lista de cierres
             return redirect('lista_cierres_mensuales')
         except Exception as e_del:
             logger.error(f"Error borrando CierreMensual ID {cierre_id}: {e_del}", exc_info=True)
             messages.error(request, f"Ocurrió un error al intentar borrar el cierre mensual: {e_del}")
-            # Redirigir de vuelta a la lista incluso si hay error
             return redirect('lista_cierres_mensuales')
-
-    # Si es método GET, mostrar la página de confirmación
     context = {
         'cierre': cierre,
         'num_estados': num_estados_asociados,
@@ -913,15 +815,12 @@ def borrar_cierre_mensual(request, cierre_id):
 def ver_detalle_cierre(request, cierre_id):
     cierre = get_object_or_404(CierreMensual, pk=cierre_id)
 
-    # Obtener los estados asociados a este cierre SIN ordenamiento por campos externos
     estados_list_qs = EstadoMensualEmpleado.objects.filter(cierre_mensual=cierre) \
-                                                .order_by('pk') # Ordenar por un campo local o quitar .order_by()
-
-    # Paginación ANTES del enriquecimiento
+                                                .order_by('pk') 
     page = request.GET.get('page', 1)
     paginator = Paginator(estados_list_qs, 50)
     try:
-        estados_pagina_actual_objetos = paginator.page(page) # Renombrar para claridad
+        estados_pagina_actual_objetos = paginator.page(page) 
     except PageNotAnInteger:
         estados_pagina_actual_objetos = paginator.page(1)
     except EmptyPage:
@@ -953,26 +852,21 @@ def ver_detalle_cierre(request, cierre_id):
             estado_obj.nombre_completo_externo = f"ID Ext: {estado_obj.personal_externo_id}"
             estado_obj.ci_externo = "N/A"
 
-    # --- Ordenar la lista enriquecida en Python ---
-    # (Opcional: si necesitas un orden específico por nombre)
+
     try:
         lista_enriquecida.sort(key=lambda x: (
             (getattr(x, 'nombre_completo_externo', '') or '').split(' ')[1] if len((getattr(x, 'nombre_completo_externo', '') or '').split(' ')) > 1 else '', # Apellido Paterno
             (getattr(x, 'nombre_completo_externo', '') or '').split(' ')[2] if len((getattr(x, 'nombre_completo_externo', '') or '').split(' ')) > 2 else '', # Apellido Materno
-            (getattr(x, 'nombre_completo_externo', '') or '').split(' ')[0]  # Nombre
+            (getattr(x, 'nombre_completo_externo', '') or '').split(' ')[0]
         ))
     except Exception as e_sort:
          logger.warning(f"No se pudo ordenar la lista enriquecida: {e_sort}")
     # --------------------------------------------
 
-    # Re-construir el objeto Page con la lista ordenada (si se va a usar en la plantilla como tal)
-    # O simplemente pasar la lista_enriquecida y ajustar la plantilla
-    # Por ahora, pasaremos la lista y ajustaremos el template de paginación si es necesario
-
     context = {
         'cierre_mensual': cierre,
-        'estados_empleados_lista': lista_enriquecida, # Pasar la lista Python enriquecida y ordenada
-        'estados_empleados_page_obj': estados_pagina_actual_objetos, # Pasar el objeto Page para la paginación
+        'estados_empleados_lista': lista_enriquecida, 
+        'estados_empleados_page_obj': estados_pagina_actual_objetos, 
         'titulo_pagina': f"Detalle Cierre Mensual: {cierre.mes}/{cierre.anio} ({cierre.get_tipo_planilla_display()})"
     }
     return render(request, 'sueldos/ver_detalle_cierre.html', context)

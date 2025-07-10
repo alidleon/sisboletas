@@ -1,21 +1,15 @@
-# planilla/utils.py (Versión Restaurada + Debug Prints)
-
 import logging
 from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-# Importa los modelos externos necesarios
 from .models import (
     Planilla, DetalleBonoTe,
     PrincipalDesignacionExterno, PrincipalPersonalExterno,
     PrincipalCargoExterno, PrincipalUnidadExterna, PrincipalSecretariaExterna
 )
 from django.db.models import Q
-from decimal import Decimal # Para convertir Item
+from decimal import Decimal 
 from collections import defaultdict
 from decimal import Decimal, InvalidOperation
-
-
-# Imports para ReportLab
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -43,16 +37,15 @@ def get_processed_planilla_details(request, planilla_id, items_por_pagina=25, re
         'search_active': False,
         'error_message': None,
         'search_term': '',
-        'all_items_for_export': [], # Para la lista completa en modo exportación
-        # Para exportación
-        'all_items_for_export_list': [], # Lista plana de todos los detalles filtrados
-        'detalles_agrupados_por_unidad_export': {}, # Diccionario para exportación
-        'orden_unidades_export': [],             # Lista para orden en exportación
+        'all_items_for_export': [], 
+        'all_items_for_export_list': [], 
+        'detalles_agrupados_por_unidad_export': {}, 
+        'orden_unidades_export': [],  
     }
     print(f"\n--- [DEBUG UTIL PLANILLA] INICIO (Planilla ID: {planilla_id}, ExportMode: {return_all_for_export}) ---")
     logger.info(f"[Util Planilla] Procesando Planilla ID {planilla_id}, ExportMode: {return_all_for_export}")
 
-    # --- 0. Obtener la Planilla (Interna) ---
+    # --- Obtener la Planilla (Interna) ---
     try:
         planilla_obj = Planilla.objects.get(pk=planilla_id)
         result['planilla'] = planilla_obj
@@ -136,7 +129,7 @@ def get_processed_planilla_details(request, planilla_id, items_por_pagina=25, re
         elif filter_unidad_str: 
             personal_ids_para_filtrar_detalles_locales = personal_ids_in_unidad
         elif filter_secretaria_str and not filter_unidad_str and not search_term:
-             personal_ids_para_filtrar_detalles_locales = None # No filtrar por personal si solo se especificó secretaría
+             personal_ids_para_filtrar_detalles_locales = None 
              print(f"[DEBUG UTIL PLANILLA] Combinación: Solo Filtro Secretaría, no se filtrarán IDs de personal (todos los de la planilla se considerarán).")
 
         if personal_ids_para_filtrar_detalles_locales is not None and not personal_ids_para_filtrar_detalles_locales:
@@ -148,15 +141,12 @@ def get_processed_planilla_details(request, planilla_id, items_por_pagina=25, re
 
     # --- 5. Obtener y Enriquecer Detalles Locales ---
     all_filtered_detalles_list = []
-    # Inicializar paginator y page_obj_resultado para evitar UnboundLocalError
     paginator = None
     page_obj_resultado = None
 
     try:
         detalles_locales_qs = DetalleBonoTe.objects.filter(id_planilla=planilla_obj)
         print(f"[DEBUG UTIL PLANILLA] COUNT DetalleBonoTe INICIAL para planilla {planilla_obj.id}: {detalles_locales_qs.count()}")
-
-        # Aplicar filtro de personal_id si se determinó un conjunto de IDs y la búsqueda está activa
         if result['search_active'] and personal_ids_para_filtrar_detalles_locales is not None:
             print(f"[DEBUG UTIL PLANILLA] Aplicando filtro personal_externo_id__in con {len(personal_ids_para_filtrar_detalles_locales)} IDs.")
             detalles_locales_qs = detalles_locales_qs.filter(
@@ -168,7 +158,6 @@ def get_processed_planilla_details(request, planilla_id, items_por_pagina=25, re
         print(f"[DEBUG UTIL PLANILLA] Detalles Bono Te para procesar (después de filtro de IDs, antes de enriquecer): {len(all_filtered_detalles_list_for_processing)}")
 
         if all_filtered_detalles_list_for_processing:
-            # --- INICIO DE TU LÓGICA DE ENRIQUECIMIENTO ORIGINAL ---
             ids_needed = {d.personal_externo_id for d in all_filtered_detalles_list_for_processing if d.personal_externo_id}
             personal_info_ext = {}
             designaciones_info_ext = {}
@@ -216,7 +205,6 @@ def get_processed_planilla_details(request, planilla_id, items_por_pagina=25, re
                 return (item_sort_val, nombre_completo_val)
 
             all_filtered_detalles_list_for_processing.sort(key=get_sort_key_item_bonote)
-            # --- FIN DE TU LÓGICA DE ENRIQUECIMIENTO ORIGINAL ---
             print(f"[DEBUG UTIL PLANILLA] Enriquecimiento y ordenamiento completado para {len(all_filtered_detalles_list_for_processing)} detalles.")
 
         logger.info(f"[Util Planilla] {len(all_filtered_detalles_list_for_processing)} detalles preparados (filtrados y enriquecidos).")
@@ -275,13 +263,7 @@ def get_processed_planilla_details(request, planilla_id, items_por_pagina=25, re
     return result
 
 
-def generar_pdf_bonote_detalles(
-    output_buffer,
-    planilla_cabecera_bonote,
-    detalles_agrupados_bonote,
-    orden_unidades_bonote,
-    column_definitions_bonote
-    ):
+def generar_pdf_bonote_detalles(output_buffer, planilla_cabecera_bonote, detalles_agrupados_bonote, orden_unidades_bonote, column_definitions_bonote):
     """
     Genera el contenido de un PDF de Detalles de Bono TE en el output_buffer.
     Agrupado por unidad.
@@ -315,13 +297,11 @@ def generar_pdf_bonote_detalles(
         canvas.drawString(0.5*inch, text_y_start - 2*line_height, "UNIDAD DE RECURSOS HUMANOS")
         try:
             logo_path = None
-            # Intenta buscar en STATICFILES_DIRS primero si está configurado
             if settings.STATICFILES_DIRS:
                 logo_path_candidate = os.path.join(settings.STATICFILES_DIRS[0], 'img', 'gadp.png')
                 if os.path.exists(logo_path_candidate):
                     logo_path = logo_path_candidate
             
-            # Si no se encontró o STATICFILES_DIRS no está, intenta en /static/img/gadp.png relativo a BASE_DIR
             if not logo_path:
                 logo_path_candidate_base = os.path.join(settings.BASE_DIR, 'static', 'img', 'gadp.png')
                 if os.path.exists(logo_path_candidate_base):
@@ -407,18 +387,15 @@ def generar_pdf_bonote_detalles(
                     if field_key in campos_numericos_decimales:
                         cell_value = "0.00"
                         cell_style = style_tabla_cell_num
-                else: # Strings
+                else: 
                     cell_value = str(cell_value_raw)
                 
-                # Ajustar estilo final basado en el tipo de campo
                 if field_key in campos_centrados:
                     cell_style = style_tabla_cell_center
                 elif field_key in campos_texto_largo:
                     cell_style = style_tabla_cell
-                elif field_key not in campos_centrados + campos_texto_largo: # Si no es texto largo ni centrado, es numérico
+                elif field_key not in campos_centrados + campos_texto_largo: 
                     cell_style = style_tabla_cell_num
-
-
                 fila.append(Paragraph(cell_value, cell_style))
             data_pdf_unidad.append(fila)
 
@@ -442,9 +419,8 @@ def generar_pdf_bonote_detalles(
         for i, col_def in enumerate(column_definitions_bonote):
             if col_def[2] in campos_texto_largo:
                 table_style_cmds.append(('ALIGN', (i, 1), (i, -1), 'LEFT'))
-            elif col_def[2] not in campos_centrados + campos_texto_largo: # Numéricos
+            elif col_def[2] not in campos_centrados + campos_texto_largo: 
                  table_style_cmds.append(('ALIGN', (i, 1), (i, -1), 'RIGHT'))
-            # Los centrados ya están por el ALIGN general de la tabla
 
         tabla_unidad.setStyle(TableStyle(table_style_cmds))
         story.append(tabla_unidad)
@@ -456,21 +432,11 @@ def generar_pdf_bonote_detalles(
     except Exception as e_build:
         logger.error(f"Error final al construir el PDF de Detalles Bono TE en buffer para Planilla ID {planilla_cabecera_bonote.pk}: {e_build}", exc_info=True)
         
-        
-
-def generar_pdf_lista_planillas(
-    output_buffer,
-    planillas_qs, # QuerySet o lista de objetos Planilla
-    column_definitions_lista, # Definición de columnas para esta tabla
-    titulo_reporte="LISTA DE PLANILLAS DE BONO DE TÉ GENERADAS" # Título general
-    ):
+def generar_pdf_lista_planillas(output_buffer, planillas_qs, column_definitions_lista, titulo_reporte="LISTA DE PLANILLAS DE BONO DE TÉ GENERADAS" ):
     """
     Genera un PDF con la lista de Planillas de Bono de Té.
     """
     logger.info(f"Iniciando generación de PDF para la lista de planillas. Total: {len(planillas_qs) if hasattr(planillas_qs, '__len__') else 'Desconocido'}")
-
-    # Usaremos tamaño carta vertical (portrait) para una lista simple.
-    # Puedes cambiar a landscape(letter) si tienes muchas columnas o muy anchas.
     PAGE_WIDTH, PAGE_HEIGHT = letter
     doc = SimpleDocTemplate(output_buffer, pagesize=(PAGE_WIDTH, PAGE_HEIGHT),
                             rightMargin=0.5*inch, leftMargin=0.5*inch,
@@ -478,8 +444,6 @@ def generar_pdf_lista_planillas(
 
     styles = getSampleStyleSheet()
     story = []
-
-    # Estilos (puedes personalizarlos más si es necesario)
     style_titulo_principal = ParagraphStyle(name='TituloPrincipalLista', parent=styles['h1'], alignment=TA_CENTER, fontSize=14, spaceAfter=0.2*inch, fontName='Helvetica-Bold')
     style_tabla_header = ParagraphStyle(name='TablaHeaderLista', parent=styles['Normal'], alignment=TA_CENTER, fontSize=9, fontName='Helvetica-Bold', leading=10, textColor=colors.whitesmoke)
     style_tabla_cell = ParagraphStyle(name='TablaCellLista', parent=styles['Normal'], alignment=TA_LEFT, fontSize=8, leading=9)
@@ -487,8 +451,6 @@ def generar_pdf_lista_planillas(
     style_tabla_cell_right = ParagraphStyle(name='TablaCellListaRight', parent=style_tabla_cell, alignment=TA_RIGHT)
 
 
-    # Función para el encabezado de la primera página (puedes reutilizar la de generar_pdf_bonote_detalles si es idéntica)
-    # O definir una específica si necesitas cambios. Por simplicidad, la redefinimos aquí.
     def primera_pagina_encabezado_lista(canvas, doc_obj):
         canvas.saveState()
         text_y_start = PAGE_HEIGHT - 0.5*inch
@@ -520,31 +482,25 @@ def generar_pdf_lista_planillas(
         except Exception as e_logo: logger.error(f"Error al cargar/dibujar logo en PDF lista planillas: {e_logo}", exc_info=True)
         canvas.restoreState()
 
-    # Título del reporte
     story.append(Paragraph(titulo_reporte.upper(), style_titulo_principal))
     story.append(Spacer(1, 0.1*inch))
-
-    # Preparar datos para la tabla
     table_data = []
-    # Encabezados
     table_headers = [Paragraph(col_def[0], style_tabla_header) for col_def in column_definitions_lista]
     table_data.append(table_headers)
-
-    # Filas de datos
     nro_item = 0
     for planilla_item in planillas_qs:
         nro_item += 1
         row = []
         for header_text, col_width, field_key_or_callable, field_type in column_definitions_lista:
             cell_value = ""
-            current_cell_style = style_tabla_cell # Default
+            current_cell_style = style_tabla_cell 
 
             if field_key_or_callable == 'nro_item_lista':
                 cell_value = str(nro_item)
                 current_cell_style = style_tabla_cell_center
-            elif callable(field_key_or_callable): # Si es una función para obtener el valor
+            elif callable(field_key_or_callable): 
                 cell_value = field_key_or_callable(planilla_item)
-            else: # Si es una clave de atributo
+            else: 
                 value_raw = getattr(planilla_item, field_key_or_callable, None)
                 if field_key_or_callable == 'fecha_elaboracion' or field_key_or_callable == 'fecha_aprobacion':
                     cell_value = value_raw.strftime("%d/%m/%Y") if value_raw else "-"
@@ -552,42 +508,37 @@ def generar_pdf_lista_planillas(
                     cell_value = f"{value_raw:.2f}" if value_raw is not None else "N/A"
                 elif field_key_or_callable == 'usuario_elaboracion':
                     cell_value = value_raw.username if value_raw else "-"
-                else: # Para mes, anio, tipo, estado
+                else: 
                     cell_value = str(value_raw) if value_raw is not None else "-"
-            
-            # Ajustar estilo según field_type
+
             if field_type == 'center':
                 current_cell_style = style_tabla_cell_center
             elif field_type == 'right':
                 current_cell_style = style_tabla_cell_right
-            # else usa style_tabla_cell (left)
 
             row.append(Paragraph(str(cell_value), current_cell_style))
         table_data.append(row)
 
-    if not planillas_qs: # Si no hay planillas
+    if not planillas_qs: 
         table_data.append([Paragraph("No hay planillas para mostrar.", style_tabla_cell_center, colSpan=len(column_definitions_lista))])
 
-    # Anchos de columna
     col_widths = [col_def[1] for col_def in column_definitions_lista]
 
-    # Crear y estilizar la tabla
     lista_table = Table(table_data, colWidths=col_widths, repeatRows=1)
     lista_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#003366")), # Fondo cabecera
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),        # Texto cabecera
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),                  # Alineación general
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),                 # Alineación vertical
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),       # Fuente cabecera
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),          # Rejilla
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),                  # Padding cabecera
-        ('TOPPADDING', (0, 0), (-1, 0), 6),                     # Padding cabecera
-        ('LEFTPADDING', (0, 1), (-1, -1), 3),                   # Padding datos
-        ('RIGHTPADDING', (0, 1), (-1, -1), 3),                  # Padding datos
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#003366")), 
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),        
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),                  
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),                 
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),       
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),          
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),                  
+        ('TOPPADDING', (0, 0), (-1, 0), 6),                     
+        ('LEFTPADDING', (0, 1), (-1, -1), 3),                   
+        ('RIGHTPADDING', (0, 1), (-1, -1), 3),                 
     ]))
     story.append(lista_table)
 
-    # Construir PDF
     try:
         doc.build(story, onFirstPage=primera_pagina_encabezado_lista)
         logger.info(f"PDF de lista de planillas construido en buffer.")

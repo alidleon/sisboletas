@@ -1,4 +1,3 @@
-# sueldos/models.py (Versión con nombres de campo ajustados al Excel)
 
 from django.db import models
 from django.conf import settings
@@ -20,12 +19,10 @@ except ImportError:
 
 # --- Modelo Cabecera: PlanillaSueldo (sin cambios) ---
 class PlanillaSueldo(models.Model):
-    # ... (código igual que antes) ...
     TIPO_CHOICES = [
-        ('planta', 'Personal Permanente'), # Ajustado según título del Excel
+        ('planta', 'Personal Permanente'), 
         ('contrato', 'Contrato'),
-        ('consultor en linea', 'Consultor en Linea'),
-        # ('consultor', 'Consultor en Linea'), # Ajusta si aplica
+        #('consultor en linea', 'Consultor en Linea'),
     ]
     ESTADO_CHOICES = [
         ('borrador', 'Borrador'),
@@ -94,7 +91,6 @@ class DetalleSueldo(models.Model):
     """ Almacena los detalles de sueldo, usando nombres de campo similares a las
         columnas del Excel y manteniendo el vínculo con personal externo.
     """
-    # --- Vínculos Fundamentales ---
     planilla_sueldo = models.ForeignKey(
         PlanillaSueldo,
         on_delete=models.CASCADE,
@@ -111,7 +107,6 @@ class DetalleSueldo(models.Model):
         db_constraint=False
     )
 
-    # --- Datos Numéricos (Nombres similares al Excel) ---
     # Columna G
     dias_trab = models.DecimalField(
         max_digits=5, decimal_places=2, default=Decimal('0.00'), verbose_name="DIAS TRAB.",
@@ -123,7 +118,7 @@ class DetalleSueldo(models.Model):
         help_text="Columna H del Excel"
     )
     # Columna I
-    categoria = models.DecimalField( # Nombre directo del Excel
+    categoria = models.DecimalField( 
         max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="CATEGORIA",
         help_text="Columna I del Excel (¿Bono Antigüedad?)"
     )
@@ -136,7 +131,7 @@ class DetalleSueldo(models.Model):
         help_text="Otros ingresos adicionales no contemplados en el Excel."
     )
     # Columna J
-    total_ganado = models.DecimalField( # Nombre directo del Excel
+    total_ganado = models.DecimalField( 
         max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="TOTAL GANADO",
         help_text="Columna J del Excel"
     )
@@ -145,32 +140,32 @@ class DetalleSueldo(models.Model):
         help_text="Columna T Saldo RC-IVA."
     )
     # Columna K
-    rc_iva_retenido = models.DecimalField( # Nombre un poco más descriptivo
+    rc_iva_retenido = models.DecimalField( 
         max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="RC-IVA RETENIDO",
         help_text="Columna K del Excel"
     )
     # Columna L
-    gestora_publica = models.DecimalField( # Nombre directo del Excel
+    gestora_publica = models.DecimalField( 
         max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="GESTORA PUBLICA",
         help_text="Columna L del Excel (¿Aporte AFP?)"
     )
     # Columna M
-    aporte_nac_solidario = models.DecimalField( # Nombre directo del Excel
+    aporte_nac_solidario = models.DecimalField( 
         max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="APORTE SOLIDARIO NAL.",
         help_text="Columna M del Excel"
     )
     # Columna N
-    cooperativa = models.DecimalField( # Nombre directo del Excel
+    cooperativa = models.DecimalField( 
         max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="COOPERATIVA",
         help_text="Columna N del Excel"
     )
     # Columna O
-    faltas = models.DecimalField( # Nombre directo del Excel
+    faltas = models.DecimalField( 
         max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="FALTAS",
         help_text="Columna O del Excel (Monto de descuento)"
     )
     # Columna P
-    memorandums = models.DecimalField( # Nombre directo del Excel
+    memorandums = models.DecimalField( 
         max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="MEMORANDUMS",
         help_text="Columna P del Excel (Monto de descuento)"
     )
@@ -179,24 +174,24 @@ class DetalleSueldo(models.Model):
         help_text="Monto de descuento por sanciones (típico de planillas de contrato)"
     )
     # Columna Q
-    otros_descuentos = models.DecimalField( # Nombre directo del Excel
+    otros_descuentos = models.DecimalField( 
         max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="OTROS DESCUENTOS",
         help_text="Columna Q del Excel"
     )
     # Columna R
-    total_descuentos = models.DecimalField( # Nombre directo del Excel
+    total_descuentos = models.DecimalField( 
         max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="TOTAL DESCUENTOS",
         help_text="Columna R del Excel"
     )
     # Columna S
-    liquido_pagable = models.DecimalField( # Nombre directo del Excel
+    liquido_pagable = models.DecimalField( 
         max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="LIQUIDO PAGABLE",
         help_text="Columna S del Excel"
     )
 
     # --- Datos de Referencia (Nombres ajustados) ---
     # Columna B
-    item_referencia = models.IntegerField( # Renombrado para evitar confusión con 'item' de designación
+    item_referencia = models.IntegerField( 
         null=True, blank=True, verbose_name="Item (Referencia Excel)",
         help_text="Columna B del Excel"
     )
@@ -226,11 +221,6 @@ class DetalleSueldo(models.Model):
         verbose_name = "Detalle de Sueldo"
         verbose_name_plural = "Detalles de Sueldo"
         unique_together = ('planilla_sueldo', 'personal_externo')
-        #ordering = [ # Mantenemos orden por BD externa
-            #models.F('personal_externo__apellido_paterno').asc(nulls_last=True),
-            #models.F('personal_externo__apellido_materno').asc(nulls_last=True),
-            #models.F('personal_externo__nombre').asc(nulls_last=True)
-        #]
 
     def __str__(self):
         # ... (igual que antes) ...
@@ -243,24 +233,18 @@ class DetalleSueldo(models.Model):
         return f"Sueldo {nombre_display} - Planilla ID {self.planilla_sueldo_id}"
 
     def clean(self):
-        # ... (igual que antes, usando los nuevos nombres de campo) ...
         super().clean()
         campos_no_negativos = [
             'dias_trab', 'haber_basico', 'categoria', 'total_ganado',
             'rc_iva_retenido', 'gestora_publica', 'aporte_nac_solidario',
             'cooperativa', 'faltas', 'memorandums', 'otros_descuentos',
             'total_descuentos', 'lactancia_prenatal', 'otros_ingresos', 'saldo_credito_fiscal',
-            # 'liquido_pagable' # Podría ser negativo
         ]
         for campo in campos_no_negativos:
             valor = getattr(self, campo)
             if valor is not None and valor < Decimal('0.00'):
                  raise ValidationError({campo: f"El valor de '{self._meta.get_field(campo).verbose_name}' no puede ser negativo."})
             
-
-
-
-
 
 class CierreMensual(models.Model):
     """
@@ -269,18 +253,16 @@ class CierreMensual(models.Model):
     """
     ESTADOS_PROCESO = [
         ('PENDIENTE', 'Pendiente de Generación'),
-        ('EN_PROCESO', 'Generación en Proceso'), # Útil si es tarea larga
+        ('EN_PROCESO', 'Generación en Proceso'), 
         ('COMPLETADO', 'Completado Exitosamente'),
         ('COMPLETADO_CON_ADVERTENCIAS', 'Completado con Advertencias'),
         ('ERROR', 'Error durante la Generación'),
     ]
 
-    # Periodo y tipo al que corresponde este cierre/generación
     mes = models.IntegerField(db_index=True)
     anio = models.IntegerField(db_index=True)
     tipo_planilla = models.CharField(max_length=40, choices=PlanillaSueldo.TIPO_CHOICES, db_index=True)
 
-    # Metadatos del proceso
     fecha_generacion = models.DateTimeField(auto_now_add=True, verbose_name="Fecha y Hora de Generación")
     usuario_generacion = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -290,17 +272,10 @@ class CierreMensual(models.Model):
     estado_proceso = models.CharField(max_length=30, choices=ESTADOS_PROCESO, default='PENDIENTE')
     resumen_proceso = models.TextField(blank=True, null=True, verbose_name="Resumen/Notas del Proceso")
     
-    # Opcional: Referencia a la planilla de sueldos usada como base
-    # planilla_sueldo_base = models.ForeignKey(
-    #     PlanillaSueldo, on_delete=models.SET_NULL, null=True, blank=True,
-    #     related_name='cierres_asociados'
-    # )
-
     class Meta:
         verbose_name = "Cierre Mensual de Estado"
         verbose_name_plural = "Cierres Mensuales de Estado"
         db_table = 'sueldo_cierre_mensual'
-        # Asegurar que solo haya un cierre por periodo/tipo
         unique_together = ('mes', 'anio', 'tipo_planilla')
         ordering = ['-anio', '-mes', 'tipo_planilla']
 
@@ -308,7 +283,7 @@ class CierreMensual(models.Model):
         return f"Cierre {self.mes}/{self.anio} ({self.get_tipo_planilla_display()}) - {self.get_estado_proceso_display()}"
 
 
-# --- MODELO DETALLE: EstadoMensualEmpleado (MODIFICADO) ---
+# --- MODELO DETALLE: EstadoMensualEmpleado  ---
 class EstadoMensualEmpleado(models.Model):
     """
     Almacena la 'foto' consolidada del estado de un empleado al final
@@ -325,58 +300,49 @@ class EstadoMensualEmpleado(models.Model):
     # --- Vínculo a la Cabecera CierreMensual ---
     cierre_mensual = models.ForeignKey(
         CierreMensual,
-        on_delete=models.CASCADE, # Si se borra el cierre, se borran sus estados
-        related_name='estados_empleados', # Para acceder desde CierreMensual: cierre.estados_empleados.all()
+        on_delete=models.CASCADE, 
+        related_name='estados_empleados', 
         db_index=True
     )
     # -----------------------------------------
 
-    # Vínculo a la persona (sin cambios)
+    # Vínculo a la persona 
     personal_externo = models.ForeignKey(
         'planilla.PrincipalPersonalExterno',
         on_delete=models.PROTECT,
         db_index=True,
-        related_name='estados_mensuales_detalle', # Cambiar related_name para evitar conflicto
+        related_name='estados_mensuales_detalle', 
         db_constraint=False
     )
 
-    # El estado determinado (sin cambios)
     estado_final_mes = models.CharField(max_length=25, choices=ESTADOS_FINALES, db_index=True)
 
-    # Última información conocida (sin cambios)
     item = models.IntegerField(null=True, blank=True, verbose_name="Último Item Conocido")
     cargo = models.CharField(max_length=300, blank=True, null=True, verbose_name="Último Cargo Conocido")
     unidad_nombre = models.CharField(max_length=150, blank=True, null=True, verbose_name="Última Unidad Conocida")
     secretaria_nombre = models.CharField(max_length=150, blank=True, null=True, verbose_name="Última Secretaría Conocida")
 
-    # Fechas relevantes (sin cambios)
     fecha_ingreso_bd = models.DateField(null=True, blank=True, verbose_name="Fecha Ingreso (BD Externa)")
     fecha_conclusion_bd = models.DateField(null=True, blank=True, verbose_name="Fecha Conclusión (BD Externa)")
 
-    # Enlace opcional al detalle de sueldo del mes (sin cambios)
     detalle_sueldo = models.OneToOneField(
         DetalleSueldo, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='estado_mensual_directo' # Cambiar related_name
+        related_name='estado_mensual_directo' 
     )
 
-    # Notas (sin cambios)
     notas_proceso = models.TextField(blank=True, null=True, verbose_name="Notas del Proceso Específico del Empleado")
     fecha_generacion_registro = models.DateTimeField(auto_now_add=True, verbose_name="Fecha Creación Registro Estado") # Renombrado
 
     class Meta:
         verbose_name = "Detalle Estado Mensual Empleado"
         verbose_name_plural = "Detalles Estados Mensuales Empleados"
-        db_table = 'sueldo_estado_mensual_detalle' # Renombrar tabla para claridad
-        # Clave única: solo un estado por empleado dentro de un cierre mensual
+        db_table = 'sueldo_estado_mensual_detalle' 
         unique_together = ('cierre_mensual', 'personal_externo')
-        # Quitar mes, anio, tipo_planilla de ordering ya que están en cierre_mensual
         ordering = ['-cierre_mensual__anio', '-cierre_mensual__mes', 'pk']
         indexes = [
             models.Index(fields=['estado_final_mes']),
-            # Ya no necesitamos el index de mes/anio/tipo aquí
         ]
 
     def __str__(self):
         nombre = f"ID Ext {self.personal_externo_id}"
-        # ... (lógica para obtener nombre_completo si es posible) ...
         return f"{nombre} ({self.cierre_mensual.mes}/{self.cierre_mensual.anio}) - {self.get_estado_final_mes_display()}"

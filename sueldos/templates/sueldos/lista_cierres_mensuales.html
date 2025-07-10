@@ -10,7 +10,6 @@
         <div class="title_left"><h3>CIERRES MENSUALES</h3></div>
         <div class="title_right">
             <div class="pull-right">
-                {# Botón Generar Nuevo Estado - Asumimos que crea un CierreMensual #}
                 {% if perms.sueldos.add_cierremensual or user.is_superuser %}
                 <a href="{% url 'generar_estado_mensual_form' %}" class="btn btn-success">
                     <i class="fa fa-cogs"></i> Generar Nuevo Estado

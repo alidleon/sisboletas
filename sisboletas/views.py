@@ -10,6 +10,6 @@ def master(request):
 def index(request):
     context = {
         'mensaje_bienvenida': f"Bienvenido al Sistema, {request.user.username}!",
-        # ... otros datos para tu dashboard ...
+        
     }
     return render(request, 'index.html', context)

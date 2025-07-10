@@ -128,16 +128,8 @@
 
             // Deshabilitar botón y mostrar spinner mientras se carga
             previewButton.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
-
-            // URL para obtener el JSON del diseño de la plantilla (la crearemos en el Paso 4)
-            // El '0' es un placeholder que reemplazaremos con el plantillaId real.
             var getDesignUrl = "/boletas/plantillas/0/obtener-diseno-json/".replace('0', plantillaId.toString());            
-            // Obtener el token CSRF. Django lo incluye automáticamente en las plantillas
-            // si usas {% csrf_token %} en algún <form>. Si no, necesitas otra forma de pasarlo.
-            // Esta es una forma común si tienes un formulario en la página:
-            // var csrfToken = $('input[name="csrfmiddlewaretoken"]').val();
-            // Si no hay formulario, puedes poner {{ csrf_token }} directamente aquí (¡con comillas si es string!)
-            // o leerlo de un meta tag. Para simplificar, asumimos que Django lo reemplazará.
+            
             var csrfToken = "{{ csrf_token }}"; // Asegúrate que esto funcione en tu contexto.
 
             // --- Petición AJAX para OBTENER el diseño JSON de la plantilla ---
@@ -184,8 +176,6 @@
                             $('#previewPlantillaModalBody').html('<div class="alert alert-danger text-center">' + errorMsg + '</div>');
                         },
                         complete: function() {
-                            // Este 'complete' es para el SEGUNDO AJAX (renderizar previsualización)
-                            // Rehabilitar el botón
                             previewButton.prop('disabled', false).html(originalButtonHtml);
                         }
                     });
@@ -202,7 +192,6 @@
                     $('#previewPlantillaModalBody').html('<div class="alert alert-danger text-center">' + errorMsg + '</div>');
                     // Rehabilitar el botón
                     previewButton.prop('disabled', false).html(originalButtonHtml);
-                    // No necesitamos cerrar el modal aquí, el usuario puede hacerlo
                 }
             });
         });

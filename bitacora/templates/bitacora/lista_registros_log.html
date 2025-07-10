@@ -8,27 +8,27 @@
 {% block extra_css %}
 <style>
     .filters-form .form-control, .filters-form .btn, .filters-form label {
-        margin-bottom: 10px; /* Espacio vertical */
-        margin-right: 5px;   /* Espacio horizontal entre elementos inline */
+        margin-bottom: 10px; 
+        margin-right: 5px;   
     }
     .log-table th, .log-table td {
-        font-size: 0.85em; /* Texto un poco más pequeño en la tabla */
-        vertical-align: top; /* Alineación vertical superior para celdas */
+        font-size: 0.85em; 
+        vertical-align: top; 
     }
     .log-table .col-changes {
-        max-width: 350px;      /* Limitar ancho de la columna de detalles */
-        min-width: 200px;      /* Ancho mínimo para la columna de detalles */
-        word-break: break-word; /* Romper palabras largas para evitar desbordamiento */
+        max-width: 350px;      
+        min-width: 200px;      
+        word-break: break-word; 
     }
     .filters-form .form-group {
-        margin-right: 15px; /* Espacio entre grupos de filtros (label + input) */
-        margin-left: 0; /* Resetear margen izquierdo por si acaso */
+        margin-right: 15px; 
+        margin-left: 0; 
     }
-    .filters-form .form-row { /* Para que los botones no se envuelvan tan rápido */
+    .filters-form .form-row { 
         display: flex;
         flex-wrap: wrap; 
     }
-    .filters-form .btn-sm { /* Para que los botones de acción no sean demasiado grandes */
+    .filters-form .btn-sm { 
         padding: .25rem .5rem;
         font-size: .875rem;
         line-height: 1.5;
@@ -105,6 +105,7 @@
                             <div class="form-group col-auto">
                                 <button type="submit" class="btn btn-primary btn-sm"><i class="fa fa-filter"></i> Filtrar</button>
                                 <a href="{% url 'lista_registros_log' %}" class="btn btn-secondary btn-sm"><i class="fa fa-eraser"></i> Limpiar</a>
+                                <!--
                                 <button type="button" class="btn btn-success btn-sm export-btn" data-export-type="csv">
                                     <i class="fa fa-file-text-o"></i> CSV {# Icono cambiado para CSV #}
                                 </button>
@@ -112,7 +113,7 @@
                                 <button type="button" class="btn btn-info btn-sm export-btn" data-export-type="excel">
                                     <i class="fa fa-file-excel-o"></i> Excel
                                 </button>
-                                
+                                -->
                                 
                                 <button type="button" class="btn btn-danger btn-sm export-btn" data-export-type="pdf">
                                     <i class="fa fa-file-pdf-o"></i> PDF

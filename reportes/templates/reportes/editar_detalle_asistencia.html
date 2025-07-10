@@ -1,4 +1,3 @@
-{# reportes/templates/reportes/editar_detalle_asistencia.html #}
 {% extends 'index_master.html' %}
 {% block title %}Editar Asistencia - {{ persona_externa.nombre_completo|default:detalle.personal_externo_id }}{% endblock %}
 
@@ -16,7 +15,6 @@
          {% endfor %}
     {% endif %}
 
-    {# Info Personal y Periodo (Como lo tenías) #}
     <div class="card mb-3">
         <div class="card-header">Información del Personal y Periodo</div>
         <div class="card-body">
@@ -34,14 +32,12 @@
         </div>
     </div>
 
-    {# Formulario de Edición (Como lo tenías) #}
     <div class="card">
         <div class="card-header">Editar Detalles de Asistencia</div>
         <div class="card-body">
             <form method="post">
                 {% csrf_token %}
 
-                {# Renderizado del formulario (exactamente como estaba antes) #}
                 <h5>Incidencias y Sanciones</h5>
                 <div class="row mb-2">
                     <div class="col-md-3">{{ form.omision_cant.label_tag }} {{ form.omision_cant }} {% if form.omision_cant.errors %}<div class="invalid-feedback d-block">{{ form.omision_cant.errors|striptags }}</div>{% endif %}</div>
@@ -112,7 +108,6 @@
               labels.forEach(function(label) {
                   if (!label.classList.contains('form-label')) {
                       label.classList.add('form-label');
-                      // label.classList.add('fw-bold'); // Opcional: negrita
                   }
               });
          });

@@ -264,12 +264,7 @@ h1, h2, h3, h4, h5, h6 {
  * =================================================================
 */
 
-/*
- * CORRECCIÓN CLAVE:
- * Añadimos selectores adicionales para apuntar a los encabezados "clonados"
- * que crean las librerías de JavaScript (como DataTables) para las
- * cabeceras y columnas fijas.
-*/
+
 .table > thead > tr > th,                                     /* Selector original para tablas estándar */
 .dataTables_scrollHead .dataTables_scrollHeadInner table.dataTable thead th, /* Para cabecera fija de DataTables */
 .DTFC_RightWrapper table.dataTable thead th,                  /* Para columna derecha fija (versiones antiguas de DT) */

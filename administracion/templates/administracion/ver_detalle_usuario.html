@@ -21,10 +21,6 @@
                 </div>
                 <div class="x_content">
                     <div class="row">
-
-                        <!-- ============================================= -->
-                        <!-- ====== Columna Izquierda: Foto y Acciones ====== -->
-                        <!-- ============================================= -->
                         <div class="col-md-3 col-sm-4 profile_left">
                             <div class="profile_img">
                                 <div id="crop-avatar">
@@ -50,25 +46,26 @@
                                     <i class="fa fa-home"></i> Volver al Inicio
                                 </a>
                             {% else %}
-                                {% if puede_editar_este_usuario %}
-                                    <a href="{% url 'editar_usuario' usuario_detalle.id %}" class="btn btn-info btn-block mb-2">
-                                        <i class="fa fa-pencil"></i> Editar Usuario
-                                    </a>
+                                {% if perms.auth.change_user or user.is_superuser %}
+                                    {% if puede_editar_este_usuario %}
+                                        <a href="{% url 'editar_usuario' usuario_detalle.id %}" class="btn btn-info btn-block mb-2">
+                                            <i class="fa fa-pencil"></i> Editar Usuario
+                                        </a>
+                                    {% endif %}
                                 {% endif %}
+                                <!--
                                 {% if puede_eliminar_este_usuario %}
                                     <a href="{% url 'eliminar_usuario' usuario_detalle.id %}" class="btn btn-danger btn-block mb-2">
                                         <i class="fa fa-trash"></i> Eliminar Usuario
                                     </a>
                                 {% endif %}
+                                -->
                                 <a href="{% url 'lista_usuarios' %}" class="btn btn-secondary btn-block">
                                     <i class="fa fa-arrow-left"></i> Volver a la Lista
                                 </a>
                             {% endif %}
                         </div>
 
-                        <!-- ============================================= -->
-                        <!-- ====== Columna Derecha: Detalles del Usuario ====== -->
-                        <!-- ============================================= -->
                         <div class="col-md-9 col-sm-8">
                             
                             <h4>Datos Personales</h4>
@@ -125,7 +122,6 @@
 </div>
 
 <style>
-    /* Pequeño ajuste de CSS para mejorar el espaciado */
     .profile-details p {
         margin-bottom: 1rem;
         font-size: 14px;

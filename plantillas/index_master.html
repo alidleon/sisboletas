@@ -99,7 +99,7 @@
                   {% endif %}
 
                   {% if perms.reportes.view_planillaasistencia or perms.reportes.add_planillaasistencia or user.is_superuser %}
-                  <li><a><i class="fa fa-calendar-check-o"></i> Reportes de Asistencia <span class="fa fa-chevron-down"></span></a>
+                  <li><a><i class="fa fa-calendar-check-o"></i> Reportes Asistencia <span class="fa fa-chevron-down"></span></a>
                     <ul class="nav child_menu">
                       {# Sub-opción Crear Reporte: visible si tiene permiso para añadir Planillas de Asistencia o es superusuario #}
                       {% if perms.reportes.add_planillaasistencia or user.is_superuser %}
@@ -292,8 +292,6 @@
     <!-- Custom Theme Scripts (de Gentelella) -->
     <script src="{% static '/FrWork/admin_lte/build/js/custom.min.js' %}"></script>
 
-
-    {# ... tus otros scripts como custom.min.js ... #}
 
     {% block extra_js %}
     {# Aquí se insertará el contenido del bloque extra_js de las plantillas hijas #}

@@ -167,7 +167,7 @@
                                                 {% endif %}
                                             {% endif %}
 
-                                            {# Botón Borrar Planilla #}
+                                            <!--
                                             {% if perms.sueldos.delete_planillasueldo or user.is_superuser %}
                                                 {# Podrías añadir lógica de estado, ej. solo borrar si es 'borrador' o no 'pagado' #}
                                                 {% if planilla_obj.estado != 'pagado' %}
@@ -176,7 +176,7 @@
                                                 </a>
                                                 {% endif %}
                                             {% endif %}
-
+                                            -->
                                             {# Botón Generar Boletas PDF #}
                                             
                                             {% if perms.sueldos.change_planillasueldo or perms.boletas.add_boletapago or user.is_superuser %} {# AJUSTA ESTE PERMISO #}
@@ -198,11 +198,11 @@
                                 </tbody>
                             </table>
                         </div>
-                        <!-- ===== INICIO DEL CÓDIGO  PAGINACION ===== -->
+                        
                         <div class="mt-3">
                             {% include "partials/paginacion.html" with page_obj=planillas_sueldo request=request %}
                         </div>
-                        <!-- ===== FIN DEL CÓDIGO PAGIANCION ===== -->
+                        
                     </div>
                 </div>
             </div>

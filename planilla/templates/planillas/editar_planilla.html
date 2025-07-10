@@ -39,15 +39,13 @@
                                 </div>
                             {% endif %}
 
-                            <!-- MES Y AÑO -->
                             <div class="form-group row">
-                                <label class="col-form-label col-md-3 col-sm-3 label-align"><strong>Mes / Año:</strong></label>
+                                <label class="col-form-label col-md-3 col-sm-3 label-align"><strong>Periodo:</strong></label>
                                 <div class="col-md-9 col-sm-9">
-                                    <p class="form-control-static" style="padding-top: 8px;"><strong>{{ planilla.mes }} / {{ planilla.anio }}</strong></p>
+                                    <p class="form-control-static" style="padding-top: 8px;">{{ planilla.mes }} / {{ planilla.anio }}</p>
                                 </div>
                             </div>
 
-                            <!-- TIPO DE PLANILLA -->
                             <div class="form-group row">
                                 <label class="col-form-label col-md-3 col-sm-3 label-align"><strong>Tipo de Planilla:</strong></label>
                                 <div class="col-md-9 col-sm-9">
@@ -55,7 +53,6 @@
                                 </div>
                             </div>
                             
-                            <!-- PLANILLA ASISTENCIA BASE -->
                             {% if planilla.planilla_asistencia_base %}
                             <div class="form-group row">
                                 <label class="col-form-label col-md-3 col-sm-3 label-align"><strong>Planilla Asistencia Base:</strong></label>
@@ -67,16 +64,11 @@
                             </div>
                             {% endif %}
 
-                            {# Separador para distinguir la información de los campos editables #}
                             <div class="ln_solid"></div>
 
-                            <!-- ===== SECCIÓN DE CAMPOS EDITABLES ===== -->
-                            {# ... (el resto del formulario no ha cambiado) ... #}
-
-                            <!-- CAMPO DÍAS HÁBILES -->
                             <div class="item form-group">
                                 <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.dias_habiles.id_for_label }}">
-                                    {{ form.dias_habiles.label }} <span class="required">*</span>
+                                    <strong>{{ form.dias_habiles.label }}</strong> <span class="required">*</span>
                                 </label>
                                 <div class="col-md-6 col-sm-6">
                                     {{ form.dias_habiles }}
@@ -85,10 +77,9 @@
                                 </div>
                             </div>
 
-                            <!-- CAMPO ESTADO -->
                             <div class="item form-group">
                                 <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.estado.id_for_label }}">
-                                    {{ form.estado.label }} <span class="required">*</span>
+                                    <strong>{{ form.estado.label }}</strong> <span class="required">*</span>
                                 </label>
                                 <div class="col-md-6 col-sm-6">
                                     {{ form.estado }}

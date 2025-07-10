@@ -1,4 +1,3 @@
-# sisboletas/bitacora/utils.py
 import csv
 import datetime
 from django.http import HttpResponse
@@ -37,9 +36,7 @@ def generar_respuesta_csv(queryset_logs, nombre_archivo_base="bitacora_export"):
         content_type='text/csv',
         headers={'Content-Disposition': f'attachment; filename="{nombre_archivo_base}_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'},
     )
-
     writer = csv.writer(response, delimiter=';') 
-    
     writer.writerow([
         _('Timestamp'), 
         _('Usuario (Nombre Completo)'), 
@@ -80,9 +77,7 @@ def generar_respuesta_csv(queryset_logs, nombre_archivo_base="bitacora_export"):
         ])
         
     return response
-
-
-
+#-----------------------------------------------
 def generar_respuesta_pdf(queryset_logs, nombre_archivo_base="bitacora_export"):
     """
     Toma un queryset de LogEntry y devuelve una HttpResponse con el archivo PDF.
@@ -161,7 +156,7 @@ def generar_respuesta_pdf(queryset_logs, nombre_archivo_base="bitacora_export"):
             
             table = Table(data, colWidths=col_widths, repeatRows=1)
             table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#40516F")),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#406C6F")),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'), # Alinear a la izquierda por defecto
                 ('ALIGN', (0, 0), (0, -1), 'CENTER'), # Timestamp centrado
@@ -191,7 +186,7 @@ def generar_respuesta_pdf(queryset_logs, nombre_archivo_base="bitacora_export"):
         print(f"Error generando PDF de bitácora: {e}")
         return HttpResponse(f"Error al generar el PDF: {e}", status=500)
     
-
+#---------------------------------------------
 def generar_respuesta_excel(queryset_logs, nombre_archivo_base="bitacora_export"):
     """
     Toma un queryset de LogEntry y devuelve una HttpResponse con el archivo Excel (.xlsx).
@@ -207,10 +202,10 @@ def generar_respuesta_excel(queryset_logs, nombre_archivo_base="bitacora_export"
     sheet.title = "BitacoraLogs"
 
     # --- Estilos ---
-    header_font = Font(name='Calibri', size=12, bold=True, color='FFFFFFFF') # Texto blanco
-    header_fill = openpyxl.styles.PatternFill(start_color='40516F', end_color='40516F', fill_type='solid') # Azul oscuro
+    header_font = Font(name='Calibri', size=12, bold=True, color='FFFFFFFF') 
+    header_fill = openpyxl.styles.PatternFill(start_color='40516F', end_color='40516F', fill_type='solid')
     center_alignment = Alignment(horizontal='center', vertical='center')
-    left_alignment = Alignment(horizontal='left', vertical='center', wrap_text=True) # wrap_text para celdas con mucho texto
+    left_alignment = Alignment(horizontal='left', vertical='center', wrap_text=True) 
     
     thin_border = Border(left=Side(style='thin'), 
                          right=Side(style='thin'), 
@@ -233,7 +228,7 @@ def generar_respuesta_excel(queryset_logs, nombre_archivo_base="bitacora_export"
         cell.border = thin_border
 
     # --- Datos ---
-    row_num = 2 # Empezar desde la fila 2 para los datos
+    row_num = 2 
     for log_entry in queryset_logs:
         actor_username = log_entry.actor.username if log_entry.actor else "Sistema"
         actor_fullname = log_entry.actor.get_full_name() if log_entry.actor and log_entry.actor.get_full_name() else actor_username
@@ -248,11 +243,11 @@ def generar_respuesta_excel(queryset_logs, nombre_archivo_base="bitacora_export"
         
         changes_cleaned = strip_tags(log_entry.changes)
 
-        # --- MANEJO DEL TIMESTAMP (MÁS ROBUSTO) ---
+        # --- TIMESTAMP ---
         timestamp_excel = None
         if log_entry.timestamp:
-            local_dt = timezone.localtime(log_entry.timestamp) # Convierte a TIME_ZONE si es aware UTC, o localiza si es naive
-            timestamp_excel = local_dt.replace(tzinfo=None)    # Hacerlo naive
+            local_dt = timezone.localtime(log_entry.timestamp) 
+            timestamp_excel = local_dt.replace(tzinfo=None)
         data_row = [
             timestamp_excel,
             actor_fullname,
@@ -272,7 +267,7 @@ def generar_respuesta_excel(queryset_logs, nombre_archivo_base="bitacora_export"
             cell = sheet.cell(row=row_num, column=col_num)
             cell.alignment = left_alignment
             cell.border = thin_border
-            if col_num == 1 and timestamp_excel: # Formato de fecha para la columna Timestamp
+            if col_num == 1 and timestamp_excel: 
                  cell.number_format = 'DD/MM/YYYY HH:MM:SS'
         row_num += 1
 

@@ -1,4 +1,3 @@
-# sisboletas/bitacora/views.py
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.models import User
@@ -6,11 +5,10 @@ from django.contrib.contenttypes.models import ContentType
 from auditlog.models import LogEntry
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Q
-from django.utils.translation import gettext_lazy as _ # Para traducciones (opcional)
+from django.utils.translation import gettext_lazy as _ 
 import json 
-from django.http import HttpResponse # <--- AÑADIR PARA CSV
-import csv # <--- AÑADIR PARA CSV
-import datetime # <--- AÑADIR PARA NOMBRE DE ARCHIVO
+from django.http import HttpResponse 
+import datetime
 from .utils import generar_respuesta_csv, generar_respuesta_pdf, generar_respuesta_excel
 
 
@@ -19,7 +17,7 @@ from .utils import generar_respuesta_csv, generar_respuesta_pdf, generar_respues
 def lista_registros_log_view(request):
     log_entries_queryset = LogEntry.objects.select_related('actor', 'content_type').order_by('-timestamp')
     
-    # --- INICIO: Lógica de Filtros y Búsqueda (SIN CAMBIOS RESPECTO A LA VERSIÓN ANTERIOR FUNCIONAL) ---
+    # --- Lógica de Filtros y Búsqueda  ---
     selected_actor_id_str = request.GET.get('actor')
     selected_action_str = request.GET.get('action')
     selected_content_type_id_str = request.GET.get('content_type')
@@ -50,27 +48,19 @@ def lista_registros_log_view(request):
             Q(actor__last_name__icontains=search_query) |
             Q(remote_addr__icontains=search_query)
         ).distinct()
-    # --- FIN: Lógica de Filtros y Búsqueda ---
 
-    # --- INICIO: MANEJAR EXPORTACIONES (MODIFICADO) ---
-    export_type = request.GET.get('export_type') # Usamos el parámetro del JS actualizado
 
+    # --- INICIO: MANEJO EXPORTACIONES ---
+    export_type = request.GET.get('export_type') 
     if export_type == 'csv':
-        # La lógica de generar el CSV ahora está en utils.py
-        # Pasamos el queryset ya filtrado.
         return generar_respuesta_csv(log_entries_queryset) 
-    # Cuando implementemos Excel y PDF, añadiremos aquí:
-
-    elif export_type == 'excel': # <--- AÑADIR ESTE BLOQUE
+    elif export_type == 'excel': 
         return generar_respuesta_excel(log_entries_queryset)
-    # elif export_type == 'pdf':
-    elif export_type == 'pdf': # <--- AÑADIR ESTE BLOQUE
+    elif export_type == 'pdf': 
         return generar_respuesta_pdf(log_entries_queryset)
     
 
-    # --- FIN: MANEJAR EXPORTACIONES ---
-
-    # --- Paginación (solo si no se está exportando, SIN CAMBIOS) ---
+    # --- Paginación ---
     page_number = request.GET.get('page', 1)
     paginator = Paginator(log_entries_queryset, 25)
     try:
@@ -80,7 +70,7 @@ def lista_registros_log_view(request):
     except EmptyPage:
         log_entries_page = paginator.page(paginator.num_pages)
 
-    # --- Datos para los Select de Filtros (SIN CAMBIOS) ---
+    # --- Datos para los Select de Filtros  ---
     actors_for_filter = User.objects.filter(pk__in=LogEntry.objects.values_list('actor_id', flat=True).distinct().exclude(actor_id=None)).order_by('username')
     if hasattr(LogEntry.Action, 'choices') and callable(getattr(LogEntry.Action, 'choices', None)):
         action_choices_for_filter = LogEntry.Action.choices
@@ -105,7 +95,7 @@ def lista_registros_log_view(request):
 
 
 @login_required
-@permission_required('auditlog.view_logentry', raise_exception=True) # Mismo permiso
+@permission_required('auditlog.view_logentry', raise_exception=True)
 def detalle_registro_log_view(request, log_id):
     log_entry = get_object_or_404(
         LogEntry.objects.select_related('actor', 'content_type'), 
@@ -113,22 +103,17 @@ def detalle_registro_log_view(request, log_id):
     )
 
     changes_dict = None
-    # Intentar parsear el campo 'changes' si es un JSON string (típico de UPDATE y CREATE)
     if log_entry.changes and isinstance(log_entry.changes, str):
         try:
-            # Para CREATE y UPDATE, 'changes' suele ser un JSON.
-            # Para ACCESS donde guardamos un string, esto fallará y está bien.
             parsed_changes = json.loads(log_entry.changes)
             if isinstance(parsed_changes, dict):
                 changes_dict = parsed_changes
         except json.JSONDecodeError:
-            # No es un JSON válido, probablemente es nuestra descripción textual para ACCESS
-            # o un formato inesperado. Lo dejaremos como string en este caso.
             pass 
     
     context = {
         'log_entry': log_entry,
-        'changes_dict': changes_dict, # El diccionario parseado, o None
+        'changes_dict': changes_dict,
         'titulo_vista': f"Detalle de Registro de Bitácora #{log_entry.pk}",
     }
     return render(request, 'bitacora/detalle_registro_log.html', context)

@@ -17,7 +17,7 @@ from django.contrib.auth.models import Group, User
 logger = logging.getLogger(__name__)
 
 
-# --- DEFINIR FUNCIONES DE TEST DE PERMISOS AQUÍ ARRIBA ---
+# --- FUNCIONES DE TEST DE PERMISOS AQUÍ ARRIBA ---
 def puede_crear_usuarios(user): 
     if not user.is_authenticated:
         return False
@@ -238,16 +238,12 @@ def ver_detalle_usuario_view(request, user_id):
 
     # Llamamos a nuestra función de permisos mejorada
     if not puede_ver_detalle_usuario(request.user, usuario_a_ver):
-        # Este mensaje es más específico
         messages.error(request, "No tiene permisos para ver los detalles de este usuario.")
-        # Redirigir a la página de inicio es más amigable que a la lista de usuarios
-        # para un usuario normal que no debería ver esa lista.
         return redirect('index')
 
     user_profile, created = UserProfile.objects.get_or_create(user=usuario_a_ver)
     if created:
         logger.info(f"Se creó un UserProfile para {usuario_a_ver.username} al intentar ver sus detalles.")
-
     grupos_del_usuario = usuario_a_ver.groups.all()
     permiso_para_editar = puede_editar_usuario(request.user, usuario_a_ver)
     permiso_para_eliminar = puede_eliminar_usuario(request.user, usuario_a_ver)
@@ -259,7 +255,7 @@ def ver_detalle_usuario_view(request, user_id):
         'titulo_vista': f"Detalles del Usuario: {usuario_a_ver.username}",
         'puede_editar_este_usuario': permiso_para_editar,
         'puede_eliminar_este_usuario': permiso_para_eliminar,
-        'es_perfil_propio': es_perfil_propio, # <-- AÑADIMOS LA NUEVA VARIABLE
+        'es_perfil_propio': es_perfil_propio, 
     }
     if es_perfil_propio:
         context['titulo_vista'] = "Mi Perfil"

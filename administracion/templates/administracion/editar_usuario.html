@@ -5,7 +5,6 @@
 
 {% block extra_css %}
 <style>
-    /* Estilos para el botón de mostrar/ocultar contraseña */
     .input-group-append .btn { border-left-width: 0; cursor: pointer; }
     .input-group-append .btn:hover { background-color: #e9ecef; }
     .input-group-append .btn i { margin: 0 2px; }
@@ -31,8 +30,6 @@
                 <div class="x_content">
                     <form method="post" enctype="multipart/form-data" novalidate>
                         {% csrf_token %}
-                        
-                        <!-- ===================== INICIO: MANEJO DE ERRORES (INTEGRADO) ===================== -->
                         {% if user_form.non_field_errors %}
                             <div class="alert alert-danger">
                                 <strong>Errores en datos de cuenta/rol:</strong>
@@ -58,7 +55,7 @@
                                 Verifique los campos marcados con errores.
                             </div>
                         {% endif %}
-                        <!-- ===================== FIN: MANEJO DE ERRORES (INTEGRADO) ===================== -->
+                       
 
                         <!-- Estructura de 2 Columnas -->
                         <div class="row">

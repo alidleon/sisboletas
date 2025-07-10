@@ -1,11 +1,10 @@
-# boletas/forms.py
 from django import forms
 from .models import PlantillaBoleta
 
 class PlantillaBoletaForm(forms.ModelForm):
     class Meta:
         model = PlantillaBoleta
-        fields = ['nombre', 'descripcion', 'es_predeterminada'] # Añade otros campos si los tienes
+        fields = ['nombre', 'descripcion', 'es_predeterminada']
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-control form-control-sm'}),
             'descripcion': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 3}),

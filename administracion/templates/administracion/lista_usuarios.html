@@ -48,7 +48,7 @@
                                     <th>CI</th>
                                     <th>Roles/Grupos</th>
                                     <th>Activo</th>
-                                    <th>Staff</th>
+                                    <!--th>Staff</th-->
                                     <th>Superusuario</th>
                                     <th>Acciones</th>
                                 </tr>
@@ -80,13 +80,13 @@
                                             <i class="fa fa-times-circle text-danger" title="Inactivo"></i>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <!--td>
                                         {% if usuario_actual.is_staff %}
                                             <i class="fa fa-check-circle text-success" title="Sí"></i>
                                         {% else %}
                                             <i class="fa fa-times-circle text-danger" title="No"></i>
                                         {% endif %}
-                                    </td>
+                                    </td-->
                                     <td>
                                         {% if usuario_actual.is_superuser %}
                                             <i class="fa fa-star text-warning" title="Sí"></i>

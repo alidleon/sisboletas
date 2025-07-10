@@ -30,7 +30,7 @@
             <form method="get" action="{% url 'ver_detalles_bono_te' planilla.id %}" class="form-horizontal" id="filtros-form-bonote"> {# ID único para este form #}
                 <div class="form-group row">
                     <label class="control-label col-md-3 col-sm-3 ">Secretaría:</label>
-                    <div class="col-md-7 col-sm-9 "> {# Ajustado para más espacio #}
+                    <div class="col-md-7 col-sm-9 "> 
                         <select name="secretaria" class="form-control form-control-sm" onchange="this.form.submit()">
                             <option value="">--- Todas ---</option>
                             {% for sec in all_secretarias %}
@@ -111,7 +111,6 @@
         </div>
     </div>
 
-    {# Estilos para Sticky Columns (sin cambios) #}
     <style>
         .table-responsive { overflow-x: auto; position: relative; }
         .tabla-bono-te th.sticky-col, .tabla-bono-te td.sticky-col {
@@ -188,7 +187,7 @@
                                 <td>{{ detalle_obj.dias_pagados|floatformat:2|default:"0.00" }}</td>
                                 <td>{{ detalle_obj.total_ganado|floatformat:2|default:"0.00" }}</td>
                                 <td>{{ detalle_obj.descuentos|floatformat:2|default:"0.00" }}</td>
-                                <td class="sticky-col sticky-col-second-last">{{ detalle_obj.liquido_pagable|floatformat:2|default:"0.00" }}</td>
+                                <td class="sticky-col sticky-col-second-last"><strong>{{ detalle_obj.liquido_pagable|floatformat:2|default:"0.00" }}</strong></td>
                                 <td title="{{ detalle_obj.observaciones_bono|default:'' }}">{{ detalle_obj.observaciones_bono|truncatechars:20|default:"" }}</td>
                                 <td class="sticky-col sticky-col-last text-nowrap">
                                     {% if planilla.estado == 'borrador' or planilla.estado == 'pendiente' %} {# O los estados que permitan edición #}
@@ -233,25 +232,21 @@
                     </div>
                  {% endif %}
             {% endif %}
-        </div> {# Fin x_content #}
-    </div> {# Fin x_panel de resultados #}
+        </div> 
+    </div> 
 </div>
 {% endblock %}
 
 {% block extra_js %}
-    {# Si tienes JS específico para esta página, como el del botón exportar_planilla_xlsx si lo manejas con JS #}
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Lógica para el botón exportar (si necesitas actualizar su URL dinámicamente)
-        const exportXlsxBtn = document.querySelector('a[href*="exportar_planilla_xlsx"]'); // Selector más genérico
+        const exportXlsxBtn = document.querySelector('a[href*="exportar_planilla_xlsx"]'); 
         if (exportXlsxBtn) {
             exportXlsxBtn.addEventListener('click', function(event) {
-                // Si necesitas modificar la URL del botón dinámicamente antes de la navegación
-                // event.preventDefault(); // Descomenta si necesitas construir la URL aquí
                 const currentParams = new URLSearchParams(window.location.search);
-                let exportUrl = "{% url 'exportar_planilla_xlsx' planilla.id %}"; // URL base
+                let exportUrl = "{% url 'exportar_planilla_xlsx' planilla.id %}"; 
                 
-                const paramsToKeep = ['secretaria', 'unidad', 'q', 'buscar']; // Parámetros de filtro
+                const paramsToKeep = ['secretaria', 'unidad', 'q', 'buscar']; 
                 const exportParams = new URLSearchParams();
                 
                 paramsToKeep.forEach(paramName => {
@@ -265,8 +260,7 @@
                 } else {
                     this.href = exportUrl;
                 }
-                // console.log("Export XLSX URL:", this.href); // Para depurar
-                // Si no hiciste preventDefault, la navegación ocurrirá con el href actualizado
+
             });
         }
     });

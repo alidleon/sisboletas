@@ -1,26 +1,20 @@
-# planilla/views.py (Versión Original con BD Externa)
-
 import logging
 from django.shortcuts import render, redirect, get_object_or_404, HttpResponse
 from django.contrib.auth.decorators import login_required, permission_required
 import os
 from django.conf import settings
-
-from django.urls import reverse # <--- Importar reverse
-from urllib.parse import urlencode # <--- Importar urlencode
-
+from django.urls import reverse 
+from urllib.parse import urlencode 
 from datetime import date
 from django.contrib import messages
 from .forms import DetalleBonoTeForm
-from .forms import PlanillaForm  # Necesitas crear un formulario para editar la planilla
+from .forms import PlanillaForm 
 from datetime import datetime
 from django.core.exceptions import ValidationError
 from decimal import Decimal, InvalidOperation
-from django.utils import timezone # Para fecha_elaboracion
-from collections import defaultdict # Para agrupar fácilmente
-from operator import attrgetter # Para ordenar objetos
-
-
+from django.utils import timezone 
+from collections import defaultdict 
+from operator import attrgetter 
 # Imports para ReportLab
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
@@ -32,36 +26,23 @@ from reportlab.lib.utils import ImageReader
 import os
 from django.conf import settings
 import io
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger # Si get_processed_planilla_details lo usa
-
-
-
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger 
 from calendar import month_name
 from openpyxl.drawing.image import Image
-
-from django.db import transaction, IntegrityError       # Para transacciones y manejo de errores BD
+from django.db import transaction, IntegrityError 
 from django.db.models import Q  
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger 
-
 # --- Importaciones de Modelos Originales ---
 from .models import (
     Planilla,
     DetalleBonoTe,
-    # DetalleSueldo,      # Si lo usabas
-    # DetalleImpositiva,  # Si lo usabas
-    # Modelos Externos
     PrincipalDesignacionExterno,
     PrincipalPersonalExterno,
     PrincipalCargoExterno,
     PrincipalUnidadExterna,
     PrincipalSecretariaExterna,
-    # PrincipalPersonal # Si tenías el duplicado
 )
-
-# Importar utils original (¡también debe ser restaurado!)
 from .utils import get_processed_planilla_details, generar_pdf_bonote_detalles, generar_pdf_lista_planillas
-
-# Importaciones y configuración de Openpyxl (igual que antes)
 try:
     import openpyxl
     from openpyxl.utils import get_column_letter
@@ -79,11 +60,8 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-
-
 from .forms import DetalleBonoTeForm, PlanillaForm, EditarPlanillaForm
 
-# --- ¡IMPORTANTE! Importar Modelos de Reportes ---
 try:
     from reportes.models import PlanillaAsistencia, DetalleAsistencia
     REPORTES_APP_AVAILABLE = True
@@ -98,29 +76,24 @@ except ImportError:
 
 @login_required
 def seleccionar_tipo_planilla(request):
-    # Usar choices originales de Planilla
-    tipos_disponibles = Planilla.TIPO_CHOICES # ('planta', 'contrato', 'consultor')
+    tipos_disponibles = Planilla.TIPO_CHOICES 
     if request.method == 'POST':
         tipo = request.POST.get('tipo')
         tipos_validos_keys = dict(tipos_disponibles).keys()
         if tipo in tipos_validos_keys:
-            return redirect('crear_planilla', tipo=tipo) # Redirige a la vista de creación
+            return redirect('crear_planilla', tipo=tipo) 
         else:
             messages.error(request, 'Seleccione un tipo de planilla válido.')
             return render(request, 'planillas/seleccionar_tipo_planilla.html', {'tipos_planilla': tipos_disponibles})
-    else: # GET
+    else: 
         context = {
             'tipos_planilla': tipos_disponibles,
         }
         return render(request, 'planillas/seleccionar_tipo_planilla.html', context)
-
-
-
-
 #-------------------------------------------------------------------------
 
 EXTERNAL_TYPE_MAP = {
-        'planta': 'ASEGURADO',       # Verifica estos mapeos
+        'planta': 'ASEGURADO',      
         'contrato': 'CONTRATO',
         'consultor': 'CONSULTOR EN LINEA',
     }
@@ -134,40 +107,28 @@ def crear_planilla_bono_te(request):
     if not REPORTES_APP_AVAILABLE:
         messages.error(request, "Error crítico: La funcionalidad de reportes de asistencia no está disponible.")
         return redirect('lista_planillas')
-
-    # Obtener el tipo_filtro de los parámetros GET de la URL actual
     tipo_filtro_seleccionado = request.GET.get('tipo_filtro', None)
 
     if request.method == 'POST':
-        # Al hacer POST, instanciamos el form con los datos POST
-        # y también con el tipo_filtro que se usó para renderizar el form (por si lo necesitamos para re-renderizar con errores)
-        form = PlanillaForm(request.POST, tipo_filtro=tipo_filtro_seleccionado) # tipo_filtro para __init__
+        form = PlanillaForm(request.POST, tipo_filtro=tipo_filtro_seleccionado) 
         if form.is_valid():
             selected_pa_base = form.cleaned_data['planilla_asistencia_base_selector']
             dias_habiles_ingresados = form.cleaned_data['dias_habiles']
             
             mes_derivado = selected_pa_base.mes
             anio_derivado = selected_pa_base.anio
-            tipo_planilla_derivado = selected_pa_base.tipo # El tipo REAL de la planilla de bono
-
-            # --- Comprobación adicional: si el tipo derivado no coincide con el filtro (no debería pasar si el form está bien) ---
+            tipo_planilla_derivado = selected_pa_base.tipo 
             if tipo_filtro_seleccionado and tipo_planilla_derivado != tipo_filtro_seleccionado:
                 messages.error(request, "Error: El tipo de la planilla de asistencia seleccionada no coincide con el tipo filtrado.")
-                # Re-renderizar con el formulario (que ya tendrá el tipo_filtro de la request.GET)
-                # O podrías forzar de nuevo el tipo_filtro al form aquí:
-                form_con_error = PlanillaForm(request.POST, tipo_filtro=tipo_filtro_seleccionado) # Reinstanciar con el filtro original
+                form_con_error = PlanillaForm(request.POST, tipo_filtro=tipo_filtro_seleccionado) 
                 context_error = {
                     'planilla_form': form_con_error,
-                    'tipos_planilla_choices': Planilla.TIPO_CHOICES, # Para el selector de filtro
+                    'tipos_planilla_choices': Planilla.TIPO_CHOICES, 
                     'tipo_filtro_actual': tipo_filtro_seleccionado,
                     'titulo_vista': f"Crear Planilla Bono TE (Filtrado por: {dict(Planilla.TIPO_CHOICES).get(tipo_filtro_seleccionado,'Todos') if tipo_filtro_seleccionado else 'Todos los Tipos'})"
                 }
                 return render(request, 'planillas/crear_planilla.html', context_error)
-            # --- Fin comprobación ---
-
-            # ... (resto de la lógica POST para crear Planilla y DetalleBonoTe, SIN CAMBIOS desde el mensaje anterior) ...
-            # ... (bloque try-except con transaction.atomic, etc.) ...
-            # INICIO LÓGICA POST (copiada y verificada del mensaje anterior)
+            
             plan_asistencia_validada = selected_pa_base
             detalles_asistencia_dict = {}
             try:
@@ -242,27 +203,24 @@ def crear_planilla_bono_te(request):
                 for field, errors in e_model_validation.message_dict.items():
                     form_field_name = 'planilla_asistencia_base_selector' if field == 'planilla_asistencia_base' else field
                     for error_msg in errors:
-                        form.add_error(form_field_name, error_msg) # El form aquí es el request.POST
+                        form.add_error(form_field_name, error_msg) 
             except IntegrityError as e_db_integrity:
                 logger.error(f"Error de integridad en la BD al crear Planilla/Detalles Bono TE: {e_db_integrity}", exc_info=True)
                 form.add_error(None, f"Error de base de datos. ({e_db_integrity})")
             except Exception as e_general_processing:
                  logger.error(f"Error general procesando la creación: {e_general_processing}", exc_info=True)
                  form.add_error(None, f"Error inesperado: {e_general_processing}")
-            # Si hubo error, 'form' (el de request.POST) ahora tiene los errores y se re-renderizará abajo.
-    else: # GET request
-        # Instanciar el formulario pasando el tipo_filtro para que __init__ lo use
+    else: 
         form = PlanillaForm(tipo_filtro=tipo_filtro_seleccionado)
-
     context = {
         'planilla_form': form,
-        'tipos_planilla_choices': Planilla.TIPO_CHOICES, # Para el selector de filtro
-        'tipo_filtro_actual': tipo_filtro_seleccionado,  # Para mantener el estado del filtro en el template
+        'tipos_planilla_choices': Planilla.TIPO_CHOICES, 
+        'tipo_filtro_actual': tipo_filtro_seleccionado,  
         'titulo_vista': f"Crear Planilla Bono TE (Filtrando por: {dict(Planilla.TIPO_CHOICES).get(tipo_filtro_seleccionado,'Todos los Tipos') if tipo_filtro_seleccionado else 'Todos los Tipos'})"
     }
     return render(request, 'planillas/crear_planilla.html', context)
 
-
+#------------------------------------------
 @login_required
 @permission_required('planilla.view_planilla', raise_exception=True)
 def lista_planillas(request):
@@ -270,23 +228,16 @@ def lista_planillas(request):
     Muestra una lista PAGINADA y FILTRABLE de todas las Planillas de Bono TE.
     """
     logger.debug(f"Vista lista_planillas (Bono TE) llamada. GET params: {request.GET.urlencode()}")
-
-    # 1. Inicializamos 'queryset' con la lista completa
     queryset = Planilla.objects.all().order_by('-anio', '-mes', 'tipo')
-
-    # 2. Leemos los filtros de la URL
     filtro_anio = request.GET.get('anio', '').strip()
     filtro_mes = request.GET.get('mes', '').strip()
     filtro_tipo = request.GET.get('tipo', '').strip()
     filtro_estado = request.GET.get('estado', '').strip()
-
-    # 3. Aplicamos los filtros al queryset
     if filtro_anio:
         try:
             queryset = queryset.filter(anio=int(filtro_anio))
         except (ValueError, TypeError):
             pass
-
     if filtro_mes:
         try:
             queryset = queryset.filter(mes=int(filtro_mes))
@@ -298,8 +249,6 @@ def lista_planillas(request):
 
     if filtro_estado:
         queryset = queryset.filter(estado=filtro_estado)
-
-    # 4. Paginación sobre el queryset ya filtrado
     items_por_pagina = 10
     paginator = Paginator(queryset, items_por_pagina)
     page_number_str = request.GET.get('page', '1')
@@ -311,17 +260,13 @@ def lista_planillas(request):
     except EmptyPage:
         page_obj = paginator.page(paginator.num_pages)
         
-    logger.info(f"Mostrando página {page_obj.number} de {paginator.num_pages} para Planillas Bono TE (Total filtrado: {paginator.count}).")
-    
-    # 5. Preparamos el querystring para la paginación
+    logger.info(f"Mostrando página {page_obj.number} de {paginator.num_pages} para Planillas Bono TE (Total filtrado: {paginator.count}).")    
     querystring = request.GET.copy()
     if 'page' in querystring:
-        del querystring['page']
-        
-    # 6. Creamos el contexto completo
+        del querystring['page']        
     context = {
         'page_obj': page_obj,
-        'titulo_vista': "Lista de Planillas Bono TE Generadas",
+        'titulo_vista': "Lista de Planillas Bono Te ",
         'valores_filtro': request.GET,
         'querystring': querystring.urlencode(),
         'tipos_disponibles': Planilla.TIPO_CHOICES,
@@ -330,18 +275,13 @@ def lista_planillas(request):
     
     return render(request, 'planillas/lista_planillas.html', context)
 
+#---------------------------------------
 @login_required
 @permission_required('planilla.view_detallebonote', raise_exception=True)
 def lista_bono_te(request):
-    # Selecciona relacionados internos, pero necesitará info externa si la muestra
     detalles_bono_te = DetalleBonoTe.objects.select_related('id_planilla').all()
-    # Aquí necesitarías un bucle para añadir info externa si la plantilla la muestra
-    # for detalle in detalles_bono_te:
-    #    try:
-    #       detalle.persona_obj = PrincipalPersonalExterno.objects.using('personas_db').get(pk=detalle.personal_externo_id)
-    #    except:
-    #       detalle.persona_obj = None
     return render(request, 'planillas/lista_bono_te.html', {'detalles_bono_te': detalles_bono_te})
+#----------------------------------------------------------
 
 @login_required
 @permission_required('planilla.change_detallebonote', raise_exception=True)
@@ -352,7 +292,6 @@ def editar_bono_te(request, detalle_id):
     )
     planilla = detalle_bono_te.id_planilla
     dias_habiles_planilla = planilla.dias_habiles if planilla else None
-    # --- Obtener datos externos (BD 'personas_db') ---
     persona_externa = None
     item_externo = 'N/A'
     cargo_externo = 'N/A'
@@ -378,14 +317,11 @@ def editar_bono_te(request, detalle_id):
         except Exception as e_desig:
             logger.error(f"Error consultando PrincipalDesignacionExterno para Persona ID {personal_externo_id}: {e_desig}", exc_info=True)
 
-    # --- Fin Obtener datos externos ---
-
     if request.method == 'POST':
-        form = DetalleBonoTeForm(request.POST, instance=detalle_bono_te) # Form original
+        form = DetalleBonoTeForm(request.POST, instance=detalle_bono_te) 
         if form.is_valid():
             form.save()
             messages.success(request, 'Detalle Bono TE editado correctamente.')
-            # Lógica de redirección original
             redirect_secretaria = request.POST.get('redirect_secretaria', '')
             redirect_unidad = request.POST.get('redirect_unidad', '')
             redirect_q = request.POST.get('redirect_q', '')
@@ -399,52 +335,49 @@ def editar_bono_te(request, detalle_id):
             return redirect(redirect_url)
         else:
             messages.error(request, 'Por favor, corrige los errores en el formulario.')
-    else: # GET
+    else: 
         form = DetalleBonoTeForm(
             instance=detalle_bono_te,
-            initial={'dias_habiles': dias_habiles_planilla} # Pasar días hábiles
+            initial={'dias_habiles': dias_habiles_planilla} 
         )
 
     context = {
         'form': form,
-        'detalle_bono_te': detalle_bono_te, # Pasa el objeto DetalleBonoTe
+        'detalle_bono_te': detalle_bono_te, 
         'dias_habiles': dias_habiles_planilla,
-        # --- Pasar datos externos al contexto ---
-        'persona_externa': persona_externa, # Pasa el objeto externo (o None)
+        'persona_externa': persona_externa, 
         'item_externo': item_externo,
         'cargo_externo': cargo_externo,
-        # --- Pasar params para redirect ---
         'redirect_secretaria': request.GET.get('secretaria', ''),
         'redirect_unidad': request.GET.get('unidad', ''),
         'redirect_q': request.GET.get('q', ''),
     }
     return render(request, 'planillas/editar_bono_te.html', context)
 
+#---------------------------------------
 @login_required
 @permission_required('planilla.delete_detallebonote', raise_exception=True)
 def borrar_bono_te(request, detalle_id):
     detalle_bono_te = get_object_or_404(DetalleBonoTe, pk=detalle_id)
     planilla_id = detalle_bono_te.id_planilla_id
-
-    # Obtener nombre para mensaje (puede fallar si BD externa no está)
     persona_nombre = f"ID Externo {detalle_bono_te.personal_externo_id}"
     try:
          if detalle_bono_te.personal_externo_id:
               persona = PrincipalPersonalExterno.objects.using('personas_db').get(pk=detalle_bono_te.personal_externo_id)
               persona_nombre = persona.nombre_completo or persona_nombre
     except:
-        pass # Mantener el ID si falla
+        pass 
 
     if request.method == 'POST':
         detalle_bono_te.delete()
         messages.success(request, f'Detalle Bono TE para {persona_nombre} borrado correctamente.')
-        # Redirigir a detalles de la planilla
         return redirect('ver_detalles_bono_te', planilla_id=planilla_id)
 
     return render(request, 'planillas/borrar_bono_te.html', {
         'detalle_bono_te': detalle_bono_te,
-        'persona_nombre': persona_nombre # Pasar nombre obtenido
+        'persona_nombre': persona_nombre 
         })
+#-------------------------------------
 
 @login_required
 @permission_required('planilla.change_planilla', raise_exception=True)
@@ -487,11 +420,10 @@ def editar_planilla(request, planilla_id):
     }
     return render(request, 'planillas/editar_planilla.html', context)
 
-
+#----------------------------------------------
 @login_required
 @permission_required('planilla.delete_planilla', raise_exception=True)
 def borrar_planilla(request, planilla_id):
-    # Sin cambios si solo borra Planilla
     planilla = get_object_or_404(Planilla, pk=planilla_id)
     if request.method == 'POST':
         planilla.delete()
@@ -499,20 +431,20 @@ def borrar_planilla(request, planilla_id):
         return redirect('lista_planillas')
     return render(request, 'planillas/borrar_planilla.html', {'planilla': planilla})
 
+#------------------------------------------------
 @login_required
-@permission_required('planilla.view_detallebonote', raise_exception=True) # Asumiendo este permiso
+@permission_required('planilla.view_detallebonote', raise_exception=True) 
 def ver_detalles_bono_te(request, planilla_id):
     logger.debug(f"Vista ver_detalles_bono_te llamada para planilla_id={planilla_id}. GET: {request.GET.urlencode()}")
     try:
-        items_por_pagina_vista = 20 # O el número que prefieras
+        items_por_pagina_vista = 20 
         processed_data = get_processed_planilla_details(request, planilla_id, items_por_pagina=items_por_pagina_vista)
 
-        planilla_obj_vista = processed_data.get('planilla') # Renombrado para claridad
-
+        planilla_obj_vista = processed_data.get('planilla') 
         if not planilla_obj_vista and processed_data.get('error_message'):
             messages.error(request, processed_data['error_message'])
             return redirect('lista_planillas')
-        if not planilla_obj_vista: # Seguridad
+        if not planilla_obj_vista: 
             messages.error(request, "Planilla de Bono TE no encontrada.")
             return redirect('lista_planillas')
         if processed_data.get('error_message') and planilla_obj_vista:
@@ -521,17 +453,14 @@ def ver_detalles_bono_te(request, planilla_id):
         page_obj_actual = processed_data.get('page_obj')
 
         context = {
-            'planilla': planilla_obj_vista, # Nombre original que usa tu template
+            'planilla': planilla_obj_vista, 
             'all_secretarias': processed_data.get('all_secretarias', []),
             'unidades_for_select': processed_data.get('unidades_for_select', []),
             'selected_secretaria_id': processed_data.get('selected_secretaria_id'),
             'selected_unidad_id': processed_data.get('selected_unidad_id'),
             'search_term': processed_data.get('search_term', ''),
             'search_active': processed_data.get('search_active', False),
-            
-            'page_obj': page_obj_actual, # <--- Objeto Page para la plantilla
-            # 'detalles_bono_te' ya no se pasa directamente si está en page_obj
-            
+            'page_obj': page_obj_actual, 
             'titulo_vista': f"Detalles Bono TE - {planilla_obj_vista.get_tipo_display()} {planilla_obj_vista.mes}/{planilla_obj_vista.anio}"
         }
         
@@ -551,7 +480,7 @@ def ver_detalles_bono_te(request, planilla_id):
 
 
 MESES_ESPANOL = [
-    None, # Para que el índice 1 sea Enero
+    None, 
     "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
     "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
 ]
@@ -568,10 +497,10 @@ def safe_int(value, default=0):
         return int(Decimal(str(value).strip()))
     except (InvalidOperation, ValueError, TypeError):
         return default
-
+#----------------------------------
 
 @login_required
-@permission_required('planilla.view_planilla', raise_exception=True) # O el permiso que uses
+@permission_required('planilla.view_planilla', raise_exception=True) 
 def exportar_planilla_xlsx(request, planilla_id):
     if not OPENPYXL_AVAILABLE:
         messages.error(request, "La funcionalidad de exportación a Excel no está disponible (falta 'openpyxl').")
@@ -580,33 +509,27 @@ def exportar_planilla_xlsx(request, planilla_id):
     logger.info(f"Solicitud de exportación XLSX para Planilla ID {planilla_id} (Agrupado por Unidad)")
 
     try:
-        # Llamamos a la utilidad para obtener los datos.
-        # return_all_for_export=True asegura que obtengamos los datos agrupados.
         processed_data = get_processed_planilla_details(request, planilla_id, return_all_for_export=True)
     except Exception as e_get_data:
         logger.error(f"Error crítico obteniendo datos para exportar Planilla {planilla_id}: {e_get_data}", exc_info=True)
         messages.error(request, f"No se pudieron obtener los datos para exportar: {e_get_data}")
-        return redirect('lista_planillas') # O a la vista de detalles con el ID
+        return redirect('lista_planillas') 
 
     planilla = processed_data.get('planilla')
     detalles_agrupados_export = processed_data.get('detalles_agrupados_por_unidad_export', {})
     orden_unidades_export = processed_data.get('orden_unidades_export', [])
     
-    # Para información en la cabecera del Excel sobre los filtros aplicados
     selected_secretaria_id = processed_data.get('selected_secretaria_id')
-    selected_unidad_id = processed_data.get('selected_unidad_id') # ID de unidad del filtro general
+    selected_unidad_id = processed_data.get('selected_unidad_id') 
     search_term = processed_data.get('search_term', '')
 
 
     if not planilla:
          messages.error(request, "No se pudo encontrar la información de la planilla para exportar.")
          return redirect('lista_planillas')
-
-    # Si hubo un error en la utilidad y no hay datos agrupados
     if processed_data.get('error_message') and not detalles_agrupados_export:
         messages.error(request, f"Error al preparar datos para exportar: {processed_data['error_message']}")
         return redirect('ver_detalles_bono_te', planilla_id=planilla_id)
-
     total_detalles_a_exportar = sum(len(lista) for lista in detalles_agrupados_export.values())
 
     if not detalles_agrupados_export:
@@ -614,33 +537,27 @@ def exportar_planilla_xlsx(request, planilla_id):
                            f"con los filtros aplicados. Se generará un archivo Excel solo con la cabecera.")
         logger.warning(msg_no_detalles)
         messages.warning(request, msg_no_detalles)
-        # Permitimos continuar para generar un Excel con cabecera pero sin datos de empleados.
     else:
         logger.info(f"Se procesarán {len(orden_unidades_export)} grupos de unidades para la planilla ID {planilla_id}. Total detalles: {total_detalles_a_exportar}")
 
     try:
         workbook = openpyxl.Workbook()
         sheet = workbook.active
-        sheet.title = f"BonoTE_{planilla.mes}_{planilla.anio}"[:31] # Título corto para la hoja
-
-        # --- Definir Estilos ---
+        sheet.title = f"BonoTE_{planilla.mes}_{planilla.anio}"[:31] 
         inst_header_bold_font = Font(name='Calibri', size=9, bold=True)
-        title_font = Font(name='Calibri', size=14, bold=True) # Azul oscuro
-        subtitle_font = Font(name='Calibri', size=11, bold=True) # Un poco más pequeño que el título
+        title_font = Font(name='Calibri', size=14, bold=True) 
+        subtitle_font = Font(name='Calibri', size=11, bold=True) 
         value_font = Font(name='Calibri', size=9)
-        header_font = Font(name='Calibri', size=9, bold=True) # Texto negro
+        header_font = Font(name='Calibri', size=9, bold=True) 
         unidad_header_font = Font(name='Calibri', size=10, bold=True)
-        
         wrap_left_alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
         centered_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
         left_alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
         right_alignment = Alignment(horizontal='right', vertical='center')
-        
         decimal_format = '#,##0.00'; integer_format = '#,##0'
-        header_fill = PatternFill(start_color='00FFFF', end_color='00FFFF', fill_type='solid') # Azul oscuro
-        thin_border_side = Side(border_style="thin", color="FF000000") # Borde negro
+        header_fill = PatternFill(start_color='00FFFF', end_color='00FFFF', fill_type='solid') 
+        thin_border_side = Side(border_style="thin", color="FF000000") 
         header_border = Border(left=thin_border_side, right=thin_border_side, top=thin_border_side, bottom=thin_border_side)
-        
         data_headers = [
             'Nro.', 'Item', 'CI', 'Nombre Completo', 'Cargo', 
             'Días Háb.', 'Faltas', 'Vacac.', 'Viajes', 'B.Médicas', 'PCGH', 'PSGH', 'P.Excep',
@@ -649,8 +566,6 @@ def exportar_planilla_xlsx(request, planilla_id):
         ]
         num_data_columns = len(data_headers)
         current_row = 1 
-
-        # --- Escribir Encabezado Institucional ---
         institucional_text = (
             "GOBIERNO AUTONOMO DEPARTAMENTAL DE POTOSI\n"
             "SECRETARIA DEPTAL. ADMINISTRATIVA FINANCIERA\n"
@@ -659,9 +574,7 @@ def exportar_planilla_xlsx(request, planilla_id):
         sheet.merge_cells(start_row=current_row, start_column=1, end_row=current_row + 2, end_column=max(5, num_data_columns // 3)) # Fusionar para texto institucional
         inst_cell = sheet.cell(row=current_row, column=1, value=institucional_text)
         inst_cell.font = inst_header_bold_font
-        inst_cell.alignment = wrap_left_alignment
-        
-        # --- Logo ---
+        inst_cell.alignment = wrap_left_alignment        
         image_path = None
         try:
             logo_filename = 'gadp.png'
@@ -673,10 +586,9 @@ def exportar_planilla_xlsx(request, planilla_id):
                 if os.path.exists(potential_path_base): image_path = potential_path_base
             
             if image_path:
-                img = OpenpyxlImage(image_path) # Usar OpenpyxlImage
-                img.height = 75 # Ajustar altura del logo
-                img.width = 65  # Ajustar ancho del logo
-                # Colocar el logo a la derecha, ajustando la columna
+                img = OpenpyxlImage(image_path) 
+                img.height = 75 
+                img.width = 65  
                 logo_anchor_column_letter = get_column_letter(num_data_columns -1 if num_data_columns > 2 else num_data_columns) 
                 logo_anchor_cell = f'{logo_anchor_column_letter}{current_row}'
                 sheet.add_image(img, logo_anchor_cell)
@@ -685,7 +597,7 @@ def exportar_planilla_xlsx(request, planilla_id):
                 logger.warning(f"Logo '{logo_filename}' no encontrado en rutas probadas para Excel.")
         except Exception as e_img:
              logger.error(f"Error al procesar o añadir la imagen al Excel: {e_img}", exc_info=True)
-        current_row += 3 # Espacio después del encabezado institucional
+        current_row += 3 
 
         # --- Título Principal de la Planilla ---
         sheet.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=num_data_columns)
@@ -701,30 +613,19 @@ def exportar_planilla_xlsx(request, planilla_id):
         try:
             mes_numero = int(planilla.mes)
             if 1 <= mes_numero <= 12: nombre_mes_str = MESES_ESPANOL[mes_numero]
-        except (IndexError, TypeError, ValueError): pass # Usar el número si falla la conversión
+        except (IndexError, TypeError, ValueError): pass 
         periodo_text = f"CORRESPONDIENTE AL MES DE {nombre_mes_str} DE {planilla.anio}"
         periodo_cell = sheet.cell(row=current_row, column=1, value=periodo_text)
         periodo_cell.font = subtitle_font
         periodo_cell.alignment = centered_alignment
         current_row += 1
-        
-        # --- Días Hábiles de la Planilla (si existen) ---
-        #if planilla.dias_habiles is not None:
-        #    sheet.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=num_data_columns)
-        #    dias_hab_text = f"DÍAS HÁBILES DEL MES (PLANILLA): {planilla.dias_habiles:.2f}"
-        #    dias_hab_cell = sheet.cell(row=current_row, column=1, value=dias_hab_text)
-        #    dias_hab_cell.font = Font(name='Calibri', size=9, italic=True)
-        #    dias_hab_cell.alignment = centered_alignment
-        #    current_row += 1
-
-        # --- Información de Filtros Aplicados (si los hay) ---
         filter_info_parts = []
         if selected_secretaria_id:
             try:
                 sec = PrincipalSecretariaExterna.objects.using('personas_db').get(pk=selected_secretaria_id)
                 filter_info_parts.append(f"Secretaría: {sec.nombre_secretaria}")
             except: filter_info_parts.append(f"Sec.ID: {selected_secretaria_id}")
-        if selected_unidad_id: # Este es el ID de unidad del filtro general
+        if selected_unidad_id: 
             try:
                 uni = PrincipalUnidadExterna.objects.using('personas_db').get(pk=selected_unidad_id)
                 filter_info_parts.append(f"Unidad: {uni.nombre_unidad}")
@@ -739,24 +640,19 @@ def exportar_planilla_xlsx(request, planilla_id):
             filter_cell.font = Font(name='Calibri', size=8, italic=True)
             filter_cell.alignment = left_alignment
             current_row += 1
-        current_row += 1 # Espacio antes de la primera tabla de unidad
-
+        current_row += 1 
         # --- Iterar sobre Unidades y sus Detalles ---
         nro_general_item_excel = 0
         for nombre_unidad_actual_excel in orden_unidades_export:
             detalles_de_esta_unidad_excel = detalles_agrupados_export.get(nombre_unidad_actual_excel, [])
             if not detalles_de_esta_unidad_excel:
                 continue
-
-            # Nombre de la Unidad
             sheet.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=num_data_columns)
             unidad_text_excel = f"UNIDAD: {nombre_unidad_actual_excel.upper()}"
             unidad_cell_excel = sheet.cell(row=current_row, column=1, value=unidad_text_excel)
             unidad_cell_excel.font = unidad_header_font
             unidad_cell_excel.alignment = left_alignment
             current_row += 1
-
-            # Encabezados de la tabla de datos
             for col_num_excel, header_title_excel in enumerate(data_headers, 1):
                 cell_excel = sheet.cell(row=current_row, column=col_num_excel, value=header_title_excel)
                 cell_excel.font = header_font
@@ -764,15 +660,13 @@ def exportar_planilla_xlsx(request, planilla_id):
                 cell_excel.fill = header_fill
                 cell_excel.border = header_border
             current_row += 1
-
-            # Datos de los empleados
             nro_item_unidad_excel = 0
             for detalle_item_excel in detalles_de_esta_unidad_excel:
                 nro_general_item_excel += 1
                 nro_item_unidad_excel +=1
 
                 row_data_excel = [
-                    nro_item_unidad_excel, # Numeración por unidad
+                    nro_item_unidad_excel, 
                     getattr(detalle_item_excel, 'item_externo', ''),
                     getattr(detalle_item_excel, 'ci_externo', ''),
                     getattr(detalle_item_excel, 'nombre_completo_externo', ''),
@@ -809,17 +703,15 @@ def exportar_planilla_xlsx(request, planilla_id):
                         cell_obj_excel.alignment = right_alignment
                         if isinstance(cell_value_excel, Decimal):
                             # Mostrar 2 decimales para la mayoría de los campos Decimal
-                            # Si el valor es entero (ej. 5.00), y no es un campo monetario principal, mostrar como entero.
                             is_monetary_field = header_name_actual_excel in ['Total Ganado', 'Desc.', 'Líquido Pagable']
                             if cell_value_excel == cell_value_excel.to_integral_value() and not is_monetary_field and header_name_actual_excel != 'Días Háb.':
                                  cell_obj_excel.number_format = integer_format
                             else:
                                  cell_obj_excel.number_format = decimal_format
-                        elif isinstance(cell_value_excel, int): # Para valores que ya son enteros
+                        elif isinstance(cell_value_excel, int): 
                              cell_obj_excel.number_format = integer_format
                 current_row += 1
-            current_row += 1 # Fila en blanco después de cada tabla de unidad
-
+            current_row += 1 
         # --- Ajustar Ancho de Columnas ---
         anchos_especificos = {
             'Nro.': 6, 'Item': 8, 'CI': 11, 'Nombre Completo': 25, 'Cargo': 30,
@@ -852,7 +744,6 @@ def exportar_planilla_xlsx(request, planilla_id):
         filter_suffix_parts_excel = []
         if selected_secretaria_id: filter_suffix_parts_excel.append(f"Sec{selected_secretaria_id}")
         if selected_unidad_id: filter_suffix_parts_excel.append(f"Uni{selected_unidad_id}")
-        # Para el término de búsqueda, limpiar caracteres no aptos para nombres de archivo
         if search_term: 
             safe_search_term = "".join(c if c.isalnum() else '_' for c in search_term[:15])
             filter_suffix_parts_excel.append(f"Q_{safe_search_term}")
@@ -873,16 +764,12 @@ def exportar_planilla_xlsx(request, planilla_id):
         return redirect('ver_detalles_bono_te', planilla_id=planilla_id)
     
 
-
+#-------------------------------------
 @login_required
 # @permission_required('planilla.view_planilla', raise_exception=True) # O un permiso más específico
 def export_detalles_bonote_pdf(request, planilla_id):
     logger.info(f"Solicitud de exportación PDF para Detalles Bono TE de Planilla ID: {planilla_id}")
-
-    # 1. Obtener datos procesados y agrupados para la exportación
-    # Usamos la función get_processed_planilla_details con return_all_for_export=True
     processed_data = get_processed_planilla_details(request, planilla_id, return_all_for_export=True)
-
     planilla_cabecera = processed_data.get('planilla')
     detalles_agrupados = processed_data.get('detalles_agrupados_por_unidad_export')
     orden_unidades = processed_data.get('orden_unidades_export')
@@ -891,9 +778,9 @@ def export_detalles_bonote_pdf(request, planilla_id):
     if error_message and not planilla_cabecera:
         logger.error(f"Error al obtener datos para exportar PDF Detalles Bono TE (Planilla ID {planilla_id}): {error_message}")
         messages.error(request, f"No se pudo generar el PDF: {error_message or 'Planilla no encontrada.'}")
-        return redirect('lista_planillas') # O a donde sea apropiado
+        return redirect('lista_planillas') 
 
-    if not planilla_cabecera: # Seguridad extra
+    if not planilla_cabecera: 
         messages.error(request, "Planilla no encontrada.")
         return redirect('lista_planillas')
 
@@ -904,17 +791,13 @@ def export_detalles_bonote_pdf(request, planilla_id):
 
 
     # 2. Definir las columnas para el PDF de Detalles Bono TE
-    # (texto_header, ancho_columna, clave_del_campo_en_el_objeto_detalle)
-    # AJUSTA ESTOS ANCHOS Y CAMPOS SEGÚN NECESITES. EL ANCHO TOTAL DEBE CABER EN LA PÁGINA.
-    # Ancho útil en landscape letter (aprox 10 a 10.5 pulgadas restando márgenes)
     column_definitions_bonote = [
-        ('Nro.', 0.3*inch, 'nro_item'), # Numeración por unidad
+        ('Nro.', 0.3*inch, 'nro_item'), 
         ('Item', 0.4*inch, 'item_externo'),
         ('CI', 0.6*inch, 'ci_externo'),
         ('Nombre Completo', 1.5*inch, 'nombre_completo_externo'),
         ('Cargo', 1.6*inch, 'cargo_externo'),
-        # ('Mes', 0.4*inch, 'mes'), # El mes ya está en el título general, pero puedes añadirlo
-        ('D.Háb.', 0.35*inch, 'dias_habiles_planilla'), # De la cabecera de la planilla
+        ('D.Háb.', 0.35*inch, 'dias_habiles_planilla'), 
         ('Faltas', 0.35*inch, 'faltas'),
         ('Vacac.', 0.35*inch, 'vacacion'),
         ('Viajes', 0.35*inch, 'viajes'),
@@ -929,10 +812,7 @@ def export_detalles_bonote_pdf(request, planilla_id):
         ('Total.G', 0.5*inch, 'total_ganado'),
         ('Desc.', 0.5*inch, 'descuentos'),
         ('Líq.Pag.', 0.5*inch, 'liquido_pagable'),
-        #('Obs.', 1.0*inch, 'observaciones_bono'), # Observaciones del bono
     ]
-    # Suma anchos: 0.3+0.5+0.7+2.0+1.5+0.5+0.45+0.45+0.5+0.5+0.6+0.7+1.0 = 10.2 pulgadas. Cabe en landscape.
-
     # 3. Preparar respuesta HTTP y buffer
     response = HttpResponse(content_type='application/pdf')
     tipo_planilla_str = "".join(c if c.isalnum() else '_' for c in planilla_cabecera.get_tipo_display())
@@ -965,24 +845,17 @@ def export_detalles_bonote_pdf(request, planilla_id):
 
 
 
-
+#------------------------------------------
 @login_required
 # @permission_required('planilla.view_planilla', raise_exception=True) # O el permiso adecuado
 def export_lista_planillas_pdf(request):
     logger.info("Solicitud de exportación PDF para la lista de planillas.")
-
-    # Obtener todas las planillas (o aplicar filtros si es necesario desde request.GET)
-    # Por ahora, exportaremos todas, ordenadas como en la vista de lista.
     planillas_a_exportar = Planilla.objects.all().order_by('-anio', '-mes', 'tipo')
-
-    # Definición de columnas para el PDF de la lista
-    # Formato: (Texto Cabecera, Ancho Columna, Clave Atributo o Callable, Tipo Alineación Texto)
-    # Tipos de alineación: 'left', 'center', 'right'
     column_definitions_lista = [
         ("Nro.", 0.5*inch, 'nro_item_lista', 'center'),
         ("Mes/Año", 1.0*inch, lambda p: f"{p.mes}/{p.anio}", 'center'),
-        ("Tipo", 1.5*inch, 'get_tipo_display', 'left'), # Usa el método del modelo
-        ("Estado", 1.0*inch, 'get_estado_display', 'left'), # Usa el método del modelo
+        ("Tipo", 1.5*inch, 'get_tipo_display', 'left'), 
+        ("Estado", 1.0*inch, 'get_estado_display', 'left'), 
         ("Días Háb.", 0.8*inch, 'dias_habiles', 'right'),
         ("Elaborado por", 1.2*inch, 'usuario_elaboracion', 'left'),
         ("Fecha Elab.", 1.0*inch, 'fecha_elaboracion', 'center'),
@@ -1000,13 +873,12 @@ def export_lista_planillas_pdf(request):
             output_buffer=buffer,
             planillas_qs=planillas_a_exportar,
             column_definitions_lista=column_definitions_lista,
-            titulo_reporte="LISTA DE PLANILLAS DE BONO DE TÉ" # Puedes personalizarlo
+            titulo_reporte="LISTA DE PLANILLAS DE BONO DE TÉ" 
         )
     except Exception as e_gen_pdf:
         logger.error(f"Vista: Falla al llamar a generar_pdf_lista_planillas: {e_gen_pdf}", exc_info=True)
         messages.error(request, f"Ocurrió un error crítico al generar el documento PDF: {e_gen_pdf}")
-        # Redirigir a la lista de planillas si falla
-        return redirect('lista_planillas') # Asegúrate que 'lista_planillas' es el name de tu URL
+        return redirect('lista_planillas') 
 
     pdf_data = buffer.getvalue()
     buffer.close()

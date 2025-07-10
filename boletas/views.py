@@ -1,8 +1,6 @@
 import logging
-
 from django.shortcuts import render, redirect, get_object_or_404
 import locale
-
 from django.contrib import messages
 from django.urls import reverse
 from .models import PlantillaBoleta
@@ -10,7 +8,7 @@ from .forms import PlantillaBoletaForm
 from sueldos.models import PlanillaSueldo, DetalleSueldo 
 from django.http import HttpResponse, JsonResponse 
 from .utils import dibujar_boleta_en_canvas
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, LETTER
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas as pdf_canvas_gen 
 from django.views.decorators.http import require_POST, require_GET
@@ -34,7 +32,6 @@ except ImportError:
     PrincipalUnidadExterna, PrincipalSecretariaExterna = None, None
     PLANILLA_APP_AVAILABLE = False
     logger.error("GENERACION PDF: No se pudieron importar modelos de la app 'planilla'.")
-
 try:
     from planilla.models import PrincipalPersonalExterno, PrincipalDesignacionExterno
     PLANILLA_APP_AVAILABLE_FOR_SEARCH = True 
@@ -42,8 +39,6 @@ except ImportError:
     PrincipalPersonalExterno, PrincipalDesignacionExterno = None, None
     PLANILLA_APP_AVAILABLE_FOR_SEARCH = False
     logger.error("GENERAR BOLETA INDIVIDUAL: No se pudieron importar modelos de la app 'planilla'.")
- 
-
 try:
     from .utils import PLACEHOLDERS_BOLETA_DEFINICION
 except ImportError:
@@ -55,7 +50,7 @@ except ImportError:
 import json 
 
 from auditlog.models import LogEntry
-from django.contrib.contenttypes.models import ContentType # Para obtener el ContentType
+from django.contrib.contenttypes.models import ContentType 
 
 @login_required
 @permission_required('boletas.view_plantillaboleta', raise_exception=True)
@@ -70,7 +65,6 @@ def lista_plantillas_boleta(request):
 @login_required
 @permission_required('boletas.change_plantillaboleta', raise_exception=True)
 def crear_editar_plantilla_boleta(request, plantilla_id=None):
-    # Usaremos logger en lugar de print para mejor manejo en producción
     logger.debug(f"--- VISTA crear_editar_plantilla_boleta --- Método: {request.method}, Plantilla ID: {plantilla_id}")
 
     instancia_plantilla = None
@@ -119,22 +113,20 @@ def crear_editar_plantilla_boleta(request, plantilla_id=None):
             try:
                 logger.debug(f"Intentando guardar la plantilla (ID: {plantilla_guardada.pk if plantilla_guardada.pk else 'Nuevo'}) en la BD...")
                 plantilla_guardada.save()
-                # form.save_m2m() # Si tuvieras
-
                 logger.debug(f"Plantilla ID {plantilla_guardada.id} guardada/actualizada en BD.")
                 messages.success(request, f"Plantilla '{plantilla_guardada.nombre}' guardada exitosamente.")
                 logger.debug("--- FIN PROCESO POST (ÉXITO) --- Redirigiendo a lista_plantillas_boleta.")
-                return redirect('lista_plantillas_boleta') # Sin namespace
+                return redirect('lista_plantillas_boleta') 
             except Exception as e_save_db:
                 messages.error(request, f"Error al guardar la plantilla en la base de datos: {e_save_db}")
                 logger.error(f"ERROR al intentar plantilla_guardada.save(): {e_save_db}", exc_info=True)
         
-        else: # form no es válido
+        else: 
             messages.error(request, "Por favor corrige los errores en el formulario.")
             logger.warning(f"Formulario NO ES VÁLIDO. Errores: {form.errors.as_json()}")
             logger.debug("--- FIN PROCESO POST (FORMULARIO INVÁLIDO) ---")
     
-    else: # GET request
+    else: 
         logger.debug("--- PROCESANDO GET request ---")
         form = PlantillaBoletaForm(instance=instancia_plantilla)
         logger.debug("Formulario inicializado para GET request.")
@@ -160,9 +152,9 @@ def crear_editar_plantilla_boleta(request, plantilla_id=None):
 
     context = {
         'plantilla_form': form,
-        'datos_diseno_json_actual': datos_diseno_para_js_str, # String JSON
-        'placeholders_disponibles': PLACEHOLDERS_BOLETA_DEFINICION, # Lista Python
-        'placeholders_disponibles_json': json.dumps(PLACEHOLDERS_BOLETA_DEFINICION), # String JSON
+        'datos_diseno_json_actual': datos_diseno_para_js_str, 
+        'placeholders_disponibles': PLACEHOLDERS_BOLETA_DEFINICION, 
+        'placeholders_disponibles_json': json.dumps(PLACEHOLDERS_BOLETA_DEFINICION), 
         'titulo_pagina': "Diseñar Plantilla de Boleta"
     }
 
@@ -182,7 +174,7 @@ def eliminar_plantilla_boleta(request, plantilla_id):
     if request.method == 'POST':
         plantilla.delete()
         messages.success(request, f"Plantilla '{nombre_plantilla}' eliminada exitosamente.")
-        return redirect('lista_plantillas_boleta') # Sin 'boletas:'
+        return redirect('lista_plantillas_boleta') 
     context = {
         'plantilla': plantilla,
         'titulo_pagina': f"Eliminar Plantilla: {plantilla.nombre}"
@@ -200,8 +192,8 @@ def ensure_string(value, default_if_none=""):
 def render_object_to_html(obj, sample_data):
     fabric_left = obj.get('left', 0)
     fabric_top = obj.get('top', 0)
-    fabric_width_base = obj.get('width', 1)  # Ancho base del objeto Fabric
-    fabric_height_base = obj.get('height', 1) # Alto base del objeto Fabric
+    fabric_width_base = obj.get('width', 1)  
+    fabric_height_base = obj.get('height', 1) 
     fabric_angle = obj.get('angle', 0)
     opacity = obj.get('opacity', 1)
     scale_x = obj.get('scaleX', 1)
@@ -271,9 +263,9 @@ def render_object_to_html(obj, sample_data):
             f"text-decoration: {'underline' if obj.get('underline') else 'none'};",
             f"text-align: {escape(ensure_string(obj.get('textAlign', 'left')))};",
             f"line-height: {ensure_string(obj.get('lineHeight', 1.16))};", 
-            f"white-space: pre-wrap;", # Para respetar saltos de línea en el texto
-            f"padding: {ensure_string(obj.get('padding',0), '0')}px;", # Padding de Fabric
-            f"box-sizing: border-box;", # El padding no debe aumentar el tamaño total
+            f"white-space: pre-wrap;", 
+            f"padding: {ensure_string(obj.get('padding',0), '0')}px;", 
+            f"box-sizing: border-box;", 
         ])
 
     elif obj_type == 'line':
@@ -313,10 +305,7 @@ def render_object_to_html(obj, sample_data):
         tag = 'img'
         img_src = obj.get('src', '#')
         additional_attrs_str = f'src="{escape(ensure_string(img_src))}" alt="BoletaImg"'
-        # object-fit: fill (estira la imagen para llenar el contenedor)
-        # object-fit: contain (escala la imagen para caber manteniendo la proporción)
-        # object-fit: cover (cubre el área manteniendo la proporción, puede recortar)
-        styles.append("object-fit: fill;") # O 'contain' si prefieres
+        styles.append("object-fit: fill;") 
     else:
         content = f"[Tipo: {escape(ensure_string(obj_type, 'desconocido'))}]"
         styles.append("border: 1px dashed red;")
@@ -328,9 +317,9 @@ def render_object_to_html(obj, sample_data):
     else:
         return f'<div style="{final_styles_str}" class="{classes}" {additional_attrs_str}>{ensure_string(content)}</div>'
 
-# --- Vista de Previsualización ---
-@require_POST # Asegurar que solo se acceda por POST
-@csrf_exempt # DESCOMENTAR SOLO PARA PRUEBAS AJAX SIN CONFIGURAR CSRF EN JS
+# -----------------------------
+@require_POST 
+@csrf_exempt 
 @login_required
 @permission_required('boletas.view_plantillaboleta', raise_exception=True)
 
@@ -347,53 +336,68 @@ def preview_boleta_view(request):
         logger.debug(f"JSON de diseño recibido y parseado para previsualización. Objetos: {len(design_data.get('objects', []))}")
 
         # --- Datos de Ejemplo ---
-        # (Puedes hacerlos más dinámicos o leerlos de alguna configuración)
-        # **IMPORTANTE**: Asegúrate que las claves coincidan EXACTAMENTE con los {{PLACEHOLDERS}}
         sample_data = {
-            '{{NOMBRE_COMPLETO}}': 'ANA MARTINEZ PRUEBA',
-            '{{CI_EMPLEADO}}': '9876543 CB',
-            '{{CARGO_EMPLEADO}}': 'Diseñador/a Gráfico/a',
-            '{{ITEM_EMPLEADO}}': '1001',
-            '{{UNIDAD_EMPLEADO}}': 'DEPTO. CREATIVO',
-            '{{FECHA_INGRESO_EMPLEADO}}': '01/01/2024',
-            '{{MES_PAGO}}': str(datetime.now().month),
-            '{{ANIO_PAGO}}': str(datetime.now().year),
-            '{{HABER_BASICO}}': '6500.00',
-            '{{CATEGORIA_ANTIGUEDAD}}': '250.00', # Ejemplo
-            '{{TOTAL_GANADO}}': '6750.00',
-            '{{RC_IVA_RETENIDO}}': '150.50',
-            '{{GESTORA_PUBLICA_AFP}}': '700.10',
-            '{{APORTE_SOLIDARIO}}': '67.50',
-            '{{COOPERATIVA}}': '50.00',
-            '{{DESCUENTO_FALTAS}}': '0.00',
-            '{{DESCUENTO_MEMORANDUMS}}': '0.00',
-            '{{OTROS_DESCUENTOS}}': '25.00',
-            '{{TOTAL_DESCUENTOS}}': '993.10',
-            '{{LIQUIDO_PAGABLE}}': '5756.90',
-            '{{DIAS_TRABAJADOS}}': '30.00',
-            '{{FECHA_EMISION_BOLETA}}': datetime.now().strftime('%d/%m/%Y'),
-            # Añade aquí CUALQUIER otro placeholder que hayas definido
-            '{{LIQUIDO_EN_PALABRAS}}': 'CINCO MIL SETECIENTOS CINCUENTA Y SEIS 90/100 BOLIVIANOS', # Necesitarás una función para esto
-            '{{MES_PAGO_LETRAS}}': datetime.now().strftime('%B').upper(), # Nombre del mes actual en mayúsculas
+            # --- Datos Personales ---
+            '{{nombre}}': 'ANA',
+            '{{nombre_completo}}': 'ANA MARTINEZ PRUEBA',
+            '{{ci}}': '9876543 CB',
+            '{{apellido_paterno}}' : 'MARTINEZ',
+            '{{apellido_materno}}': 'PRUEBA',
+            # --- Datos de designación ---
+            '{{item}}': '1001',
+            '{{tipo_designacion}}': 'Asegurado',
+            '{{fecha_ingreso}}': '01/01/2025',
+            '{{fecha_conclusion}}': '01/01/2025',
+            # --- Datos de designación2 ---
+            '{{cargo_nombre_cargo}}': 'PROFESIONAL I',
+            '{{unidad_nombre_unidad}}': 'AREA DE SISTEMAS',
+            '{{secretaria_nombre_secretaria}}': 'UNIDAD FINANCIERA', 
+            # --- Datos de planilla sueldo ---
+            '{{planilla_mes}}': '1',
+            '{{planilla_anio}}': '2025',
+            '{{planilla_tipo}}': 'ASEGURADO',
+            '{{planilla_tipo_display}}': 'PERSONAL_PERMANENTE',
+            # --- Datos boletas ---
+            '{{dias_trab}}': '30',
+            '{{haber_basico}}': '3500.00',
+            '{{categoria}}': '0.00',
+            '{{lactancia_prenatal}}': '0.00',
+            '{{saldo_credito_fiscal}}': '100.00',
+            '{{total_ganado}}': '3600.00',
+            '{{rc_iva_retenido}}': '0.00',
+            '{{gestora_publica}}': '0.00',
+            '{{aporte_nac_solidario}}': '0.00',
+            '{{cooperativa}}': '0.00',
+            '{{faltas}}': '0.00',
+            '{{memorandums}}': '100.00',
+            '{{otros_descuentos}}': '3600.00',
+            '{{total_descuentos}}': '600.00',
+            '{{liquido_pagable}}': '3000.00',
+            '{{cargo_referencia}}': 'PROFESIONAL I',
+
+            # --- Datos Calculados ---
+            '{{literal_liquido}}': 'TRES MIL BOLIVIANOS',
+            '{{fecha_emision_actual}}': datetime.now().strftime('%d/%m/%Y'),
+            '{{mes_literal_actual}}': datetime.now().strftime('%B').upper(),
+            '{{CODIGO_QR}}': 'QR',
+            '{{literal_liquido_extendido}}': 'TRES MIL CON CINCUENTA',
         }
         logger.debug(f"Datos de ejemplo generados: {list(sample_data.keys())}")
 
         # --- Generar HTML ---
         html_objects = []
         if 'objects' in design_data and isinstance(design_data['objects'], list):
-             # Importar math si no está ya importado
-             import math
-             for obj in design_data['objects']:
-                 # No renderizar líneas de grid en la previsualización
-                 if not obj.get('isGridLine'):
-                      html_objects.append(render_object_to_html(obj, sample_data))
-             logger.debug(f"Generados {len(html_objects)} elementos HTML para la previsualización.")
+             
+            import math
+            for obj in design_data['objects']:
+                if not obj.get('isGridLine'):
+                    html_objects.append(render_object_to_html(obj, sample_data))
+            logger.debug(f"Generados {len(html_objects)} elementos HTML para la previsualización.")
         else:
-             logger.warning("El JSON de diseño recibido no tiene una lista 'objects'.")
+            logger.warning("El JSON de diseño recibido no tiene una lista 'objects'.")
 
 
-        # Ensamblar HTML final (simulando el tamaño del canvas)
-        # Usamos las mismas dimensiones que el canvas
+        
         canvas_width = 595
         canvas_height = 842
         final_html = f"""
@@ -413,7 +417,7 @@ def preview_boleta_view(request):
     
 
 
-# --- NUEVA VISTA: Generación de PDF ---
+# --------------------------
 @login_required
 @permission_required('sueldos.view_planillasueldo', raise_exception=True)
 def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
@@ -470,10 +474,8 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
 
     # --- 3. Preparar PDF ---
     buffer = io.BytesIO()
-    # Crear el canvas de ReportLab. Usar A4 por defecto.
-    # El origen (0,0) en ReportLab está en la esquina INFERIOR izquierda.
     p = pdf_canvas_gen.Canvas(buffer, pagesize=A4)
-    page_width, page_height = A4 # Obtener dimensiones en puntos
+    page_width, page_height = A4 
 
     logger.debug(f"Canvas PDF creado. Tamaño página: {page_width}x{page_height} puntos.")
 
@@ -496,7 +498,7 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
                     datos_empleado_actual['{{nombre}}'] = personal_ext.nombre or ''
                     datos_empleado_actual['{{apellido_paterno}}'] = personal_ext.apellido_paterno or ''
                     datos_empleado_actual['{{apellido_materno}}'] = personal_ext.apellido_materno or ''
-                    datos_empleado_actual['{{nombre_completo}}'] = personal_ext.nombre_completo # Usar la property
+                    datos_empleado_actual['{{nombre_completo}}'] = personal_ext.nombre_completo 
                     datos_empleado_actual['{{ci}}'] = personal_ext.ci or 'S/CI'
                 except PrincipalPersonalExterno.DoesNotExist:
                      logger.warning(f"No se encontró PrincipalPersonalExterno ID: {detalle.personal_externo_id}")
@@ -522,9 +524,9 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
                             .select_related('cargo', 'unidad__secretaria') \
                             .filter(
                                 personal_id=detalle.personal_externo_id,
-                                estado='ACTIVO', # Podría necesitar ser más flexible que solo ACTIVO
+                                estado='ACTIVO', 
                                 tipo_designacion=tipo_designacion_busqueda
-                            ).order_by('-fecha_ingreso').first() # La más reciente activa
+                            ).order_by('-fecha_ingreso').first() 
 
                     if designacion_activa:
                         datos_empleado_actual['{{item}}'] = str(designacion_activa.item) if designacion_activa.item is not None else ''
@@ -539,16 +541,14 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
                         # Llenar con vacíos o N/A para evitar errores al reemplazar placeholders
                         datos_empleado_actual['{{item}}'] = 'N/A'
                         datos_empleado_actual['{{tipo_designacion}}'] = 'N/A'
-                        # ... etc para otros campos de designación ...
                         errores_empleados.append(f"ID {detalle.personal_externo_id}: Designación no encontrada.")
 
                 except Exception as e_desig:
                      logger.error(f"Error obteniendo datos de designación para ID {detalle.personal_externo_id}: {e_desig}")
                      errores_empleados.append(f"ID {detalle.personal_externo_id}: Error datos designación.")
-                     # Llenar con vacíos para evitar errores
-                     # ...
+                     
             else:
-                 # Manejar caso si planilla.models no está disponible
+                 
                  errores_empleados.append(f"ID {detalle.personal_externo_id}: Módulo Planilla no disponible.")
                  continue
 
@@ -561,11 +561,10 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
 
 
             # --- Añadir datos de DetalleSueldo (formateados como string) ---
-            # Usar locale para formato de número si es necesario o Decimal.quantize
             from decimal import Decimal, ROUND_HALF_UP
-            quantizer = Decimal('0.01') # Para redondear a 2 decimales
+            quantizer = Decimal('0.01') 
 
-            datos_empleado_actual['{{cargo_referencia}}'] = detalle.cargo_referencia or '' # Usamos 'or ""' por si el valor es None
+            datos_empleado_actual['{{cargo_referencia}}'] = detalle.cargo_referencia or '' 
             datos_empleado_actual['{{dias_trab}}'] = str((detalle.dias_trab or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
             datos_empleado_actual['{{haber_basico}}'] = str((detalle.haber_basico or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
             datos_empleado_actual['{{categoria}}'] = str((detalle.categoria or Decimal(0)).quantize(quantizer, ROUND_HALF_UP))
@@ -586,22 +585,17 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
 
             # --- Añadir datos calculados ---
             datos_empleado_actual['{{fecha_emision_actual}}'] = datetime.now().strftime('%d/%m/%Y')
-            # Necesitarás una función para convertir número a literal (num2words o similar)
-            # from num2words import num2words
             monto_liquido = detalle.liquido_pagable or Decimal(0)
             datos_empleado_actual['{{literal_liquido}}'] = numero_a_literal(monto_liquido)
             datos_empleado_actual['{{literal_liquido_extendido}}'] = numero_a_literal_con_decimal_y_salto(monto_liquido)
             try:
-                # Requiere configurar locale en el sistema o usar calendar
                 import calendar
-                # Asegúrate que planilla_sueldo.mes es un entero 1-12
                 mes_literal = calendar.month_name[planilla_sueldo.mes].upper()
             except Exception as e_mes:
                 logger.warning(f"Error obteniendo nombre del mes para {planilla_sueldo.mes}: {e_mes}")
                 mes_literal = f"MES {planilla_sueldo.mes}"
             datos_empleado_actual['{{mes_literal_actual}}'] = mes_literal
-
-
+            
             # --- 4b. Llamar a la función de dibujo (a crear en utils.py) ---
             logger.debug(f"Llamando a dibujar_boleta_en_canvas para empleado CI: {datos_empleado_actual.get('{{ci}}', 'N/A')}")
             dibujar_boleta_en_canvas(p, page_height, diseno_json_dict, datos_empleado_actual)
@@ -614,13 +608,12 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
             empleado_id_log = f"Detalle ID {detalle.id} / Pers ID {detalle.personal_externo_id}"
             logger.error(f"Error procesando boleta para {empleado_id_log}: {e_empleado}", exc_info=True)
             errores_empleados.append(f"{empleado_id_log}: {e_empleado}")
-            # ¿Continuar con el siguiente o detener todo? Por ahora continuamos.
 
     # --- 5. Finalizar y Devolver PDF ---
     if num_boletas_generadas > 0:
         logger.info(f"Generación PDF completada. Boletas generadas: {num_boletas_generadas}. Errores: {len(errores_empleados)}.")
-        p.save() # Guardar el contenido PDF en el buffer
-         # --- REGISTRAR ACCIÓN EN AUDITLOG (FORMA CORREGIDA) ---
+        p.save()
+         # --- REGISTRAR ACCIÓN EN AUDITLOG  ---
         try:
             content_type_planilla_sueldo = ContentType.objects.get_for_model(PlanillaSueldo)
             log_changes_description = (
@@ -631,28 +624,27 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
             if errores_empleados:
                 log_changes_description += f" Hubo {len(errores_empleados)} errores al procesar empleados individuales."
 
-            # Crear la entrada de log directamente
+            
             LogEntry.objects.create(
                 actor=request.user,
                 content_type=content_type_planilla_sueldo,
-                object_pk=str(planilla_sueldo.pk), # object_pk es CharField
-                object_id=planilla_sueldo.pk,    # object_id es BigAutoField o similar (el numérico)
+                object_pk=str(planilla_sueldo.pk), 
+                object_id=planilla_sueldo.pk,   
                 object_repr=str(planilla_sueldo),
-                action=LogEntry.Action.ACCESS, # 3 para ACCESS
+                action=LogEntry.Action.ACCESS, 
                 changes=log_changes_description,
-                remote_addr=request.META.get('REMOTE_ADDR'), # Capturar IP si es posible
-                # timestamp se establece automáticamente por auto_now_add=True en LogEntry
+                remote_addr=request.META.get('REMOTE_ADDR'), 
+                
             )
             logger.info(f"Acción de generación de PDF registrada en auditlog para PlanillaSueldo ID: {planilla_sueldo.id}")
         except Exception as e_audit:
             logger.error(f"Error al registrar la acción de generación de PDF en auditlog: {e_audit}", exc_info=True)
-        # --- FIN REGISTRAR ACCIÓN EN AUDITLOG ---
 
-        buffer.seek(0) # Volver al inicio del buffer para la respuesta
+
+        buffer.seek(0) 
         response = HttpResponse(buffer, content_type='application/pdf')
-        # Nombre de archivo sugerido
         filename = f"boletas_{planilla_sueldo.tipo}_{planilla_sueldo.mes}_{planilla_sueldo.anio}.pdf"
-        response['Content-Disposition'] = f'inline; filename="{filename}"' # inline para ver en navegador, attachment para descargar
+        response['Content-Disposition'] = f'inline; filename="{filename}"' 
         return response
     else:
         logger.error("No se generó ninguna boleta exitosamente.")
@@ -660,11 +652,10 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
         if errores_empleados:
             messages.warning(request, f"Errores encontrados durante la generación: {'; '.join(errores_empleados[:3])}{'...' if len(errores_empleados)>3 else ''}")
 
-        # --- REGISTRAR INTENTO FALLIDO EN AUDITLOG (FORMA CORREGIDA) ---
+        # --- REGISTRAR INTENTO FALLIDO EN AUDITLOG ---
         try:
             content_type_planilla_sueldo = ContentType.objects.get_for_model(PlanillaSueldo)
             log_failure_description = (
-                # ... (tu descripción de fallo) ...
             )
             LogEntry.objects.create(
                 actor=request.user,
@@ -672,24 +663,20 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
                 object_pk=str(planilla_sueldo.pk),
                 object_id=planilla_sueldo.pk,
                 object_repr=str(planilla_sueldo),
-                action=LogEntry.Action.ACCESS, # O un ID de acción personalizado
+                action=LogEntry.Action.ACCESS, 
                 changes=log_failure_description,
                 remote_addr=request.META.get('REMOTE_ADDR'),
             )
             logger.info(f"Intento fallido de generación de PDF registrado en auditlog para PlanillaSueldo ID: {planilla_sueldo.id}")
         except Exception as e_audit_fail:
             logger.error(f"Error al registrar el intento fallido de generación de PDF en auditlog: {e_audit_fail}", exc_info=True)
-        # --- FIN REGISTRAR INTENTO FALLIDO ---
-        # return redirect('lista_planillas_sueldo') # Ajustar URL
         return HttpResponse("Error: No se generaron boletas.", status=500)
     
 
-
-
 #---------------------------
 @login_required
-@permission_required('boletas.view_plantillaboleta', raise_exception=True) # Mismo permiso que para ver la lista
-@require_GET # Esta vista solo debe responder a peticiones GET
+@permission_required('boletas.view_plantillaboleta', raise_exception=True)
+@require_GET
 def obtener_diseno_plantilla_json(request, plantilla_id):
     logger.debug(f"Solicitud GET para obtener JSON de diseño para Plantilla ID: {plantilla_id}")
     try:
@@ -700,9 +687,7 @@ def obtener_diseno_plantilla_json(request, plantilla_id):
         
         if not diseno_data or not isinstance(diseno_data, dict):
             logger.warning(f"Diseño JSON para plantilla ID {plantilla_id} está vacío o no es un diccionario. Contenido: {diseno_data}")
-            # Devolver un objeto JSON con una lista 'objects' vacía para que el JS no falle si espera esa estructura.
-            # Es importante que el JS que llama a preview_boleta_view pueda manejar un diseño vacío.
-            return JsonResponse({'objects': [], 'background': 'white'}, status=200) # Devolvemos un objeto Fabric.js vacío básico
+            return JsonResponse({'objects': [], 'background': 'white'}, status=200) 
 
         logger.debug(f"Diseño JSON encontrado para plantilla ID {plantilla_id}. Tiene {len(diseno_data.get('objects', []))} objetos.")
         return JsonResponse(diseno_data) # JsonResponse serializa el dict a JSON y establece el Content-Type correcto
@@ -745,7 +730,7 @@ def vista_generar_boleta_individual_buscar(request):
                 item_busqueda = int(termino)
                 designacion = PrincipalDesignacionExterno.objects.using('personas_db').filter(
                     item=item_busqueda
-                ).order_by('-fecha_ingreso', '-id').select_related('personal').first() # '-id' para desempate si hay misma fecha
+                ).order_by('-fecha_ingreso', '-id').select_related('personal').first() 
                 if designacion and designacion.personal:
                     personal_encontrado = designacion.personal
                 else:
@@ -775,7 +760,6 @@ def vista_generar_boleta_individual_buscar(request):
 #----------------------------------
 
 @login_required
-# Usa el mismo permiso que para generar el PDF masivo o uno más específico.
 @permission_required('boletas.view_plantillaboleta', raise_exception=True) 
 def vista_generar_pdf_boleta_unica(request, personal_externo_id, anio, mes):
     try:
@@ -792,11 +776,6 @@ def vista_generar_pdf_boleta_unica(request, personal_externo_id, anio, mes):
     try:
         detalle_sueldo = DetalleSueldo.objects.select_related(
             'planilla_sueldo', 
-            # 'personal_externo' # Ya no es necesario si obtenemos PrincipalPersonalExterno por separado
-                               # o si está bien hacer otra consulta a personas_db.
-                               # Si personal_externo es una FK a un modelo en la misma DB, mantenlo.
-                               # Como es una FK a una tabla externa (db_constraint=False),
-                               # Django no hará un JOIN real a través de DBs aquí.
         ).get(
             personal_externo_id=personal_externo_id,
             planilla_sueldo__anio=anio,
@@ -840,12 +819,12 @@ def vista_generar_pdf_boleta_unica(request, personal_externo_id, anio, mes):
         messages.error(request, "Error al obtener la plantilla de diseño de boleta.")
         return HttpResponse("Error interno al obtener plantilla de diseño.", status=500)
 
-    # --- 3. Recopilar Datos del Empleado y Sueldo (Similar a generar_pdf_boletas_por_planilla) ---
+    # --- 3. Datos del Empleado y Sueldo (Similar a generar_pdf_boletas_por_planilla) ---
     datos_empleado_actual = {}
     personal_ext = None
-    designacion_activa = None # Para el cargo, unidad, etc.
+    designacion_activa = None 
 
-    if PLANILLA_APP_AVAILABLE_FOR_SEARCH and detalle_sueldo.personal_externo_id: # Usamos la constante de la vista de búsqueda
+    if PLANILLA_APP_AVAILABLE_FOR_SEARCH and detalle_sueldo.personal_externo_id: 
         try:
             personal_ext = PrincipalPersonalExterno.objects.using('personas_db').get(pk=detalle_sueldo.personal_externo_id)
             datos_empleado_actual['{{nombre}}'] = personal_ext.nombre or ''
@@ -864,9 +843,6 @@ def vista_generar_pdf_boleta_unica(request, personal_externo_id, anio, mes):
 
         # Obtener datos de la Designación ACTIVA (o la más relevante para el periodo de la boleta)
         try:
-            # Para una boleta específica de un mes/año, idealmente buscaríamos la designación
-            # que estaba activa DURANTE ESE MES. Esto puede ser complejo.
-            # Por simplicidad, primero intentamos con la lógica actual: ACTIVA y del tipo de la planilla.
             
             tipo_externo_map = {
                 'planta': 'ASEGURADO', 'contrato': 'CONTRATO', 'consultor en linea': 'CONSULTOR EN LINEA',
@@ -874,21 +850,12 @@ def vista_generar_pdf_boleta_unica(request, personal_externo_id, anio, mes):
             tipo_designacion_busqueda = tipo_externo_map.get(planilla_sueldo_base.tipo)
 
             if tipo_designacion_busqueda:
-                # Podríamos añadir un filtro de fecha para que la designación sea relevante al periodo
-                # designacion_activa = PrincipalDesignacionExterno.objects.using('personas_db') \
-                #     .filter(
-                #         personal_id=detalle_sueldo.personal_externo_id,
-                #         tipo_designacion=tipo_designacion_busqueda,
-                #         fecha_ingreso__lte=datetime(anio, mes, 1), # Asumiendo que mes/anio son del sueldo
-                #         # Q(fecha_conclusion__gte=datetime(anio, mes, 1)) | Q(fecha_conclusion__isnull=True) # No funciona bien con MAX()
-                #     ).order_by('-fecha_ingreso').select_related('cargo', 'unidad__secretaria').first()
-
-                # Simplificado: la activa más reciente del tipo correcto (como antes)
+                
                 designacion_activa = PrincipalDesignacionExterno.objects.using('personas_db') \
                     .filter(
                         personal_id=detalle_sueldo.personal_externo_id,
                         tipo_designacion=tipo_designacion_busqueda,
-                        estado='ACTIVO' # O la lógica de estado que uses
+                        estado='ACTIVO' 
                     ).order_by('-fecha_ingreso').select_related('cargo', 'unidad__secretaria').first()
 
 
@@ -900,22 +867,19 @@ def vista_generar_pdf_boleta_unica(request, personal_externo_id, anio, mes):
                 datos_empleado_actual['{{cargo_nombre_cargo}}'] = (designacion_activa.cargo.nombre_cargo if designacion_activa.cargo else '') or (detalle_sueldo.cargo_referencia or '')
                 datos_empleado_actual['{{unidad_nombre_unidad}}'] = designacion_activa.unidad.nombre_unidad if designacion_activa.unidad else ''
                 datos_empleado_actual['{{secretaria_nombre_secretaria}}'] = designacion_activa.unidad.secretaria.nombre_secretaria if designacion_activa.unidad and designacion_activa.unidad.secretaria else ''
-            else: # Fallback a datos de referencia del detalle si no hay designación activa
+            else: 
                 logger.warning(f"PDF ÚNICO: No se encontró designación ACTIVA para ID {detalle_sueldo.personal_externo_id}. Usando datos de referencia del sueldo.")
                 datos_empleado_actual['{{item}}'] = str(detalle_sueldo.item_referencia) if detalle_sueldo.item_referencia is not None else 'S/I'
                 datos_empleado_actual['{{cargo_nombre_cargo}}'] = detalle_sueldo.cargo_referencia or 'N/A'
                 datos_empleado_actual['{{fecha_ingreso}}'] = detalle_sueldo.fecha_ingreso_referencia.strftime('%d/%m/%Y') if detalle_sueldo.fecha_ingreso_referencia else 'N/A'
-                # Otros campos de designación pueden quedar vacíos o 'N/A'
                 datos_empleado_actual['{{tipo_designacion}}'] = 'N/A'
                 datos_empleado_actual['{{unidad_nombre_unidad}}'] = 'N/A'
                 datos_empleado_actual['{{secretaria_nombre_secretaria}}'] = 'N/A'
 
         except Exception as e_desig:
             logger.error(f"PDF ÚNICO: Error obteniendo datos de designación para ID {detalle_sueldo.personal_externo_id}: {e_desig}")
-            # Llenar con datos de referencia o N/A
             datos_empleado_actual['{{item}}'] = str(detalle_sueldo.item_referencia) if detalle_sueldo.item_referencia is not None else 'S/I'
             datos_empleado_actual['{{cargo_nombre_cargo}}'] = detalle_sueldo.cargo_referencia or 'Error Designación'
-            # ... y así sucesivamente para otros campos de designación.
     else:
         messages.error(request, "Módulo de personal no disponible.")
         return HttpResponse("Error: Módulo de personal no disponible.", status=500)
@@ -951,14 +915,12 @@ def vista_generar_pdf_boleta_unica(request, personal_externo_id, anio, mes):
     # --- Añadir datos calculados (fecha emisión, literal, mes literal) ---
     datos_empleado_actual['{{fecha_emision_actual}}'] = datetime.now().strftime('%d/%m/%Y')
     
-    # Literal del líquido pagable (reutiliza tu función si la tienes, o una simple)
-    from .utils import numero_a_literal # Asumiendo que tienes esta función en utils.py
+    from .utils import numero_a_literal 
     monto_liquido = detalle_sueldo.liquido_pagable or Decimal(0)
     datos_empleado_actual['{{literal_liquido}}'] = numero_a_literal(monto_liquido)
     datos_empleado_actual['{{literal_liquido_extendido}}'] = numero_a_literal_con_decimal_y_salto(monto_liquido)
 
-    # Mes literal
-    import calendar # Asegúrate de importarlo
+    import calendar 
     try:
         mes_literal_str = calendar.month_name[planilla_sueldo_base.mes].upper()
     except Exception:
@@ -967,40 +929,29 @@ def vista_generar_pdf_boleta_unica(request, personal_externo_id, anio, mes):
     
     # --- 4. Preparar y Generar PDF ---
     buffer = io.BytesIO()
-    # Usar A4 por defecto, podrías hacerlo configurable por la plantilla_boleta si quieres
     p_canvas = pdf_canvas_gen.Canvas(buffer, pagesize=A4) 
     _page_width, page_height = A4 # Para la función de dibujo
 
     logger.debug(f"PDF ÚNICO: Llamando a dibujar_boleta_en_canvas para CI: {datos_empleado_actual.get('{{ci}}', 'N/A')}")
     
-    # Asegúrate que dibujar_boleta_en_canvas esté importado (from .utils import dibujar_boleta_en_canvas)
     dibujar_boleta_en_canvas(p_canvas, page_height, diseno_json_dict, datos_empleado_actual)
     
-    p_canvas.showPage() # Solo una página para esta boleta individual
+    p_canvas.showPage() 
     p_canvas.save()
-
-    # --- REGISTRAR ACCIÓN EN AUDITLOG ---
     try:
-        # El objeto principal podría ser el DetalleSueldo o el PrincipalPersonalExterno
-        # Usemos DetalleSueldo como el "recurso" principal accedido para esta acción específica.
-        # O PrincipalPersonalExterno si lo consideras más relevante para "generar boleta PARA un empleado".
-        # Vamos con PrincipalPersonalExterno ya que la boleta es PARA esa persona.
         
-        # Asegurarse de que personal_ext (PrincipalPersonalExterno) está disponible y es el correcto
-        if personal_ext: # Si pudimos cargar la info del empleado externo
+        if personal_ext: 
             content_type_obj = ContentType.objects.get_for_model(PrincipalPersonalExterno)
             obj_pk = str(personal_ext.pk)
             obj_id_numeric = personal_ext.pk
             obj_repr = str(personal_ext)
-        elif detalle_sueldo.personal_externo_id: # Fallback si personal_ext no se cargó pero tenemos el ID
-            # En este caso, no podemos obtener el ContentType de PrincipalPersonalExterno directamente
-            # si la app no está disponible o el modelo no se cargó, así que podríamos asociarlo
-            # al DetalleSueldo como fallback.
+        elif detalle_sueldo.personal_externo_id: 
+           
             content_type_obj = ContentType.objects.get_for_model(DetalleSueldo)
             obj_pk = str(detalle_sueldo.pk)
             obj_id_numeric = detalle_sueldo.pk
             obj_repr = f"Detalle Sueldo ID {detalle_sueldo.pk} (Personal Ext. ID {detalle_sueldo.personal_externo_id})"
-        else: # Caso muy improbable si la lógica anterior funciona
+        else: 
             content_type_obj = None
             obj_pk = None
             obj_id_numeric = None
@@ -1018,7 +969,7 @@ def vista_generar_pdf_boleta_unica(request, personal_externo_id, anio, mes):
             actor=request.user,
             content_type=content_type_obj,
             object_pk=obj_pk,
-            object_id=obj_id_numeric, # Campo numérico para la FK genérica
+            object_id=obj_id_numeric, 
             object_repr=obj_repr,
             action=LogEntry.Action.ACCESS,
             changes=log_description,
@@ -1027,14 +978,12 @@ def vista_generar_pdf_boleta_unica(request, personal_externo_id, anio, mes):
         logger.info(f"Acción de generación de boleta individual registrada. Target Obj PK: {obj_pk}")
     except Exception as e_audit:
         logger.error(f"Error al registrar la acción de generación de boleta individual en auditlog: {e_audit}", exc_info=True)
-    # --- FIN REGISTRAR ACCIÓN EN AUDITLOG ---
 
     buffer.seek(0)
     response = HttpResponse(buffer, content_type='application/pdf')
-    # Nombre de archivo más específico
     ci_filename_safe = (datos_empleado_actual.get('{{ci}}', 'SIN_CI')).replace(" ", "_").replace("/", "-")
     filename = f"boleta_{ci_filename_safe}_{planilla_sueldo_base.mes}_{planilla_sueldo_base.anio}.pdf"
-    response['Content-Disposition'] = f'inline; filename="{filename}"' # inline para ver en navegador
+    response['Content-Disposition'] = f'inline; filename="{filename}"' 
     
     logger.info(f"PDF ÚNICO: Boleta generada exitosamente para {filename}")
     return response

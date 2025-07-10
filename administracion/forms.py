@@ -1,10 +1,10 @@
-# administracion/forms.py
+
 from django import forms
-from django.contrib.auth.forms import UserCreationForm # Heredaremos de este
+from django.contrib.auth.forms import UserCreationForm 
 from django.contrib.auth.models import User, Group, Permission
-from .models import UserProfile # Importamos nuestro modelo de perfil
-from django.core.validators import RegexValidator # Para validaciones con regex
-import re # Módulo de expresiones regulares de Python
+from .models import UserProfile 
+from django.core.validators import RegexValidator 
+import re 
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _ 
 from django.contrib.contenttypes.models import ContentType
@@ -226,13 +226,15 @@ class UserProfileForm(forms.ModelForm):
         max_length=10,
         required=True,
         label="Cédula de Identidad (CI)",
-        validators=[ci_validator]
+        validators=[ci_validator],
+        widget=forms.TextInput(attrs={'class': 'form-control'})
     )
     telefono = forms.CharField(
         max_length=10,
         required=False,
         label="Teléfono",
-        validators=[phone_validator]
+        validators=[phone_validator],
+        widget=forms.TextInput(attrs={'class': 'form-control'})
     )
 
     class Meta:
@@ -242,6 +244,7 @@ class UserProfileForm(forms.ModelForm):
             'ci': "Cédula de Identidad (CI)",
         }
         widgets = {
+            
             #'ci': forms.TextInput(attrs={'class': 'form-control'}),
             #'telefono': forms.TextInput(attrs={'class': 'form-control'}),
             'foto': forms.ClearableFileInput(attrs={'class': 'form-control-file'}),
@@ -279,7 +282,9 @@ class GroupForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        excluded_apps = ['admin', 'auth', 'contenttypes', 'sessions', 'auditlog']
+        excluded_apps = [ 'contenttypes', 'sessions']
+        #excluded_apps = ['admin', 'auth', 'contenttypes', 'sessions', 'auditlog']
+        #excluded_apps = []
         filtered_permissions = Permission.objects.exclude(content_type__app_label__in=excluded_apps).select_related('content_type').order_by('content_type__app_label', 'content_type__model', 'name')
 
         self.fields['permissions'] = forms.ModelMultipleChoiceField(

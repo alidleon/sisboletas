@@ -15,69 +15,17 @@ from reportlab.pdfbase.ttfonts import TTFont # Para registrar fuentes TrueType
 from reportlab.lib import colors # Para colores predefinidos y HexColor
 import qrcode  
 from qrcode.util import QRData
-
 from reportlab.platypus import Paragraph # Para texto multilinea si es necesario
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT, TA_JUSTIFY
-
-
 from decimal import Decimal
-# Para texto más complejo (multilinea, estilos mixtos) - opcional al principio
-# from reportlab.platypus import Paragraph
-# from reportlab.lib.styles import getSampleStyleSheet
 logger = logging.getLogger(__name__)
-# Para conversión literal (instalar con pip install num2words) - opcional
 try:
     from num2words import num2words
     NUM2WORDS_AVAILABLE = True
 except ImportError:
     NUM2WORDS_AVAILABLE = False
 
-
-
-# boletas/utils.py o en la vista
-#PLACEHOLDERS_BOLETA_DEFINICION = [
-    # Datos Personales (de PrincipalPersonalExterno via DetalleSueldo.personal_externo)
-#    {'id': '{{NOMBRE_COMPLETO}}', 'label': 'Nombre Completo Empleado', 'fuente': 'PrincipalPersonalExterno.nombre_completo'},
-#    {'id': '{{CI_EMPLEADO}}', 'label': 'CI Empleado', 'fuente': 'PrincipalPersonalExterno.ci'},
-#    {'id': '{{ITEM_EMPLEADO}}', 'label': 'Ítem', 'fuente': 'PrincipalDesignacionExterno.item'},
-#    {'id': '{{CARGO_EMPLEADO}}', 'label': 'Cargo', 'fuente': 'PrincipalCargoExterno.nombre_cargo'},
-#    {'id': '{{UNIDAD_EMPLEADO}}', 'label': 'Unidad Organizacional', 'fuente': 'PrincipalUnidadExterna.nombre_unidad'},
-#    {'id': '{{FECHA_INGRESO_EMPLEADO}}', 'label': 'Fecha Ingreso', 'fuente': 'PrincipalDesignacionExterno.fecha_ingreso'}, # o DetalleSueldo.fecha_ingreso_referencia
-
-    # Datos de la Planilla de Sueldos (Cabecera)
-#    {'id': '{{MES_PAGO}}', 'label': 'Mes de Pago', 'fuente': 'PlanillaSueldo.mes'},
-#    {'id': '{{ANIO_PAGO}}', 'label': 'Año de Pago', 'fuente': 'PlanillaSueldo.anio'},
-
-    # Conceptos de Sueldo (de DetalleSueldo)
-#    {'id': '{{HABER_BASICO}}', 'label': 'Haber Básico', 'fuente': 'DetalleSueldo.haber_basico'},
-#    {'id': '{{CATEGORIA_ANTIGUEDAD}}', 'label': 'Categoría/Antigüedad', 'fuente': 'DetalleSueldo.categoria'},
-#    {'id': '{{TOTAL_GANADO}}', 'label': 'Total Ganado', 'fuente': 'DetalleSueldo.total_ganado'},
-#    {'id': '{{RC_IVA_RETENIDO}}', 'label': 'RC-IVA Retenido', 'fuente': 'DetalleSueldo.rc_iva_retenido'},
-#    {'id': '{{GESTORA_PUBLICA_AFP}}', 'label': 'Aporte Gestora/AFP', 'fuente': 'DetalleSueldo.gestora_publica'},
-#    {'id': '{{APORTE_SOLIDARIO}}', 'label': 'Aporte Nac. Solidario', 'fuente': 'DetalleSueldo.aporte_nac_solidario'},
-#    {'id': '{{COOPERATIVA}}', 'label': 'Desc. Cooperativa', 'fuente': 'DetalleSueldo.cooperativa'},
-#    {'id': '{{DESCUENTO_FALTAS}}', 'label': 'Desc. Faltas', 'fuente': 'DetalleSueldo.faltas'},
-   # {'id': '{{DESCUENTO_MEMORANDUMS}}', 'label': 'Desc. Memorándums', 'fuente': 'DetalleSueldo.memorandums'},
-  #  {'id': '{{OTROS_DESCUENTOS}}', 'label': 'Otros Descuentos', 'fuente': 'DetalleSueldo.otros_descuentos'},
- #   {'id': '{{TOTAL_DESCUENTOS}}', 'label': 'Total Descuentos', 'fuente': 'DetalleSueldo.total_descuentos'},
-#    {'id': '{{LIQUIDO_PAGABLE}}', 'label': 'Líquido Pagable', 'fuente': 'DetalleSueldo.liquido_pagable'},
-#    {'id': '{{DIAS_TRABAJADOS}}', 'label': 'Días Trabajados', 'fuente': 'DetalleSueldo.dias_trab'},
-
-    # Datos Generales
-#    {'id': '{{FECHA_EMISION_BOLETA}}', 'label': 'Fecha Emisión Boleta', 'fuente': 'Calculado'},
-    # Podrías añadir aquí placeholders para el logo de la empresa, nombre de la empresa, etc.
-    # que pueden ser textos fijos pero útiles de tener en la lista.
-#]
-
-
-
-
-
-# boletas/utils.py (o constants.py)
-
-# Asumiendo que estos son los nombres de campo relevantes en tus modelos
-# (Verifica con tus archivos models.py si hay alguna diferencia)
 
 PLACEHOLDERS_BOLETA_DEFINICION = [
     # --- Datos PrincipalPersonalExterno (Accedido via DetalleSueldo.personal_externo) ---
@@ -86,13 +34,13 @@ PLACEHOLDERS_BOLETA_DEFINICION = [
     {'id': '{{apellido_materno}}', 'label': 'Apellido Materno (BD Externa)', 'fuente': 'PrincipalPersonalExterno.apellido_materno'},
     {'id': '{{nombre_completo}}', 'label': 'Nombre Completo (Calculado)', 'fuente': 'PrincipalPersonalExterno.nombre_completo'}, # Property del modelo
     {'id': '{{ci}}', 'label': 'CI (BD Externa)', 'fuente': 'PrincipalPersonalExterno.ci'},
-    # ... otros campos de PrincipalPersonalExterno que necesites ...
 
     # --- Datos PrincipalDesignacionExterno (Necesitarás buscar la designación activa del empleado) ---
     {'id': '{{item}}', 'label': 'N° Item (BD Externa)', 'fuente': 'PrincipalDesignacionExterno.item'},
     {'id': '{{tipo_designacion}}', 'label': 'Tipo Designación (BD Externa)', 'fuente': 'PrincipalDesignacionExterno.tipo_designacion'},
     {'id': '{{fecha_ingreso}}', 'label': 'Fecha Ingreso (BD Externa)', 'fuente': 'PrincipalDesignacionExterno.fecha_ingreso'},
     {'id': '{{fecha_conclusion}}', 'label': 'Fecha Conclusión (BD Externa)', 'fuente': 'PrincipalDesignacionExterno.fecha_conclusion'},
+    
     # --- Datos de relaciones de PrincipalDesignacionExterno ---
     {'id': '{{cargo_nombre_cargo}}', 'label': 'Cargo (BD Externa)', 'fuente': 'PrincipalCargoExterno.nombre_cargo'}, # A través de designacion.cargo
     {'id': '{{unidad_nombre_unidad}}', 'label': 'Unidad (BD Externa)', 'fuente': 'PrincipalUnidadExterna.nombre_unidad'}, # A través de designacion.unidad
@@ -132,17 +80,9 @@ PLACEHOLDERS_BOLETA_DEFINICION = [
     
 ]
 
-# Nota: Para los campos de relaciones (cargo, unidad, secretaria), necesitarás obtener
-# el objeto relacionado en tu lógica de generación de PDF para acceder a su nombre.
-# Por ejemplo, para {{cargo_nombre_cargo}}, obtendrías la designación, luego designacion.cargo.nombre_cargo.
-
-
-
-#REGISTERED_FONTS_CACHE = set()
 
 # TODO: Define esta ruta correctamente en tu settings.py o como variable de entorno
-#FONT_DIRECTORY = os.path.join(os.path.dirname(__file__), 'fonts') # Ejemplo: busca en una carpeta 'fonts' dentro de la app 'boletas'
-# O podrías usar una ruta absoluta o buscar en carpetas del sistema
+
 
 
 def get_reportlab_color(fabric_color_str, default_color=colors.black):
@@ -189,18 +129,14 @@ def numero_a_literal_con_decimal_y_salto(numero):
     from decimal import Decimal, ROUND_HALF_UP
 
     if not NUM2WORDS_AVAILABLE:
-        # Fallback si num2words no está instalado
         return f"LITERAL EXTENDIDO\n({Decimal(str(numero)):.2f})"
     try:
-        # Asegurarnos de trabajar con Decimal para precisión
         numero_dec = Decimal(str(numero)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         # Separar la parte entera y la parte decimal
         parte_entera = int(numero_dec)
         parte_decimal = int((numero_dec - parte_entera) * 100)
         # Convertir la parte entera a palabras
         literal_entero = num2words(parte_entera, lang='es').upper()
-        # Construir la cadena final con el salto de línea
-        # \n es el carácter de salto de línea que ReportLab entenderá
         if parte_decimal> 0:
             literal_decimal = num2words(parte_decimal, lang='es').upper()
             resultado_final = f"{literal_entero}\nCON {literal_decimal}"
@@ -237,11 +173,6 @@ def generar_imagen_qr(datos_a_codificar):
         )
         
         # 2. Añadir los datos. Aquí es donde ocurre la magia.
-        #    La librería qrcode tiene un método interno para manejar esto,
-        #    pero la forma más segura es pasar los datos ya codificados
-        #    y asegurarse de que el objeto QR sepa que está en modo byte.
-        #    La documentación recomienda añadir datos como strings y la librería
-        #    se encarga. Si eso falla, este es el método a prueba de fallos.
         qr.add_data(data=datos_string, optimize=20)
         qr.make(fit=True)
 

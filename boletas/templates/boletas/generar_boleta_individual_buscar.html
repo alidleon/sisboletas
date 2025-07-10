@@ -10,7 +10,6 @@
             <div class="title_left">
                 <h3>GENERAR BOLETA INDIVIDUAL</h3>
             </div>
-            {# Puedes añadir un botón de "Nueva Búsqueda" o similar a la derecha si quieres #}
         </div>
         <div class="clearfix"></div>
 
@@ -32,7 +31,6 @@
                         {% endif %}
 
                         <form method="GET" action="{% url 'generar_boleta_individual_buscar' %}" class="form-horizontal form-label-left">
-                            {# {% csrf_token %} NO es necesario para GET #}
                             <div class="form-group row">
                                 <label class="control-label col-md-3 col-sm-3 col-xs-12" for="termino_busqueda">
                                     C.I. o Ítem del Funcionario: <span class="required">*</span>
@@ -54,12 +52,12 @@
                         <hr>
 
                         {% if empleado_encontrado %}
-                            <h4>Resultados para: <small>{{ termino_busqueda }}</small></h4>
+                            
+                        <h4>Resultados para: <small>{{ termino_busqueda }}</small></h4>
                             <div class="row" style="margin-bottom: 20px;">
                                 <div class="col-md-6">
                                     <p><strong>Nombre Completo:</strong> {{ empleado_encontrado.nombre_completo }}</p>
                                     <p><strong>C.I.:</strong> {{ empleado_encontrado.ci }}</p>
-                                    {# Aquí podrías intentar mostrar el cargo actual si tienes esa lógica #}
                                     {# <p><strong>Cargo Actual:</strong> {{ empleado_encontrado.get_cargo_actual_display }}</p> #}
                                 </div>
                             </div>
@@ -89,7 +87,6 @@
                                                         target="_blank">
                                                         <i class="fa fa-file-pdf-o"></i> Generar Boleta
                                                     </a>
-                                                    {# El href se completará en el siguiente paso #}
                                                 </td>
                                             </tr>
                                             {% endfor %}
@@ -97,12 +94,10 @@
                                     </table>
                                 </div>
                             {% else %}
-                                {# Este mensaje ya se maneja arriba con messages.info #}
-                                {# <p class="text-info">El empleado fue encontrado pero no tiene registros de sueldo.</p> #}
+                                <p class="text-info">El empleado fue encontrado pero no tiene registros de sueldo.</p>
                             {% endif %}
                         {% elif termino_busqueda %}
-                            {# Este mensaje ya se maneja arriba con messages.error si no se encontró nada y se buscó #}
-                            {# <p class="text-warning">No se encontró ningún empleado con el C.I. o Ítem: "{{ termino_busqueda }}".</p> #}
+                            <p class="text-warning">No se encontró ningún empleado con el C.I. o Ítem: "{{ termino_busqueda }}".</p>
                         {% endif %}
                     </div>
                 </div>

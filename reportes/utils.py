@@ -1,4 +1,4 @@
-# reportes/utils.py
+
 import logging
 from django.shortcuts import get_object_or_404
 from .models import PlanillaAsistencia, DetalleAsistencia
@@ -17,7 +17,6 @@ from django.db.models import Q
 from decimal import Decimal
 from collections import defaultdict
 
-# Imports para ReportLab (asegúrate de que estén aquí o ya importados arriba)
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -33,7 +32,7 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 logger = logging.getLogger(__name__)
 
-def get_processed_asistencia_details(request, planilla_asistencia_id, items_por_pagina=25): # Añadido items_por_pagina
+def get_processed_asistencia_details(request, planilla_asistencia_id, items_por_pagina=25): 
     """
     Obtiene la PlanillaAsistencia, listas de filtros (externos), y los
     DetallesAsistencia PAGINADOS (filtrados por unidad/búsqueda externa si aplica, y
@@ -43,11 +42,11 @@ def get_processed_asistencia_details(request, planilla_asistencia_id, items_por_
     """
     result = {
         'planilla_asistencia': None,
-        'all_secretarias': PrincipalSecretariaExterna.objects.none() if PLANILLA_APP_AVAILABLE else [], # Inicializar como queryset vacío o lista
-        'unidades_for_select': PrincipalUnidadExterna.objects.none() if PLANILLA_APP_AVAILABLE else [], # Inicializar
+        'all_secretarias': PrincipalSecretariaExterna.objects.none() if PLANILLA_APP_AVAILABLE else [], 
+        'unidades_for_select': PrincipalUnidadExterna.objects.none() if PLANILLA_APP_AVAILABLE else [], 
         'selected_secretaria_id': None,
         'selected_unidad_id': None,
-        'page_obj': None, # REEMPLAZA a 'detalles_asistencia'
+        'page_obj': None, 
         'detalle_ids_order': [], 
         'search_active': False,
         'error_message': None,
@@ -57,7 +56,7 @@ def get_processed_asistencia_details(request, planilla_asistencia_id, items_por_
     logger.debug(f"UTIL: Request GET params: {request.GET.urlencode()}")
 
 
-    # --- 0. Obtener PlanillaAsistencia --- (Tu lógica original)
+    # ---  Obtenemos PlanillaAsistencia --- 
     try:
         planilla = PlanillaAsistencia.objects.get(pk=planilla_asistencia_id)
         result['planilla_asistencia'] = planilla
@@ -71,31 +70,29 @@ def get_processed_asistencia_details(request, planilla_asistencia_id, items_por_
         return result
 
     if not PLANILLA_APP_AVAILABLE:
-        # No es un error fatal para los datos locales, pero sí para el enriquecimiento y filtros externos.
         msg_warn = "Componentes externos de la app 'planilla' no disponibles. El enriquecimiento y algunos filtros no funcionarán."
         result['error_message'] = (result.get('error_message') or '') + msg_warn
         logger.warning(f"UTIL: {msg_warn}")
-        # No retornamos, intentaremos mostrar datos locales.
 
-    # --- 1. Obtener Secretarías Externas --- (Tu lógica original)
+    # --- 1. Obtener Secretarías Externas --- 
     if PLANILLA_APP_AVAILABLE:
         try:
             all_secretarias_qs = PrincipalSecretariaExterna.objects.using('personas_db').order_by('nombre_secretaria')
-            result['all_secretarias'] = list(all_secretarias_qs) # Convertir a lista
+            result['all_secretarias'] = list(all_secretarias_qs) 
         except Exception as e_sec:
             logger.error(f"UTIL: Error obteniendo secretarías: {e_sec}", exc_info=True)
             result['error_message'] = (result.get('error_message') or '') + " Error cargando secretarías."
     
-    # --- 2. Procesar Filtros GET --- (Tu lógica original)
+    # --- 2. Procesar Filtros GET --- 
     filter_secretaria_str = request.GET.get('secretaria', '').strip()
     filter_unidad_str = request.GET.get('unidad', '').strip()
     search_term = request.GET.get('q', '').strip()
     result['search_term'] = search_term
-    result['search_active'] = bool(request.GET.get('buscar')) # Solo si el botón 'buscar' se presionó
+    result['search_active'] = bool(request.GET.get('buscar')) 
 
     logger.debug(f"UTIL: Filtros GET: sec='{filter_secretaria_str}', un='{filter_unidad_str}', q='{search_term}' | Search Active (por botón 'buscar'): {result['search_active']}")
 
-    # --- 3. Cargar Unidades si aplica --- (Tu lógica original)
+    # --- 3. Cargar Unidades si aplica --- 
     selected_secretaria_id_int = None
     if filter_secretaria_str and PLANILLA_APP_AVAILABLE:
         try:
@@ -104,7 +101,7 @@ def get_processed_asistencia_details(request, planilla_asistencia_id, items_por_
             unidades_qs = PrincipalUnidadExterna.objects.using('personas_db') \
                                 .filter(secretaria_id=selected_secretaria_id_int) \
                                 .order_by('nombre_unidad')
-            result['unidades_for_select'] = list(unidades_qs) # Convertir a lista
+            result['unidades_for_select'] = list(unidades_qs) 
         except (ValueError, TypeError):
              logger.warning(f"UTIL: ID Secretaría inválido: '{filter_secretaria_str}'")
              result['selected_secretaria_id'] = None
@@ -112,26 +109,19 @@ def get_processed_asistencia_details(request, planilla_asistencia_id, items_por_
              logger.error(f"UTIL: Error obteniendo unidades para sec ID {selected_secretaria_id_int}: {e_uni}", exc_info=True)
              result['error_message'] = (result.get('error_message') or '') + " Error cargando unidades."
     
-    # --- 4. Obtener IDs Externos (Solo si filtro unidad o búsqueda, Y search_active es True) --- (Tu lógica original)
-    # apply_external_id_filter se basaba en (filter_unidad_str or search_term) en tu original.
-    # Vamos a mantener esa lógica: si hay un filtro de unidad O un término de búsqueda, intentamos filtrar por IDs externos.
-    # Y adicionalmente, solo si PLANILLA_APP_AVAILABLE.
+    # --- 4. Obtener IDs Externos  --- 
     
     attempt_external_filter = (filter_unidad_str or search_term) and PLANILLA_APP_AVAILABLE
     personal_ids_to_filter_local = set()
-    selected_unidad_id_int_filter = None # Para el ID de unidad usado en el filtro
+    selected_unidad_id_int_filter = None 
 
     if attempt_external_filter:
         logger.debug("UTIL: Intentando obtener IDs externos para filtrar (porque hay filtro de unidad o término de búsqueda).")
-        # ... (COPIA AQUÍ TU LÓGICA ORIGINAL COMPLETA para llenar 'personal_ids_to_filter_local'
-        #      basada en filter_unidad_str y search_term. Esto incluye las sub-consultas
-        #      a PrincipalDesignacionExterno y PrincipalPersonalExterno de TU CÓDIGO ORIGINAL) ...
-        # --- INICIO LÓGICA ORIGINAL (ADAPTADA) PARA OBTENER IDS EXTERNOS ---
         personal_ids_in_unidad = set()
         if filter_unidad_str:
             try:
                 selected_unidad_id_int_filter = int(filter_unidad_str)
-                result['selected_unidad_id'] = selected_unidad_id_int_filter # Guardar el ID válido
+                result['selected_unidad_id'] = selected_unidad_id_int_filter 
                 designaciones_qs = PrincipalDesignacionExterno.objects.using('personas_db').filter(unidad_id=selected_unidad_id_int_filter, estado='ACTIVO').values_list('personal_id', flat=True).distinct()
                 personal_ids_in_unidad = set(pid for pid in designaciones_qs if pid is not None)
                 logger.debug(f"UTIL: IDs por unidad '{filter_unidad_str}': {len(personal_ids_in_unidad)} IDs - {list(personal_ids_in_unidad)[:5]}")
@@ -143,7 +133,7 @@ def get_processed_asistencia_details(request, planilla_asistencia_id, items_por_
              try:
                  item_numeric = None
                  try: item_numeric = int(search_term)
-                 except (ValueError, TypeError): pass # No es un error si no es numérico, simplemente no se busca por ítem.
+                 except (ValueError, TypeError): pass 
                  
                  ids_ci_qs = PrincipalPersonalExterno.objects.using('personas_db').filter(ci__iexact=search_term).values_list('id', flat=True)
                  personal_ids_from_search.update(ids_ci_qs)
@@ -154,49 +144,36 @@ def get_processed_asistencia_details(request, planilla_asistencia_id, items_por_
                  logger.debug(f"UTIL: IDs por búsqueda '{search_term}': {len(personal_ids_from_search)} IDs - {list(personal_ids_from_search)[:5]}")
              except Exception as e: logger.error(f"UTIL: Error IDs por Búsqueda '{search_term}': {e}", exc_info=True)
         
-        # Combinación según tu lógica original:
+        
         if filter_unidad_str and search_term: 
             personal_ids_to_filter_local = personal_ids_in_unidad.intersection(personal_ids_from_search)
         elif search_term: 
             personal_ids_to_filter_local = personal_ids_from_search
         elif filter_unidad_str: 
             personal_ids_to_filter_local = personal_ids_in_unidad
-        # Nota: Si solo se filtra por secretaría, no por unidad específica, esta lógica no captura
-        # los IDs de todas las unidades de esa secretaría. Tu código original no parecía tener esa parte aquí.
-        # Si es necesario, se debería añadir aquí.
 
-        if not personal_ids_to_filter_local and (filter_unidad_str or search_term): # Si se intentó filtrar pero no se encontraron IDs externos
+        if not personal_ids_to_filter_local and (filter_unidad_str or search_term): 
              logger.info("UTIL: Filtro/Búsqueda externa no encontró IDs de personal coincidentes.")
         logger.debug(f"UTIL: personal_ids_to_filter_local (final para filtro de QS): {len(personal_ids_to_filter_local)} IDs - {list(personal_ids_to_filter_local)[:5]}")
-        # --- FIN LÓGICA ORIGINAL (ADAPTADA) PARA OBTENER IDS EXTERNOS ---
     else:
         logger.debug("UTIL: No se requiere filtro por IDs externos (no hay filtro de unidad ni término de búsqueda, o app planilla no disponible).")
 
 
-    # --- 5. Obtener, Filtrar (si aplica), Enriquecer y PAGINAR Detalles Locales ---
+    # --- 5. Obtener, Filtrar (si aplica) ---
     try:
         detalles_locales_qs = DetalleAsistencia.objects.filter(planilla_asistencia=planilla)
         logger.debug(f"UTIL: COUNT detalles_locales_qs INICIAL: {detalles_locales_qs.count()}")
-
-        # Aplicar filtro por IDs externos SI SE INTENTÓ filtrar por unidad o búsqueda Y la app planilla está disponible
-        if attempt_external_filter: # (filter_unidad_str or search_term) and PLANILLA_APP_AVAILABLE
-            # Si personal_ids_to_filter_local está vacío, el filter() resultará en un queryset vacío,
-            # lo cual es correcto si no hay personal que coincida con los filtros.
+        if attempt_external_filter: 
             logger.debug(f"UTIL: Aplicando filtro por personal_externo_id__in con IDs: {list(personal_ids_to_filter_local)[:10]}")
             detalles_locales_qs = detalles_locales_qs.filter(
-                personal_externo_id__in=list(personal_ids_to_filter_local) # Convertir set a lista
+                personal_externo_id__in=list(personal_ids_to_filter_local) 
             )
             logger.debug(f"UTIL: COUNT detalles_locales_qs DESPUÉS de filtro ID externo: {detalles_locales_qs.count()}")
         
-        # Convertir a lista DESPUÉS de todos los filtros de QuerySet
-        all_filtered_detalles_list = list(detalles_locales_qs) # Ejecutar la consulta
+        all_filtered_detalles_list = list(detalles_locales_qs) 
         logger.info(f"UTIL: Detalles locales filtrados (ANTES de enriquecer y paginar): {len(all_filtered_detalles_list)}")
 
-        # Enriquecer (Tu lógica original)
         if all_filtered_detalles_list and PLANILLA_APP_AVAILABLE:
-            # ... (COPIA AQUÍ TU LÓGICA DE ENRIQUECIMIENTO ORIGINAL COMPLETA, que opera sobre all_filtered_detalles_list) ...
-            # Esta parte es crucial y debe ser idéntica a tu versión funcional.
-            # Ejemplo (debes usar la tuya completa):
             ids_needed = {d.personal_externo_id for d in all_filtered_detalles_list if d.personal_externo_id}
             personal_info_ext = {}
             designaciones_info_ext = {}
@@ -229,10 +206,8 @@ def get_processed_asistencia_details(request, planilla_asistencia_id, items_por_
                 detalle_obj.nombre_completo_externo = persona_ext_data.nombre_completo if persona_ext_data else f'ID:{detalle_obj.personal_externo_id} (No Encontrado)'
             logger.debug(f"UTIL: Enriquecimiento completado para {len(all_filtered_detalles_list)} detalles.")
 
-
-        # Ordenar la lista COMPLETA ya enriquecida (Tu lógica original)
         try:
-            def get_sort_key_item(detalle_obj): # Tu función de ordenamiento
+            def get_sort_key_item(detalle_obj): 
                 item_val = getattr(detalle_obj, 'item_externo', None)
                 nombre_completo_val = (getattr(detalle_obj, 'nombre_completo_externo', '') or '').strip().upper()
                 item_sort_val = float('inf') 
@@ -262,7 +237,7 @@ def get_processed_asistencia_details(request, planilla_asistencia_id, items_por_
         result['page_obj'] = page_obj_resultado
         
         if page_obj_resultado:
-            result['detalle_ids_order'] = [d.id for d in page_obj_resultado.object_list] # IDs de la página actual
+            result['detalle_ids_order'] = [d.id for d in page_obj_resultado.object_list] 
             logger.debug(f"UTIL: Página actual: {page_obj_resultado.number}, Items en página: {len(page_obj_resultado.object_list)}, IDs para JS: {len(result['detalle_ids_order'])}")
         else:
              result['detalle_ids_order'] = []
@@ -277,9 +252,6 @@ def get_processed_asistencia_details(request, planilla_asistencia_id, items_por_
     return result
 
 
-
-
-# --- NUEVA FUNCIÓN PARA OBTENER DATOS DE PLANILLA PARA EXPORTACIÓN ---
 def get_planilla_data_for_export(planilla_asistencia_id):
     """
     Obtiene todos los datos necesarios de una PlanillaAsistencia y sus detalles
@@ -292,8 +264,8 @@ def get_planilla_data_for_export(planilla_asistencia_id):
     """
     result = {
         'planilla_asistencia': None,
-        'detalles_agrupados_por_unidad': {}, # Cambiado
-        'orden_unidades': [],                # Nuevo
+        'detalles_agrupados_por_unidad': {}, 
+        'orden_unidades': [],                
         'error_message': None
     }
     logger.info(f"[Util Export] Solicitud de datos para exportar PlanillaAsistencia ID {planilla_asistencia_id}")
@@ -301,10 +273,7 @@ def get_planilla_data_for_export(planilla_asistencia_id):
     if not PLANILLA_APP_AVAILABLE:
         result['error_message'] = "Componentes externos de la app 'planilla' no disponibles."
         logger.critical("[Util Export] PLANILLA_APP_AVAILABLE es False.")
-        # Podríamos no retornar aquí y dejar que intente cargar los datos locales.
-        # Dependerá de si los datos externos son absolutamente críticos para la exportación.
-
-    # 1. Obtener PlanillaAsistencia (cabecera)
+       
     try:
         planilla = PlanillaAsistencia.objects.get(pk=planilla_asistencia_id)
         result['planilla_asistencia'] = planilla
@@ -320,19 +289,17 @@ def get_planilla_data_for_export(planilla_asistencia_id):
     # 2. Obtener todos los detalles locales
     try:
         detalles_locales_qs = DetalleAsistencia.objects.filter(planilla_asistencia=planilla)
-        detalles_locales_list = list(detalles_locales_qs) # Ejecutar consulta
+        detalles_locales_list = list(detalles_locales_qs) 
         logger.info(f"[Util Export] {len(detalles_locales_list)} detalles locales encontrados para PlanillaAsistencia ID {planilla.id}")
 
-        # 3. Enriquecer detalles con datos externos (similar a get_processed_asistencia_details)
+        # 3. Enriquecer detalles con datos externos 
         if detalles_locales_list and PLANILLA_APP_AVAILABLE:
             ids_needed_for_enrichment = {d.personal_externo_id for d in detalles_locales_list if d.personal_externo_id}
             personal_info_ext = {}
-            designaciones_info_ext = {} # Guardará la info de la designación más relevante
+            designaciones_info_ext = {} 
 
             if ids_needed_for_enrichment:
-                # Obtener info de PrincipalPersonalExterno
                 try:
-                    # Traer solo los campos necesarios para el reporte
                     campos_persona = ['id', 'nombre', 'apellido_paterno', 'apellido_materno', 'ci']
                     personas_externas = PrincipalPersonalExterno.objects.using('personas_db') \
                         .filter(id__in=ids_needed_for_enrichment) \
@@ -342,17 +309,11 @@ def get_planilla_data_for_export(planilla_asistencia_id):
                 except Exception as e_pers_f:
                     logger.error(f"[Util Export] Error consultando PrincipalPersonalExterno: {e_pers_f}", exc_info=True)
                     result['error_message'] = (result.get('error_message') or '') + " Error al obtener datos personales externos."
-
-                # Obtener info de PrincipalDesignacionExterno (item, cargo, unidad)
-                # Queremos la designación ACTIVA más relevante (ej. la última por ID si hay varias)
                 try:
-                    # Traer campos necesarios y relacionados
                     designaciones_query = PrincipalDesignacionExterno.objects.using('personas_db') \
                         .filter(personal_id__in=ids_needed_for_enrichment, estado='ACTIVO') \
                         .select_related('cargo', 'unidad') \
-                        .order_by('personal_id', '-id') # Importante para obtener la más reciente por persona
-
-                    # Procesar para obtener solo una designación por personal_id
+                        .order_by('personal_id', '-id') 
                     processed_person_ids_for_desig = set()
                     for desig in designaciones_query:
                         if desig.personal_id not in processed_person_ids_for_desig:
@@ -366,13 +327,9 @@ def get_planilla_data_for_export(planilla_asistencia_id):
                 except Exception as e_desig_f:
                     logger.error(f"[Util Export] Error consultando PrincipalDesignacionExterno: {e_desig_f}", exc_info=True)
                     result['error_message'] = (result.get('error_message') or '') + " Error al obtener datos de designación externos."
-
-            # Bucle de enriquecimiento
             for detalle_obj in detalles_locales_list:
                 persona_ext = personal_info_ext.get(detalle_obj.personal_externo_id)
                 info_desig_ext = designaciones_info_ext.get(detalle_obj.personal_externo_id)
-
-                # Nombre completo (manejando None)
                 if persona_ext:
                     nombre = getattr(persona_ext, 'nombre', '') or ''
                     paterno = getattr(persona_ext, 'apellido_paterno', '') or ''
@@ -382,8 +339,6 @@ def get_planilla_data_for_export(planilla_asistencia_id):
                 else:
                     detalle_obj.nombre_completo_externo = f'ID:{detalle_obj.personal_externo_id} (No Encontrado)'
                     detalle_obj.ci_externo = 'N/A'
-
-                # Item, Cargo, Unidad
                 if info_desig_ext:
                     detalle_obj.item_externo = info_desig_ext.get('item', '')
                     detalle_obj.cargo_externo = info_desig_ext.get('cargo', 'N/A')
@@ -396,16 +351,15 @@ def get_planilla_data_for_export(planilla_asistencia_id):
         # 4. AGRUPAR DETALLES POR UNIDAD
         detalles_agrupados = defaultdict(list)
         for detalle_obj in detalles_locales_list:
-            # Usar un valor por defecto si unidad_externa_nombre no está o es None
             unidad_nombre = getattr(detalle_obj, 'unidad_externa_nombre', 'SIN UNIDAD ESPECÍFICA')
-            if unidad_nombre is None or not str(unidad_nombre).strip(): # Doble chequeo por si acaso
+            if unidad_nombre is None or not str(unidad_nombre).strip(): 
                 unidad_nombre = 'SIN UNIDAD ESPECÍFICA'
             detalles_agrupados[unidad_nombre].append(detalle_obj)
 
         # 5. ORDENAR DETALLES DENTRO DE CADA UNIDAD Y OBTENER ORDEN DE UNIDADES
-        orden_unidades = sorted(detalles_agrupados.keys()) # Ordenar nombres de unidades alfabéticamente
+        orden_unidades = sorted(detalles_agrupados.keys()) 
         
-        def get_sort_key_empleado(detalle): # Clave para ordenar empleados dentro de una unidad
+        def get_sort_key_empleado(detalle): 
             item_val = getattr(detalle, 'item_externo', None)
             nombre_val = (getattr(detalle, 'nombre_completo_externo', '') or '').strip().upper()
             item_sort_val = float('inf')
@@ -419,29 +373,19 @@ def get_planilla_data_for_export(planilla_asistencia_id):
         for unidad_nombre in orden_unidades:
             detalles_agrupados[unidad_nombre].sort(key=get_sort_key_empleado)
             
-        result['detalles_agrupados_por_unidad'] = dict(detalles_agrupados) # Convertir de defaultdict a dict
+        result['detalles_agrupados_por_unidad'] = dict(detalles_agrupados) 
         result['orden_unidades'] = orden_unidades
         logger.debug(f"[Util Export] Detalles agrupados por unidad. Unidades: {len(orden_unidades)}")
 
     except Exception as e_general:
         logger.error(f"[Util Export] Error INESPERADO obteniendo/procesando detalles para exportación: {e_general}", exc_info=True)
         result['error_message'] = (result.get('error_message') or '') + f" Error general procesando detalles: {e_general}"
-        # Asegurar valores por defecto en error
         result['detalles_agrupados_por_unidad'] = {}
         result['orden_unidades'] = []
 
     return result
-
-# --- FIN NUEVA FUNCIÓN ---
-
-# --- NUEVA FUNCIÓN REFACTORIZADA PARA GENERAR EL PDF ---
-def generar_pdf_asistencia(
-    output_buffer, 
-    planilla_cabecera, 
-    detalles_agrupados, # Diccionario {nombre_unidad: [lista_detalles]}
-    orden_unidades,     # Lista de nombres de unidad para el orden
-    column_definitions  # Lista de tuplas definiendo columnas (texto_header, ancho, clave_campo)
-    ):
+#-------------------------------
+def generar_pdf_asistencia(output_buffer, planilla_cabecera, detalles_agrupados, orden_unidades, column_definitions):
     """
     Genera el contenido de un PDF de asistencia en el output_buffer proporcionado.
     Este PDF estará agrupado por unidad.
@@ -466,8 +410,8 @@ def generar_pdf_asistencia(
     style_tabla_cell_num = ParagraphStyle(name='TablaCellNum', parent=styles['Normal'], alignment=TA_RIGHT, fontSize=5, leading=6)
     style_tabla_cell_center = ParagraphStyle(name='TablaCellCenter', parent=styles['Normal'], alignment=TA_CENTER, fontSize=5, leading=6)
 
-    # --- Función para el encabezado de la primera página (exactamente como la tenías) ---
-    def primera_pagina_encabezado(canvas, doc_obj): # Renombrado 'doc' a 'doc_obj' para evitar conflicto con el 'doc' exterior
+    # --- Función para el encabezado de la primera página ---
+    def primera_pagina_encabezado(canvas, doc_obj): 
         canvas.saveState()
         text_y_start = PAGE_HEIGHT - 0.5*inch
         line_height = 12
@@ -476,7 +420,7 @@ def generar_pdf_asistencia(
         canvas.drawString(0.5*inch, text_y_start - line_height, "SECRETARÍA DEPTAL. ADMINISTRATIVA FINANCIERA")
         canvas.drawString(0.5*inch, text_y_start - 2*line_height, "UNIDAD DE RECURSOS HUMANOS")
         try:
-            logo_path = os.path.join(settings.BASE_DIR, 'static', 'img', 'gadp.png') # ¡VERIFICA ESTA RUTA!
+            logo_path = os.path.join(settings.BASE_DIR, 'static', 'img', 'gadp.png') 
             if os.path.exists(logo_path):
                 logo_height = 0.9*inch
                 img = ImageReader(logo_path)
@@ -486,14 +430,14 @@ def generar_pdf_asistencia(
                 
                 margen_superior_logo = 0.3*inch 
                 logo_y = PAGE_HEIGHT - margen_superior_logo - logo_height
-                logo_x = PAGE_WIDTH - doc_obj.rightMargin - logo_width # Usar doc_obj.rightMargin
+                logo_x = PAGE_WIDTH - doc_obj.rightMargin - logo_width 
                 
                 canvas.drawImage(logo_path, logo_x, logo_y, width=logo_width, height=logo_height, mask='auto')
             else:
                 logger.warning(f"Logo no encontrado en: {logo_path}")
                 canvas.drawString(PAGE_WIDTH - 2*inch, text_y_start, "[Logo no encontrado]")
         except Exception as e_logo:
-            logger.error(f"Error al cargar o dibujar el logo: {e_logo}", exc_info=True) # exc_info=True para traceback
+            logger.error(f"Error al cargar o dibujar el logo: {e_logo}", exc_info=True) 
             canvas.drawString(PAGE_WIDTH - 2*inch, text_y_start, "[Error logo]")
         canvas.restoreState()
 
@@ -506,9 +450,7 @@ def generar_pdf_asistencia(
     
     # Título general del reporte
     story.append(Paragraph(f"REPORTE DE CONTROL DE ASISTENCIA DEL PERSONAL {planilla_cabecera.get_tipo_display().upper()}", style_titulo_principal))
-    story.append(Paragraph(f"Correspondiente al mes {nombre_mes}      de {planilla_cabecera.anio}", style_subtitulo_principal))
-    #story.append(Spacer(1, 0.1*inch))
-    # Preparar encabezados de tabla y anchos (se reciben de column_definitions)
+    story.append(Paragraph(f"CORRESPONDIENTE AL MES {nombre_mes}      DE {planilla_cabecera.anio}", style_subtitulo_principal))
     table_headers_styled = [Paragraph(col_def[0], style_tabla_header) for col_def in column_definitions]
     col_widths = [col_def[1] for col_def in column_definitions]
 
@@ -566,4 +508,4 @@ def generar_pdf_asistencia(
         logger.info(f"Contenido PDF construido en buffer para Planilla ID: {planilla_cabecera.pk}")
     except Exception as e_build:
         logger.error(f"Error final al construir el PDF en buffer para Planilla ID {planilla_cabecera.pk}: {e_build}", exc_info=True)
-        raise # Re-lanzar la excepción para que la vista la maneje
+        raise 

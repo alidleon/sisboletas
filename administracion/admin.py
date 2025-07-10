@@ -1,4 +1,3 @@
-# administracion/admin.py
 from django.contrib import admin
 from auditlog.models import LogEntry
 from auditlog.admin import LogEntryAdmin as DefaultLogEntryAdmin
@@ -116,7 +115,7 @@ class CustomLogEntryAdmin(DefaultLogEntryAdmin):
         """Acorta la dirección IP si es IPv6 mapeada a IPv4."""
         if obj.remote_addr and obj.remote_addr.startswith('::ffff:'):
             return obj.remote_addr[7:]
-        return obj.remote_addr or "-" # Devolver "-" si es None
+        return obj.remote_addr or "-" 
     shortened_remote_addr.short_description = _('IP Remota')
     shortened_remote_addr.admin_order_field = 'remote_addr'
 if admin.site.is_registered(LogEntry):

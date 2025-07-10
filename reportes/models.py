@@ -1,9 +1,8 @@
 import logging
 from django.db import models
-
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.utils import timezone # <--- Añadir esta importación
+from django.utils import timezone 
 from django.apps import apps
 
 try:
@@ -14,11 +13,8 @@ except ImportError:
     print("ADVERTENCIA: No se pudieron importar modelos de la app 'planilla'. "
           "Esto puede ser normal durante las migraciones iniciales.")
 
-# ... (otros imports y el logger si lo defines a nivel de módulo)
-
 logger_model = logging.getLogger(__name__)
 
-# --- Modelo Cabecera: Planilla de Asistencia ---
 class PlanillaAsistencia(models.Model):
     TIPO_CHOICES = [
         ('planta', 'Asegurado'),
@@ -27,9 +23,9 @@ class PlanillaAsistencia(models.Model):
     ]
     ESTADO_CHOICES = [
         ('borrador', 'Borrador'),
-        ('completo', 'Completo'),
+        
         ('validado', 'Validado'),
-        ('rechazado', 'Rechazado'),
+        
         ('archivado', 'Archivado'),
     ]
 
@@ -69,19 +65,18 @@ class PlanillaAsistencia(models.Model):
         if self.estado in ['borrador', 'completo']:
             self.estado = 'validado'
             self.usuario_validacion = usuario
-            self.fecha_validacion = timezone.now() # <-- Usa timezone
-            self.save(update_fields=['estado', 'usuario_validacion', 'fecha_validacion']) # Optimización
+            self.fecha_validacion = timezone.now() 
+            self.save(update_fields=['estado', 'usuario_validacion', 'fecha_validacion']) 
             return True
         logger_model.warning(f"MODELO Planilla ID {self.id}: NO SE PUDO marcar como validado. Condición de estado no cumplida (estado actual: '{self.estado}')")
         return False
 
-# --- Modelo Detalle: Registro de Asistencia por Persona ---
+
 class DetalleAsistencia(models.Model):
     """
     Representa el registro detallado de asistencia, incidencias y permisos
     para una persona específica dentro de una PlanillaAsistencia.
     """
-    # --- Vínculos (Sin cambios) ---
     planilla_asistencia = models.ForeignKey(
         PlanillaAsistencia,
         on_delete=models.CASCADE,
@@ -90,16 +85,13 @@ class DetalleAsistencia(models.Model):
     )
     personal_externo = models.ForeignKey(
         'planilla.PrincipalPersonalExterno',
-        on_delete=models.SET_NULL, # O PROTECT
+        on_delete=models.SET_NULL, 
         null=True,
         blank=False,
         related_name='registros_asistencia',
         verbose_name='Personal Externo',
-        db_constraint=False # ¡Esencial!
+        db_constraint=False 
     )
-
-    # --- Campos de Incidencias / Sanciones (Según tu lista) ---
-
     omision_cant = models.IntegerField(default=0, verbose_name='Nro. Omisiones Marcado', help_text="Cantidad de veces que omitió marcar entrada/salida.")
     omision_sancion = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='Sanción Omisión', help_text="Valor de la sanción por omisión (monetario o factor).")
     abandono_dias = models.DecimalField(max_digits=5, decimal_places=2, default=0, verbose_name='Abandono (días)', help_text="Días registrados como abandono de trabajo.")
@@ -125,12 +117,8 @@ class DetalleAsistencia(models.Model):
         verbose_name = "Detalle de Asistencia"
         verbose_name_plural = "Detalles de Asistencia"
         unique_together = ('planilla_asistencia', 'personal_externo')
-        # ordering = [...] # Considerar si el ordenamiento por defecto es necesario aquí
 
-    def __str__(self):
-        # Usamos _id para evitar consultas a la base de datos externa desde __str__
-        # Esto es más seguro y eficiente, especialmente cuando auditlog lo llama.
-        
+    def __str__(self):     
         planilla_id_display = self.planilla_asistencia_id if self.planilla_asistencia_id is not None else "N/A"
         
         if self.personal_externo_id is not None:
@@ -142,21 +130,16 @@ class DetalleAsistencia(models.Model):
 
     def clean(self):
         super().clean()
-        # Validar no negativos para todos los campos numéricos relevantes
         campos_numericos = [
             'omision_cant', 'omision_sancion', 'abandono_dias', 'abandono_sancion',
             'faltas_dias', 'faltas_sancion', 'atrasos_minutos', 'atrasos_sancion',
             'vacacion', 'viajes', 'bajas_medicas', 'pcgh', 'perm_excep',
             'asuetos', 'psgh', 'pcgh_embar_enf_base', 'actividad_navidad', 'iza_bandera'
-            # , 'pcgh_embar_enf_base' # Si se mantiene
         ]
         for campo in campos_numericos:
             valor = getattr(self, campo)
             if valor is not None and valor < 0:
                 raise ValidationError({campo: f"El valor de '{self._meta.get_field(campo).verbose_name}' no puede ser negativo."})
-
-        # Validar que el personal externo referenciado exista (Opcional, puede ser costoso)
-        # ... (código comentado de validación de existencia externa) ...
 
         if not PrincipalPersonalExterno:
              print(f"ADVERTENCIA (clean DetalleAsistencia): PrincipalPersonalExterno no está cargado.")

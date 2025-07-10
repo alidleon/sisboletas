@@ -35,7 +35,6 @@
                         <form method="post" class="form-horizontal form-label-left" novalidate>
                             {% csrf_token %}
                             
-                            <!-- CAMPO AÑO -->
                             <div class="item form-group">
                                 <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.anio.id_for_label }}">
                                     {{ form.anio.label }} <span class="required">*</span>
@@ -47,7 +46,6 @@
                                 </div>
                             </div>
 
-                            <!-- CAMPO MES -->
                             <div class="item form-group">
                                 <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.mes.id_for_label }}">
                                     {{ form.mes.label }} <span class="required">*</span>
@@ -58,7 +56,6 @@
                                 </div>
                             </div>
 
-                            <!-- CAMPO TIPO -->
                             <div class="item form-group">
                                 <label class="col-form-label col-md-3 col-sm-3 label-align" for="{{ form.tipo.id_for_label }}">
                                     {{ form.tipo.label }} <span class="required">*</span>
@@ -72,7 +69,7 @@
                             <div class="ln_solid"></div>
                             <div class="item form-group">
                                 <div class="col-md-6 col-sm-6 offset-md-3">
-                                    <button type="submit" class="btn btn-danger"> {# Botón rojo como en tu captura de pantalla #}
+                                    <button type="submit" class="btn btn-danger"> 
                                         <i class="fa fa-plus-circle"></i> Crear Reporte e Inicializar Personal
                                     </button>
                                     <a href="{% url 'lista_planillas_asistencia' %}" class="btn btn-secondary" type="button">Cancelar</a>

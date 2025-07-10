@@ -3,22 +3,15 @@ from django.apps import AppConfig
 
 class ReportesConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'reportes' # Nombre de tu aplicación
+    name = 'reportes' 
 
     def ready(self):
-        # Registrar modelos locales de esta app con django-auditlog
         try:
-            from auditlog.registry import auditlog
-            
-            # Importa los modelos locales específicos de ESTA APP que quieres auditar
-            # Reemplaza con tus nombres de modelos reales de la app 'reportes'
+            from auditlog.registry import auditlog    
             from .models import PlanillaAsistencia 
             from .models import DetalleAsistencia 
-            # from .models import OtroModeloDeReportes # Si tuvieras más
-
             auditlog.register(PlanillaAsistencia)
             auditlog.register(DetalleAsistencia)
-            # auditlog.register(OtroModeloDeReportes)
             
             print(f"Auditlog: Modelos de la app '{self.name}' registrados para auditoría.")
 

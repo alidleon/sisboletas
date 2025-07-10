@@ -1,17 +1,10 @@
-// static/reportes/js/quick_edit_asistencia.js
 
 $(document).ready(function() {
-    // --- NUEVO LOG: Inicio de ejecución ---
     console.log("Document ready. Intentando adjuntar listeners...");
-
-    // --- Selección de Elementos del DOM ---
     const tableBody = $('#asistencia-table-body');
-
-    // --- NUEVO LOG: Verificar si se encontró el tbody ---
     if (tableBody.length > 0) {
         console.log("Elemento #asistencia-table-body encontrado. Procediendo a adjuntar listener.");
     } else {
-        // Si no se encuentra el tbody, los listeners delegados no funcionarán.
         console.error("¡ERROR CRÍTICO! Elemento #asistencia-table-body NO encontrado. El listener de clic en botones no funcionará. Verifica el ID en tu HTML.");
     }
 
@@ -22,14 +15,12 @@ $(document).ready(function() {
     const saveButton = $('#quick-edit-save-btn');
     const saveNextButton = $('#quick-edit-save-next-btn');
     const cancelButton = $('#quick-edit-cancel-btn');
-    const closeButton = $('#quick-edit-close'); // Botón 'X' del panel
+    const closeButton = $('#quick-edit-close'); 
 
-    let currentEditingId = null; // Guarda el ID del detalle que se está editando
-    let isSaving = false; // Flag para evitar doble envío
+    let currentEditingId = null; 
+    let isSaving = false; 
 
     // --- Funciones Auxiliares ---
-
-    // Obtener CSRF token (Django estándar)
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
@@ -46,9 +37,7 @@ $(document).ready(function() {
     }
     const csrftoken = getCookie('csrftoken');
 
-    // Aplicar clases de Bootstrap a los campos del formulario (llamada después de poblar)
     function applyBootstrapClassesToQuickEditForm() {
-        // console.log("Aplicando clases de Bootstrap al formulario de edición rápida...");
         quickEditForm.find('input[type="number"], input[type="text"], textarea, select').each(function() {
             if (!$(this).hasClass('form-control-sm')) { $(this).addClass('form-control-sm'); }
             if (!$(this).hasClass('form-control')) { $(this).addClass('form-control'); }
@@ -56,22 +45,19 @@ $(document).ready(function() {
         });
     }
 
-    // Limpiar mensajes y estilos de error del formulario
     function clearFormErrors() {
         quickEditForm.find('.is-invalid').removeClass('is-invalid');
-        // Buscar el div de error por ID construido dinámicamente y vaciarlo
-        quickEditForm.find('[id^="error_id_"]').text(''); // Vaciar divs de error específicos
-        quickEditErrorMessage.hide().empty(); // Ocultar y vaciar mensaje general
+        quickEditForm.find('[id^="error_id_"]').text(''); 
+        quickEditErrorMessage.hide().empty(); 
     }
 
-    // Mostrar errores de validación del formulario recibidos del backend
     function showFormErrors(errors) {
         clearFormErrors();
         let firstErrorField = null;
         console.log("Mostrando errores de formulario:", errors);
         for (const fieldName in errors) {
-            const fieldElement = $(`#id_${fieldName}`); // <-- CORREGIDO: Buscar ID estándar
-            const errorElement = $(`#error_id_${fieldName}`); // <-- CORREGIDO: Buscar ID de error estándar
+            const fieldElement = $(`#id_${fieldName}`); 
+            const errorElement = $(`#error_id_${fieldName}`); 
 
             if (fieldElement.length) {
                 fieldElement.addClass('is-invalid');
@@ -80,7 +66,6 @@ $(document).ready(function() {
                                         ? errors[fieldName].map(e => e.message || e).join(' ')
                                         : errors[fieldName];
                     errorElement.text(errorMessage);
-                    // No necesitamos .show() aquí si invalid-feedback de Bootstrap funciona como se espera
                 } else {
                     console.warn(`Div de error #error_id_${fieldName} no encontrado para el campo ${fieldName}`);
                 }
@@ -88,29 +73,23 @@ $(document).ready(function() {
                     firstErrorField = fieldElement;
                 }
             } else {
-                 // Manejar errores generales (__all__) o errores de campos no encontrados
                 console.warn(`Campo de error '${fieldName}' no encontrado en el formulario (ID esperado: #id_${fieldName}). Mostrando en área general.`);
                 const generalErrorMessage = Array.isArray(errors[fieldName])
                                             ? errors[fieldName].map(e => e.message || e).join('<br>')
                                             : errors[fieldName];
-                // Añadir al div general de errores
                 quickEditErrorMessage.append(`<div><strong>${fieldName === '__all__' ? 'Error General' : fieldName}:</strong> ${generalErrorMessage}</div>`);
             }
         }
-        // Mostrar el div general solo si tiene contenido
         if (quickEditErrorMessage.html() !== '') {
             quickEditErrorMessage.show();
         }
-        // Enfocar el primer campo con error
         if (firstErrorField) {
             firstErrorField.focus();
         } else if (quickEditErrorMessage.is(':visible')) {
-            // Scroll al mensaje de error general si es el único
             quickEditPanel.animate({ scrollTop: 0 }, "fast");
         }
     }
 
-    // Resaltar fila y quitar resaltado de otras
     function highlightTableRow(detalleId) {
         tableBody.find('tr.table-info').removeClass('table-info');
         if(detalleId) {
@@ -122,8 +101,6 @@ $(document).ready(function() {
             }
         }
     }
-
-    // Cargar datos en el formulario fijo vía AJAX GET
     function fetchAndLoadDetail(detalleId) {
         if (!detalleId) {
             console.error("fetchAndLoadDetail llamado sin detalleId.");
@@ -159,10 +136,8 @@ $(document).ready(function() {
                 quickEditForm.find('[name]').each(function() {
                     camposPoblados++;
                     const fieldName = $(this).attr('name');
-                    const inputId = `id_${fieldName}`; // <-- CORREGIDO: Usar ID estándar
-                    const fieldElement = $(`#${inputId}`); // <-- CORREGIDO: Buscar ID estándar
-
-                    // No mostrar log para csrf o el hidden ref
+                    const inputId = `id_${fieldName}`; 
+                    const fieldElement = $(`#${inputId}`); 
                     if(fieldName !== 'csrfmiddlewaretoken' && fieldName !== 'detalle_id_hidden_field_ref') {
                         console.log(`--> Dentro del bucle: Procesando campo con name="${fieldName}" (ID esperado: ${inputId})`);
                     }
@@ -181,7 +156,6 @@ $(document).ready(function() {
 
                     if (fieldElement.length && data.hasOwnProperty(fieldName)) {
                         const valorRecibido = data[fieldName];
-                         // No mostrar log para csrf
                          if(fieldName !== 'csrfmiddlewaretoken') {
                              console.log(`    OK: Poblando campo ${fieldName} (ID: ${inputId}) con valor:`, valorRecibido);
                          }
@@ -204,7 +178,7 @@ $(document).ready(function() {
                      console.error("¡ERROR! El selector quickEditForm.find('[name]') no encontró campos de formulario editables con atributo 'name'. Revisa el HTML del panel y cómo se renderizan los campos con {{ field }}.");
                 }
 
-                applyBootstrapClassesToQuickEditForm(); // Aplicar clases después
+                applyBootstrapClassesToQuickEditForm(); 
 
                 quickEditForm.attr('data-detalle-id', detalleId);
                 $('#quick-edit-detalle-id-hidden').val(detalleId);
@@ -241,8 +215,6 @@ $(document).ready(function() {
             }
         });
     }
-
-    // Actualizar los datos en la fila correspondiente de la tabla
     function updateTableRow(detalleId, updatedData) {
         const row = $(`#detalle-row-${detalleId}`);
         if (row.length) {
@@ -251,7 +223,6 @@ $(document).ready(function() {
                 const fieldName = $(this).data('field');
                 if (updatedData.hasOwnProperty(fieldName)) {
                     let newValue = updatedData[fieldName];
-                    // Formateo
                      if (typeof newValue === 'number' || (typeof newValue === 'string' && newValue !== '' && !isNaN(parseFloat(newValue)))) {
                          if (['omision_sancion', 'abandono_dias', 'abandono_sancion', 'faltas_dias', 'faltas_sancion', 'atrasos_sancion', 'vacacion', 'viajes', 'bajas_medicas', 'pcgh', 'perm_excep', 'asuetos', 'psgh', 'pcgh_embar_enf_base', 'actividad_navidad', 'iza_bandera'].includes(fieldName)) {
                              const num = parseFloat(newValue);
@@ -279,7 +250,6 @@ $(document).ready(function() {
         }
     }
 
-    // Guardar los datos vía AJAX POST
     function saveDetail(andLoadNext = false) {
         if (isSaving) {
              console.warn("FUNC saveDetail: Intento de doble envío bloqueado.");
@@ -335,34 +305,22 @@ $(document).ready(function() {
                     showFormErrors(response.errors || {'_error': 'Error desconocido del servidor.'});
                 }
             },
-            error: function(jqXHR, textStatus, errorThrown) { // <--- ESTA ES LA SECCIÓN A MODIFICAR/ASEGURAR
+            error: function(jqXHR, textStatus, errorThrown) { 
                  console.error(`FUNC saveDetail: Error en AJAX POST para ID ${detalleId}. Status Code: ${jqXHR.status}, TextStatus: ${textStatus}, ErrorThrown: ${errorThrown}`, jqXHR.responseText);
                  
                  let errorMessage = "Ocurrió un error inesperado al intentar guardar.";
-                 // Intentar obtener el mensaje de la respuesta JSON del servidor
                  if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
                      errorMessage = jqXHR.responseJSON.message;
                  } else if (jqXHR.statusText && jqXHR.status !== 0) { 
                      errorMessage = `Error ${jqXHR.status}: ${jqXHR.statusText}`;
                  }
 
-                 // --- MANEJO ESPECÍFICO PARA ERROR DE ESTADO (403) ---
-                 if (jqXHR.status === 403) { // 403 Forbidden (nuestro caso para control de estado)
-                     // Mostrar el mensaje de error en el panel de edición rápida
+                 if (jqXHR.status === 403) { 
                      quickEditErrorMessage.html(`<strong>Acción no permitida:</strong> ${errorMessage}`).show();
-                     // Opcional: usar un alert si prefieres
-                     // alert(`Acción no permitida: ${errorMessage}`);
                      
-                     // Opcional: cerrar el panel y limpiar, ya que la edición no es posible
-                     // quickEditPanel.slideUp(); 
-                     // highlightTableRow(null); 
-                     // currentEditingId = null;
-                     // clearFormErrors(); 
                  } else if (jqXHR.responseJSON && jqXHR.responseJSON.errors) {
-                     // Si el backend devuelve errores de formulario estructurados en un error HTTP (ej. 400)
                      showFormErrors(jqXHR.responseJSON.errors);
                  } else {
-                     // Error genérico de red o servidor
                      quickEditErrorMessage.html(`<strong>Error de Red/Servidor:</strong> ${errorMessage}`).show();
                  }
             },
@@ -376,7 +334,6 @@ $(document).ready(function() {
         });
     }
 
-    // Cargar el siguiente detalle en la secuencia visible
     function loadNextDetail() {
          console.log("FUNC loadNextDetail: Intentando cargar el siguiente...");
         if (typeof visibleDetailIds === 'undefined' || !Array.isArray(visibleDetailIds) || visibleDetailIds.length === 0) {
@@ -396,7 +353,7 @@ $(document).ready(function() {
         if (currentIndex !== -1 && currentIndex < visibleDetailIds.length - 1) {
             const nextId = visibleDetailIds[currentIndex + 1];
             console.log(`FUNC loadNextDetail: Cargando siguiente ID: ${nextId}`);
-            fetchAndLoadDetail(nextId); // Llamada para cargar el siguiente
+            fetchAndLoadDetail(nextId); 
         } else {
             console.log("FUNC loadNextDetail: Se alcanzó el final o ID actual no encontrado en la lista.");
             alert("Ha llegado al final de los registros visibles en esta página/filtro.");
@@ -406,7 +363,6 @@ $(document).ready(function() {
         }
     }
 
-    // --- Event Listeners ---
     console.log("Adjuntando listener de clic a #asistencia-table-body para .quick-edit-btn...");
 
     tableBody.on('click', '.quick-edit-btn', function(event) {
@@ -452,4 +408,4 @@ $(document).ready(function() {
 
     console.log("Todos los listeners adjuntados. Script listo.");
 
-}); // Fin $(document).ready
+}); 

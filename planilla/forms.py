@@ -1,7 +1,5 @@
-# planilla/forms.py (Versión Original)
-
 from django import forms
-from .models import DetalleBonoTe, Planilla # Solo modelos internos
+from .models import DetalleBonoTe, Planilla 
 from django.core.exceptions import ValidationError
 from reportes.models import PlanillaAsistencia
 
@@ -21,7 +19,6 @@ class DetalleBonoTeForm(forms.ModelForm):
             'perm_excep', 'asuetos', 'pcgh_embar_enf_base', 
             'descuentos', 'observaciones_bono'
         ]
-        # Opcional: definir widgets para añadir clases de Bootstrap
         widgets = {
             'faltas': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'step': '0.01'}),
             'vacacion': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'step': '0.01'}),
@@ -41,16 +38,15 @@ class DetalleBonoTeForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if 'mes' in self.fields:
             self.fields['mes'].widget.attrs['readonly'] = True
-            self.fields['mes'].widget.attrs['class'] = 'form-control form-control-sm' # Añadir clase
+            self.fields['mes'].widget.attrs['class'] = 'form-control form-control-sm' 
         
-        # Aplicar clases a otros campos si no se definieron en Meta.widgets
         for field_name, field in self.fields.items():
-            if field_name != 'dias_habiles' and field_name != 'mes': # Estos ya tienen widgets o se manejan arriba
+            if field_name != 'dias_habiles' and field_name != 'mes': 
                 if isinstance(field.widget, forms.NumberInput):
                     field.widget.attrs.update({'class': 'form-control form-control-sm', 'step': '1.00'})
                 elif isinstance(field.widget, forms.Textarea):
                     field.widget.attrs.update({'class': 'form-control form-control-sm', 'rows': 2})
-                elif not field.widget.attrs.get('class'): # Si no tiene clase, añadir una genérica
+                elif not field.widget.attrs.get('class'): 
                     field.widget.attrs.update({'class': 'form-control form-control-sm'})
 
 
@@ -62,19 +58,19 @@ class PlanillaForm(forms.ModelForm):
     e ingresa los días hábiles.
     """
     planilla_asistencia_base_selector = forms.ModelChoiceField(
-        queryset=PlanillaAsistencia.objects.none(), # Se poblará dinámicamente en __init__
+        queryset=PlanillaAsistencia.objects.none(), 
         label="Planilla de Asistencia Validada Base",
-        required=False, # Inicialmente no es requerido; se ajusta en __init__ y se valida en clean()
+        required=False, 
         empty_label="Seleccione un tipo de planilla arriba para ver opciones",
         help_text="Solo se muestran planillas de asistencia validadas y no usadas para el tipo seleccionado."
     )
 
     dias_habiles = forms.DecimalField(
         label='Días Hábiles del Mes para Bono TE',
-        required=False, # Inicialmente no es requerido; se ajusta en clean()
+        required=False, 
         max_digits=5,
         decimal_places=2,
-        min_value=0, # Validación básica a nivel de campo
+        min_value=0, 
     )
 
     class Meta:
@@ -82,11 +78,9 @@ class PlanillaForm(forms.ModelForm):
         fields = ['dias_habiles']
 
     def __init__(self, *args, **kwargs):
-        # Obtener 'tipo_filtro' pasado desde la vista
         self.tipo_filtro = kwargs.pop('tipo_filtro', None)
         super().__init__(*args, **kwargs)
 
-        # Configurar el campo 'planilla_asistencia_base_selector'
         self.fields['planilla_asistencia_base_selector'].widget.attrs['disabled'] = True
 
         if self.tipo_filtro:
@@ -118,7 +112,6 @@ class PlanillaForm(forms.ModelForm):
                 self.fields['planilla_asistencia_base_selector'].empty_label = "Error al cargar asistencias"
                 self.fields['planilla_asistencia_base_selector'].widget.attrs['disabled'] = True
 
-        # Configurar el campo 'dias_habiles'
         if self.fields['planilla_asistencia_base_selector'].widget.attrs.get('disabled', False):
             self.fields['dias_habiles'].widget.attrs['disabled'] = True
             self.fields['dias_habiles'].required = False
@@ -127,18 +120,12 @@ class PlanillaForm(forms.ModelForm):
                  del self.fields['dias_habiles'].widget.attrs['disabled']
             self.fields['dias_habiles'].required = True
 
-        # ==========================================================
-        # =====           MODIFICACIÓN PARA ESTILOS            =====
-        # ==========================================================
-        # Asignar la clase CSS 'form-control' a los widgets para que
-        # coincidan con el tema visual (ej. Gentelella/Bootstrap).
         self.fields['planilla_asistencia_base_selector'].widget.attrs.update(
             {'class': 'form-control'}
         )
         self.fields['dias_habiles'].widget.attrs.update(
             {'class': 'form-control'}
         )
-        # ==========================================================
 
     def clean(self):
         cleaned_data = super().clean()
@@ -169,42 +156,26 @@ class EditarPlanillaForm(forms.ModelForm):
     """
     class Meta:
         model = Planilla
-        fields = ['dias_habiles', 'estado'] # Solo estos campos serán editables
+        fields = ['dias_habiles', 'estado']
         widgets = {
-            # Opcional: puedes definir widgets específicos si lo deseas
-            # 'estado': forms.Select(attrs={'class': 'form-control'}),
-            # 'dias_habiles': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-        }
+         }
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # No hay lógica especial de __init__ necesaria aquí a menos que quieras
-        # deshabilitar campos condicionalmente basado en el estado de la instancia,
-        # pero para solo dos campos, generalmente no es necesario.
-        
-        # Aplicar clases de Bootstrap si es tu estilo
+        super().__init__(*args, **kwargs)       
         for field_name, field in self.fields.items():
             if isinstance(field.widget, (forms.TextInput, forms.NumberInput, forms.EmailInput, forms.PasswordInput, forms.URLInput, forms.DateInput, forms.TimeInput, forms.DateTimeInput)):
                 field.widget.attrs.update({'class': 'form-control'})
             elif isinstance(field.widget, forms.Select):
-                field.widget.attrs.update({'class': 'form-control custom-select'}) # O solo 'form-control'
+                field.widget.attrs.update({'class': 'form-control custom-select'}) 
             elif isinstance(field.widget, forms.CheckboxInput):
                 field.widget.attrs.update({'class': 'form-check-input'})
             elif isinstance(field.widget, forms.Textarea):
                  field.widget.attrs.update({'class': 'form-control', 'rows': 3})
-
-
-    # Mantener las validaciones para los campos que son editables
     def clean_dias_habiles(self):
         dias_habiles = self.cleaned_data.get('dias_habiles')
         if dias_habiles is not None:
             if dias_habiles < 0:
                 raise forms.ValidationError("Los días hábiles no pueden ser un número negativo.")
-            if dias_habiles > 31: # O tu límite más específico
+            if dias_habiles > 31: 
                 raise forms.ValidationError("Los días hábiles no pueden ser mayores a 31.")
-        # Si el campo es opcional en el modelo y se permite dejarlo vacío en edición:
-        # elif dias_habiles is None and self.instance and self.instance.pk:
-        #     pass # Permitir borrar el valor si es una edición y el campo es nullable
-        # else:
-        #     raise forms.ValidationError("Este campo es requerido.") # Si es obligatorio
         return dias_habiles

@@ -1,7 +1,5 @@
-# sueldos/excel_config.py
 
 # --- Configuración para el Excel de PERSONAL PERMANENTE (PLANTA) ---
-# Esto se basa en la lógica que ya tenías.
 CONFIG_PLANTA = {
     'fila_inicio_datos': 11,  # Fila 12 en Excel
     'columnas': {
@@ -33,12 +31,10 @@ CONFIG_PLANTA = {
 CONFIG_CONTRATO = {
     'fila_inicio_datos': 10,   
     'columnas': {
-        # Clave (campo en DetalleSueldo) : Valor (índice de columna en Excel)
         'ci': 0,                        # CI en Col A
         'nombre_completo_referencia': 1,# Nombre en Col B
         'cargo_referencia': 2,          #Cargo en Col C
         'item_referencia': 3,           # Nro Contrato en Col D         
-        # 'fecha_ingreso_referencia' no existe en este formato
         'dias_trab': 4,
         'haber_basico': 5,
         'categoria': 6,

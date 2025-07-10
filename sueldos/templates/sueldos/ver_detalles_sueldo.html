@@ -66,7 +66,7 @@
                 </div>
                 <div class="form-group row mb-3">
                     <label for="search_q" class="control-label col-md-2 col-sm-3 ">Buscar (CI o Item):</label>
-                    <div class="col-md-6 col-sm-9 ">
+                    <div class="col-md-8 col-sm-9 ">
                         <input type="text" name="q" id="search_q" class="form-control form-control-sm" value="{{ search_term|default:'' }}" placeholder="Ingrese CI o Nro. Item...">
                     </div>
                 </div>
@@ -96,6 +96,20 @@
             </form>
         </div>
     </div>
+    <style>
+        .table-responsive { overflow-x: auto; position: relative; }
+        .tabla-sueldos th.sticky-col, .tabla-sueldos td.sticky-col {
+            position: -webkit-sticky; position: sticky; background-color: #ffffff; z-index: 1; border-left: 1px solid #dee2e6;
+        }
+        .tabla-sueldos thead th.sticky-col { background-color: #f8f9fa; }
+        .tabla-sueldos th.sticky-col-last, .tabla-sueldos td.sticky-col-last {
+            right: 0; z-index: 2; min-width: 90px; text-align: center;
+        }
+        .tabla-sueldos td.sticky-col-last .btn { margin-left: 2px; margin-right: 2px; margin-bottom: 2px; }
+        .tabla-sueldos th.sticky-col-second-last, .tabla-sueldos td.sticky-col-second-last {
+            right: 90px; /* Ajustar si el ancho de la última columna cambia */
+        }
+    </style>
 
     <div class="x_panel">
         <div class="x_title">
@@ -107,7 +121,6 @@
         </div>
         <div class="x_content">
 
-            {# --- INICIO DE LA LÓGICA DE VISUALIZACIÓN CORREGIDA --- #}
             {% if page_obj and page_obj.object_list %}
                 {# 1. Si hay objetos en la página, SIEMPRE muestra la tabla y la paginación #}
                 <div class="table-responsive">
@@ -134,9 +147,9 @@
                                 <th class="column-title text-end">Memos</th>
                                 <th class="column-title text-end">Otros Desc.</th>
                                 <th class="column-title text-end">T. Desctos</th>
-                                <th class="column-title text-end">L. Pagable</th>
+                                <th class="sticky-col sticky-col-second-last">L. Pagable</th>
                                 <th class="column-title text-end">Saldo RC-IVA</th>
-                                <th class="column-title no-link last text-center"><span class="nobr">Acciones</span></th>
+                                <th class="sticky-col sticky-col-last"><span class="nobr">Acciones</span></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -163,17 +176,17 @@
                                     <td class="text-end">{{ detalle_obj.memorandums|floatformat:2|intcomma }}</td>
                                     <td class="text-end">{{ detalle_obj.otros_descuentos|floatformat:2|intcomma }}</td>
                                     <td class="text-end">{{ detalle_obj.total_descuentos|floatformat:2|intcomma }}</td>
-                                    <td class="text-end"><strong>{{ detalle_obj.liquido_pagable|floatformat:2|intcomma }}</strong></td>
+                                    <td class="sticky-col sticky-col-second-last"><strong>{{ detalle_obj.liquido_pagable|floatformat:2|intcomma }}</strong></td>
                                     <td class="text-end">{{ detalle_obj.saldo_credito_fiscal|floatformat:2|intcomma }}</td>
-                                    <td class=" last text-center text-nowrap">
+                                    <td class=" sticky-col sticky-col-last text-nowrap">
                                         {% if perms.sueldos.change_detallesueldo or user.is_superuser %}
                                             {% if planilla_sueldo.estado != 'pagado' %}
                                             <a href="{% url 'editar_detalle_sueldo' detalle_obj.pk %}?secretaria={{ request.GET.secretaria|default:'' }}&unidad={{ request.GET.unidad|default:'' }}&q={{ request.GET.q|default:'' }}&page={{ page_obj.number }}" class="btn btn-primary btn-sm" title="Editar Detalle">
-                                                <i class="fa fa-pencil"></i>
+                                                <i class="fa fa-eye"></i>
                                             </a>
                                             {% endif %}
                                         {% endif %}
-
+                                        <!--
                                         {% if perms.sueldos.delete_detallesueldo or user.is_superuser %}
                                             {% if planilla_sueldo.estado != 'pagado' %}
                                             <a href="{% url 'borrar_detalle_sueldo' detalle_obj.pk %}?secretaria={{ request.GET.secretaria|default:'' }}&unidad={{ request.GET.unidad|default:'' }}&q={{ request.GET.q|default:'' }}&page={{ page_obj.number }}" class="btn btn-danger btn-sm" title="Borrar Detalle" onclick="return confirm('¿Está seguro de que desea borrar este detalle de sueldo para {{ detalle_obj.nombre_completo_externo|default:detalle_obj.ci_externo|escapejs }}? Esta acción no se puede deshacer.');">
@@ -181,6 +194,7 @@
                                             </a>
                                             {% endif %}
                                         {% endif %}
+                                        -->
                                     </td>
                                 </tr>
                             {% endfor %}

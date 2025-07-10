@@ -115,7 +115,6 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {# CAMBIO: Iterar sobre page_obj.object_list #}
                         {% for planilla_obj in page_obj.object_list %}
                         <tr>
                             <td>{{ planilla_obj.mes }}/{{ planilla_obj.anio }}</td>
@@ -149,22 +148,21 @@
                                     <i class="fa fa-file-pdf-o"></i>
                                 </a>
                                 {% endif %}
+                                <!--
                                 {% if perms.reportes.delete_planillaasistencia or user.is_superuser %}
                                 <a href="{% url 'borrar_planilla_asistencia' planilla_obj.pk %}" class="btn btn-sm btn-danger" title="Borrar Reporte" onclick="return confirm('¿Está seguro que desea eliminar este reporte de asistencia?');">
                                     <i class="fa fa-trash"></i>
                                 </a>
                                 {% endif %}
+                                -->
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-
-            {# Controles de Paginación #}
             {% if page_obj.has_other_pages %}
                 <div class="mt-3">
-                    {# Asegúrate que la ruta sea correcta para tu paginacion.html global #}
                     {% include "partials/paginacion.html" with page_obj=page_obj request=request %}
                 </div>
             {% endif %}

@@ -8,11 +8,6 @@ class PlantillaBoleta(models.Model):
     descripcion = models.TextField(blank=True, null=True, verbose_name="Descripción")
     # Usar JSONField si tu BD lo soporta (PostgreSQL, MySQL 5.7.8+), sino TextField
     datos_diseno_json = models.JSONField(default=dict, verbose_name="Datos del Diseño (JSON)")
-    # O como alternativa:
-    # datos_diseno_json_text = models.TextField(default='{}', verbose_name="Datos del Diseño (JSON)")
-    
-    # Puedes añadir un campo para el tipo de planilla de sueldos al que aplica, si es necesario
-    # tipo_aplicable = models.CharField(max_length=40, choices=PlanillaSueldo.TIPO_CHOICES, blank=True, null=True)
     TAMANO_PAGINA_CHOICES = [
         ('LETTER', 'Carta (8.5 x 11 pulgadas)'),
         ('LEGAL', 'Oficio / Legal (8.5 x 14 pulgadas)'),
