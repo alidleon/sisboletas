@@ -21,52 +21,56 @@ logger = logging.getLogger(__name__)
 def puede_crear_usuarios(user): 
     if not user.is_authenticated:
         return False
-    return user.is_superuser or user.groups.filter(name='Administradores').exists() # Ajusta el nombre del grupo
+    # Permitir si es superusuario o tiene el permiso de agregar usuario
+    return user.is_superuser or user.has_perm('auth.add_user')
 
 def puede_ver_lista_usuarios(user): 
     if not user.is_authenticated:
         return False
-    return user.is_superuser or user.groups.filter(name='Administradores').exists()
+    # Permitir si es superusuario o tiene el permiso de ver usuario
+    return user.is_superuser or user.has_perm('auth.view_user')
 
 def puede_ver_detalle_usuario(viewer_user, target_user):
-    # Condición 1: El usuario que mira debe estar autenticado.
     if not viewer_user.is_authenticated:
         return False
-    
-    # Condición 2: Si el usuario está viendo su propio perfil, siempre tiene permiso.
+    # Puede ver su propio perfil
     if viewer_user.pk == target_user.pk:
         return True
-    
-    # Condición 3: Si el usuario es superusuario o del grupo Administradores, puede ver cualquier perfil.
-    if viewer_user.is_superuser or viewer_user.groups.filter(name='Administradores').exists():
+    # Puede ver cualquier perfil si es superusuario o tiene el permiso de ver usuario
+    if viewer_user.is_superuser or viewer_user.has_perm('auth.view_user'):
         return True
-    
-    # Si ninguna de las condiciones anteriores se cumple, se deniega el acceso.
     return False
 
 def puede_editar_usuario(editor, usuario_a_editar):
-    if not editor.is_authenticated: return False
+    if not editor.is_authenticated:
+        return False
     if editor.id == usuario_a_editar.id:
         return True
-    if editor.is_superuser: return True 
-    if editor.groups.filter(name='Administradores').exists() and not usuario_a_editar.is_superuser:
+    if editor.is_superuser:
+        return True
+    # Permitir si tiene el permiso de cambiar usuario y no intenta editar a un superusuario
+    if editor.has_perm('auth.change_user') and not usuario_a_editar.is_superuser:
         return True
     return False
 
 def puede_eliminar_usuario(editor, usuario_a_eliminar):
-    if not editor.is_authenticated: return False
+    if not editor.is_authenticated:
+        return False
     # Nadie se elimina a sí mismo con este botón
-    if editor.id == usuario_a_eliminar.id: return False 
+    if editor.id == usuario_a_eliminar.id:
+        return False
     # Solo un superadmin puede eliminar a otro superadmin (o decidir que no se puede en absoluto)
-    if usuario_a_eliminar.is_superuser and not editor.is_superuser: return False 
-    if editor.is_superuser: return True # Superadmin puede eliminar (excepto a sí mismo)
-    # Admin puede eliminar a otros si no son superusuarios
-    if editor.groups.filter(name='Administradores').exists() and not usuario_a_eliminar.is_superuser:
+    if usuario_a_eliminar.is_superuser and not editor.is_superuser:
+        return False
+    if editor.is_superuser:
+        return True
+    # Permitir si tiene el permiso de eliminar usuario y no intenta eliminar a un superusuario
+    if editor.has_perm('auth.delete_user') and not usuario_a_eliminar.is_superuser:
         return True
     return False
 
 def puede_gestionar_grupos(user): 
-    return user.is_superuser 
+    return user.is_superuser or user.has_perm('auth.change_group')
 #----------------------------------------------------
 @login_required 
 @permission_required('auth.add_user', raise_exception=True)
