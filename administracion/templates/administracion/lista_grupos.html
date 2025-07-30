@@ -72,7 +72,7 @@
                                         {# Botón Eliminar Grupo #}
                                         {% if perms.auth.delete_group or user.is_superuser %}
                                             
-                                            {% if grupo_actual.name != "Administradores" and grupo_actual.name != "NombreGrupoCriticoProtegido" %}
+                                            {% if  grupo_actual not in user.group.all %}
                                                 <a href="{% url 'eliminar_grupo' grupo_actual.id %}"
                                                    class="btn btn-sm btn-danger"
                                                    title="Eliminar Grupo"
@@ -80,17 +80,9 @@
                                                     <i class="fa fa-trash"></i> Eliminar
                                                 </a>
                                             {% else %}
-                                                {# Este grupo está "protegido" por su nombre en esta lógica de UI #}
-                                                {% if user.is_superuser %}
-                                                     <a href="{% url 'eliminar_grupo' grupo_actual.id %}"
-                                                        class="btn btn-sm btn-danger"
-                                                        title="Eliminar Grupo (Acción de Superadmin)"
-                                                        onclick="return confirm('ADVERTENCIA (Superadmin): ¿Está seguro que desea eliminar el grupo protegido \'{{ grupo_actual.name|escapejs }}\'? Esta acción no se puede deshacer.');">
-                                                        <i class="fa fa-trash"></i> Eliminar
-                                                    </a>
-                                                {% else %}
-                                                    <span class="badge badge-secondary" title="Este grupo tiene protección especial y no puede ser eliminado desde aquí por su rol. Contacte a un superadministrador si es necesario."><i class="fa fa-lock"></i> Protegido</span>
-                                                {% endif %}
+                                                <span class ="badge badge-secondary" title="No puedes eliminar al grupo que perteneces">
+                                                    <i class="fa fa-lock"></i> Tu grupo
+                                                </span>
                                             {% endif %}
                                         {% endif %}
                                     </td>
