@@ -397,9 +397,10 @@ def preview_boleta_view(request):
             logger.warning("El JSON de diseño recibido no tiene una lista 'objects'.")
 
 
-        
-        canvas_width = 595
-        canvas_height = 842
+        canvas_width = 612
+        canvas_height = 792
+        #canvas_width = 595
+        #canvas_height = 842
         final_html = f"""
         <div id="preview-container" style="width: {canvas_width}px; height: {canvas_height}px; border: 1px dashed #aaa; position: relative; background-color: white; margin: 10px auto; overflow: hidden;">
             {''.join(html_objects)}
@@ -474,8 +475,9 @@ def generar_pdf_boletas_por_planilla(request, planilla_sueldo_id):
 
     # --- 3. Preparar PDF ---
     buffer = io.BytesIO()
-    p = pdf_canvas_gen.Canvas(buffer, pagesize=A4)
-    page_width, page_height = A4 
+    p = pdf_canvas_gen.Canvas(buffer, pagesize=LETTER)
+    page_width, page_height = LETTER  # Usar tamaño carta por defecto
+    #page_width, page_height = A4 
 
     logger.debug(f"Canvas PDF creado. Tamaño página: {page_width}x{page_height} puntos.")
 
@@ -929,8 +931,8 @@ def vista_generar_pdf_boleta_unica(request, personal_externo_id, anio, mes):
     
     # --- 4. Preparar y Generar PDF ---
     buffer = io.BytesIO()
-    p_canvas = pdf_canvas_gen.Canvas(buffer, pagesize=A4) 
-    _page_width, page_height = A4 # Para la función de dibujo
+    p_canvas = pdf_canvas_gen.Canvas(buffer, pagesize=LETTER) # Usar tamaño carta por defecto
+    _page_width, page_height = LETTER # Para la función de dibujo
 
     logger.debug(f"PDF ÚNICO: Llamando a dibujar_boleta_en_canvas para CI: {datos_empleado_actual.get('{{ci}}', 'N/A')}")
     

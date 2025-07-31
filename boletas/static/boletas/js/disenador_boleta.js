@@ -49,8 +49,10 @@ $(document).ready(function() {
 
     // --- 3. Inicialización del Canvas de Fabric.js ---
     var canvas = new fabric.Canvas('boletaCanvas', {
-        width: 595,  // A4 width a ~72 DPI
-        height: 842, // A4 height a ~72 DPI
+        width: 612,
+        height: 792,
+        //width: 595,  // A4 width a ~72 DPI
+        //height: 842, // A4 height a ~72 DPI
         backgroundColor: '#ffffff' // Fondo blanco
     });
     window.myFabricCanvas = canvas;
@@ -694,93 +696,163 @@ $(document).ready(function() {
 
     // --- 8. Funciones y Eventos UX (Zoom, Grid, Snap) ---
 
-    function updateZoomDisplay() { 
-    var zoomValue = Math.round(canvas.getZoom() * 100);
-    console.log("DEBUG: updateZoomDisplay ejecutado. Zoom actual del canvas:", canvas.getZoom(), "Valor a mostrar:", zoomValue);
-    $('#zoomLevel').text(zoomValue); 
+        // Variables de estado
+    var currentZoomLevel = 1.0; // Empezamos en 100%
+    var MIN_ZOOM = 0.10; // 10%
+    var MAX_ZOOM = 4.00; // 400%
+    var ZOOM_STEP = 0.10; // Pasos más finos de 10%
+
+    // Dimensiones base de la hoja
+    const BASE_WIDTH = 612;
+    const BASE_HEIGHT = 792;
+
+    // Referencia a los elementos
+    const $canvasWrapper = $('.canvas-container-wrapper');
+    const $centerColumn = $('.designer-center-column');
+
+    function updateZoomDisplay() {
+        $('#zoomLevel').text(Math.round(currentZoomLevel * 100));
     }
-    
-    function zoomCanvas(delta) {
-        var newZoom = canvas.getZoom() + delta * ZOOM_STEP;
-        newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom)); // Limitar zoom
 
-        // Hacer zoom hacia el centro del canvas actual
-        var center = canvas.getCenter();
-        canvas.zoomToPoint({ x: center.left, y: center.top }, newZoom);
+    function applyZoom() {
+        // 1. Calcular las nuevas dimensiones de la "hoja de papel"
+        const newWidth = BASE_WIDTH * currentZoomLevel;
+        const newHeight = BASE_HEIGHT * currentZoomLevel;
 
+        // 2. Aplicar las nuevas dimensiones directamente al DIV de la hoja
+        $canvasWrapper.css({
+            width: newWidth + 'px',
+            height: newHeight + 'px'
+        });
+
+        // 3. Sincronizar el canvas de Fabric.js
+        canvas.setWidth(newWidth);
+        canvas.setHeight(newHeight);
+        canvas.setZoom(currentZoomLevel);
+        canvas.renderAll();
+
+        // 4. Actualizar el display
         updateZoomDisplay();
-        console.log("Zoom aplicado:", newZoom);
-        // La cuadrícula se redibujará automáticamente si es necesario
+        console.log(`Zoom: ${Math.round(currentZoomLevel * 100)}%`);
     }
 
-    $('#zoomIn').on('click', function() { zoomCanvas(1); });
-    $('#zoomOut').on('click', function() { zoomCanvas(-1); });
-    $('#zoomReset').on('click', function() {
-        canvas.setZoom(1.0);
-        canvas.viewportTransform = [1, 0, 0, 1, 0, 0]; // Resetear pan también
-        updateZoomDisplay();
-        canvas.renderAll(); // Asegurarse de renderizar después del reset
-        console.log("Zoom Reset a 1.0");
-    });
+    function zoom(delta) {
+        const scrollLeftBefore = $centerColumn.scrollLeft();
+        const scrollTopBefore = $centerColumn.scrollTop();
+        const oldWrapperWidth = $canvasWrapper.width();
+        const oldWrapperHeight = $canvasWrapper.height();
+        
+        const scrollRatioX = (scrollLeftBefore + $centerColumn.width() / 2) / oldWrapperWidth;
+        const scrollRatioY = (scrollTopBefore + $centerColumn.height() / 2) / oldWrapperHeight;
 
-    updateZoomDisplay(); // Inicializar display
+        let newZoom = currentZoomLevel + delta;
+        newZoom = Math.max(MIN_ZOOM, Math.min(newZoom, MAX_ZOOM));
+        
+        if (newZoom.toFixed(2) === currentZoomLevel.toFixed(2)) return;
+        
+        currentZoomLevel = newZoom;
+        applyZoom();
 
-    // --- Grid (MODIFICADO para usar objetos Line) ---
+        const newWrapperWidth = $canvasWrapper.width();
+        const newWrapperHeight = $canvasWrapper.height();
+        const newScrollLeft = (scrollRatioX * newWrapperWidth) - ($centerColumn.width() / 2);
+        const newScrollTop = (scrollRatioY * newWrapperHeight) - ($centerColumn.height() / 2);
+        
+        $centerColumn.scrollLeft(newScrollLeft);
+        $centerColumn.scrollTop(newScrollTop);
+    }
+
+    function zoomIn() { zoom(ZOOM_STEP); }
+    function zoomOut() { zoom(-ZOOM_STEP); }
+
+    function zoomReset() {
+        currentZoomLevel = 1.0;
+        applyZoom();
+        const newScrollLeft = ($canvasWrapper.width() - $centerColumn.width()) / 2;
+        $centerColumn.scrollLeft(newScrollLeft > 0 ? newScrollLeft : 0);
+        $centerColumn.scrollTop(0);
+    }
+
+    function zoomToFit() {
+        const areaWidth = $centerColumn.width();
+        const areaHeight = $centerColumn.height();
+        const availableWidth = areaWidth - 40;
+        const availableHeight = areaHeight - 40;
+        
+        const zoomX = availableWidth / BASE_WIDTH;
+        const zoomY = availableHeight / BASE_HEIGHT;
+        
+        currentZoomLevel = Math.min(zoomX, zoomY);
+        applyZoom();
+        
+        const newScrollLeft = ($canvasWrapper.width() - areaWidth) / 2;
+        $centerColumn.scrollLeft(newScrollLeft > 0 ? newScrollLeft : 0);
+        $centerColumn.scrollTop(0);
+    }
+
+    // Conexión a los botones
+    $('#zoomIn').on('click', zoomIn);
+    $('#zoomOut').on('click', zoomOut);
+    $('#zoomReset').on('click', zoomReset);
+    $('#zoomFit').on('click', zoomToFit);
+
+    // **Inicialización Correcta para el problema 1**
+    setTimeout(function() {
+        zoomReset(); 
+    }, 250); // Dar un poco más de tiempo para que el layout se asiente
+
     var gridLines = []; // Para mantener referencia a las líneas de la grid
 
     function drawGrid() {
         clearGrid(); // Limpiar grid anterior si existe
         if (!gridVisible) return;
 
-        console.log("DEBUG: Dibujando Grid con objetos Line...");
-        var canvasWidth = canvas.getWidth();
-        var canvasHeight = canvas.getHeight();
-        // El espaciado ahora es siempre el lógico (20px)
-        // El zoom afectará visualmente el tamaño, no el número de líneas
+        // ¡CORRECCIÓN CLAVE!
+        // Ya no escalamos el espaciado aquí. Usamos siempre el valor base.
+        // Fabric.js se encargará de escalar visualmente la cuadrícula con setZoom().
+        const lineSpacing = gridSpacing; 
+        
+        // Y dibujamos las líneas sobre las dimensiones base de la hoja.
+        const canvasWidth = BASE_WIDTH;
+        const canvasHeight = BASE_HEIGHT;
 
         var lineOptions = {
             stroke: gridColor,
-            strokeWidth: 1,
-            selectable: false, // No seleccionable
-            evented: false,    // No dispara eventos
-            isGridLine: true   // Propiedad personalizada para identificarla
+            strokeWidth: 1 / currentZoomLevel, // Hacemos las líneas más delgadas al hacer zoom para que no se vean toscas
+            selectable: false,
+            evented: false,
+            isGridLine: true
         };
 
         // Líneas verticales
-        for (var x = gridSpacing; x < canvasWidth; x += gridSpacing) {
+        for (var x = lineSpacing; x < canvasWidth; x += lineSpacing) {
             var lineV = new fabric.Line([x, 0, x, canvasHeight], lineOptions);
             canvas.add(lineV);
-            gridLines.push(lineV); // Guardar referencia
+            gridLines.push(lineV);
         }
         // Líneas horizontales
-        for (var y = gridSpacing; y < canvasHeight; y += gridSpacing) {
+        for (var y = lineSpacing; y < canvasHeight; y += lineSpacing) {
             var lineH = new fabric.Line([0, y, canvasWidth, y], lineOptions);
             canvas.add(lineH);
             gridLines.push(lineH);
         }
-        // Enviar las líneas de la cuadrícula al fondo para que no tapen otros objetos
+        
         gridLines.forEach(line => canvas.sendToBack(line));
-
-        canvas.renderAll(); // Renderizar para mostrar la nueva grid
-        console.log("DEBUG: Grid dibujada con", gridLines.length, "líneas.");
+        // No necesitamos un renderAll() aquí, porque la función applyZoom ya lo hace.
     }
 
     function clearGrid() {
         if (gridLines.length > 0) {
-             console.log("DEBUG: Limpiando", gridLines.length, "líneas de grid...");
-             gridLines.forEach(line => canvas.remove(line));
-             gridLines = []; // Vaciar el array de referencias
-             canvas.renderAll(); // Renderizar para quitar las líneas
-             console.log("DEBUG: Grid limpiada.");
+            canvas.remove(...gridLines); // Forma moderna de quitar múltiples objetos
+            gridLines = [];
+            canvas.renderAll();
+            console.log("Cuadrícula limpiada.");
         }
     }
 
-    // Ya NO necesitamos el listener 'after:render' para la grid
-
-    // Toggle Grid Checkbox
+    // --- ¡LA CLAVE! Conectar los checkboxes a las funciones ---
     $('#toggleGrid').on('change', function() {
         gridVisible = $(this).is(':checked');
-        console.log("DEBUG: Toggle Grid cambiado. Nuevo estado:", gridVisible);
         if (gridVisible) {
             drawGrid();
         } else {
@@ -788,29 +860,40 @@ $(document).ready(function() {
         }
     });
 
-    // --- Snap to Grid (Sin cambios, debería funcionar ahora) ---
     $('#toggleSnap').on('change', function() {
         snapEnabled = $(this).is(':checked');
-        console.log("DEBUG: Toggle Snap cambiado. Nuevo estado:", snapEnabled);
+        console.log("Alinear a cuadrícula:", snapEnabled);
     });
 
+    // --- Alinear objetos al moverlos (Snap to Grid) ---
     canvas.on('object:moving', function(options) {
         if (!snapEnabled) return;
+        
         var target = options.target;
-        // No aplicar snap a las líneas de la cuadrícula
         if (target.isGridLine) return;
 
-        var effectiveSpacing = gridSpacing;
+        // El espaciado para el snap debe considerar el zoom actual
+        var effectiveSpacing = gridSpacing * currentZoomLevel;
+
         var snappedLeft = Math.round(target.left / effectiveSpacing) * effectiveSpacing;
         var snappedTop = Math.round(target.top / effectiveSpacing) * effectiveSpacing;
 
-        if(target.left !== snappedLeft || target.top !== snappedTop) {
-            target.set({ left: snappedLeft, top: snappedTop });
-            // Fabric se encarga de renderizar durante el movimiento
-            // console.log("DEBUG: Snap aplicado a", snappedLeft, snappedTop);
-        }
+        target.set({
+            left: snappedLeft,
+            top: snappedTop
+        });
     });
-    // Fin Eventos UX
+
+    // También necesitamos actualizar la grid cuando el zoom cambia
+    // Sobreescribimos la función applyZoom para añadir esta lógica
+    var originalApplyZoom = applyZoom; // Guardamos una referencia a la función original de zoom
+    applyZoom = function() {
+        originalApplyZoom(); // Ejecutamos la lógica de zoom que ya funciona
+        if (gridVisible) {
+            // Si la cuadrícula está activa, la redibujamos para que coincida con el nuevo zoom
+            drawGrid();
+        }
+    }
 
     // --- 9. Funcionalidad de Previsualización ---
     $('#previewButton').on('click', function() {

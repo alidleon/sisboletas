@@ -4,6 +4,7 @@
 {% block title_suffix %} - {% if plantilla_form.instance.pk %}Editar Plantilla{% else %}Diseñar Plantilla{% endif %}{% endblock %}
 
 {% block extra_css %}
+    {# Referencia ÚNICA al archivo CSS del diseñador #}
     <link rel="stylesheet" href="{% static 'boletas/css/disenador_boleta.css' %}">
 {% endblock %}
 
@@ -12,7 +13,7 @@
     <div class="">
         <div class="page-title">
             <div class="title_left">
-                <h3>DISEÑAR PLANTILLA DE BOLETA</h3>
+                <h3>{{ titulo_pagina }}</h3>
             </div>
         </div>
         <div class="clearfix"></div>
@@ -25,7 +26,7 @@
                         <div class="clearfix"></div>
                     </div>
                     <div class="x_content">
-                        {% if messages %} {# Mostrar mensajes #}
+                        {% if messages %}
                             {% for message in messages %}
                             <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible " role="alert">
                                 <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button>
@@ -34,39 +35,37 @@
                             {% endfor %}
                         {% endif %}
 
-                        {# Formulario principal #}
+                        {# Formulario principal que ahora es un contenedor flex #}
                         <form method="post" id="formPlantilla">
                             {% csrf_token %}
-                            <div class="row">
-                                <div class="col-md-6">
-                                     <div class="form-group">
-                                         <label for="{{ plantilla_form.nombre.id_for_label }}"><strong>Nombre <span class="required">*</span></strong></label>
-                                         {{ plantilla_form.nombre }}
-                                         {% if plantilla_form.nombre.errors %}<ul class="parsley-errors-list filled">{% for error in plantilla_form.nombre.errors %}<li class="parsley-required">{{ error }}</li>{% endfor %}</ul>{% endif %}
-                                     </div>
+
+                            {# --- INICIO DE LA SECCIÓN MODIFICADA (Opción 1+2) --- #}
+                            {# Campos Nombre/Descripción/Predeterminada en un layout compacto #}
+                            <div class="row align-items-center mb-3">
+                                <div class="col-md-5">
+                                    <label for="{{ plantilla_form.nombre.id_for_label }}" class="mb-0">Nombre <span class="required">*</span></label>
+                                    {{ plantilla_form.nombre }}
+                                    {% if plantilla_form.nombre.errors %}<ul class="parsley-errors-list filled" style="margin:0;">{% for error in plantilla_form.nombre.errors %}<li class="parsley-required">{{ error }}</li>{% endfor %}</ul>{% endif %}
                                 </div>
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label for="{{ plantilla_form.descripcion.id_for_label }}"><strong>Descripción</strong></label>
-                                         {{ plantilla_form.descripcion }}
-                                         {% if plantilla_form.descripcion.errors %}<ul class="parsley-errors-list filled">{% for error in plantilla_form.descripcion.errors %}<li class="parsley-required">{{ error }}</li>{% endfor %}</ul>{% endif %}
+                                <div class="col-md-5">
+                                    <label for="{{ plantilla_form.descripcion.id_for_label }}" class="mb-0">Descripción</label>
+                                    {{ plantilla_form.descripcion }}
+                                    {% if plantilla_form.descripcion.errors %}<ul class="parsley-errors-list filled" style="margin:0;">{% for error in plantilla_form.descripcion.errors %}<li class="parsley-required">{{ error }}</li>{% endfor %}</ul>{% endif %}
+                                </div>
+                                <div class="col-md-2 align-self-center pt-3">
+                                    <div class="checkbox">
+                                        <label class="mb-0">
+                                           {{ plantilla_form.es_predeterminada }} {{ plantilla_form.es_predeterminada.label }}
+                                        </label>
                                     </div>
                                 </div>
-                                <div class="col-md-12">
-                                    <div class="form-group">
-                                         <div class="checkbox">
-                                             <label>
-                                                 <strong>{{ plantilla_form.es_predeterminada }} {{ plantilla_form.es_predeterminada.label }}</strong>
-                                             </label>
-                                         </div>
-                                          {% if plantilla_form.es_predeterminada.errors %}<ul class="parsley-errors-list filled">{% for error in plantilla_form.es_predeterminada.errors %}<li class="parsley-required">{{ error }}</li>{% endfor %}</ul>{% endif %}
-                                     </div>
-                                </div>
                             </div>
+                            {# --- FIN DE LA SECCIÓN MODIFICADA --- #}
 
+                            {# Input hidden para el JSON del diseño #}
                             <input type="hidden" name="datos_diseno_json_input" id="datos_diseno_json_input">
 
-                            
+                            {# Contenedor principal del diseñador que ahora crece para llenar el espacio #}
                             <div class="designer-wrapper">
 
                                 {# --- COLUMNA IZQUIERDA: HERRAMIENTAS Y PLACEHOLDERS --- #}
@@ -85,56 +84,66 @@
                                         <h4><i class="fa fa-database fa-fw"></i> Campos Datos</h4>
                                         <select id="placeholderSelector" class="form-control form-control-sm mb-2">
                                             <option value="">-- Seleccionar --</option>
-                                            {# Iterar sobre placeholders pasados desde la vista #}
                                             {% for ph in placeholders_disponibles %}
                                             <option value="{{ ph.id }}" data-label="{{ ph.label }}">{{ ph.label }}</option>
                                             {% endfor %}
                                         </select>
                                         <button type="button" id="addPlaceholder" class="btn btn-sm btn-info w-100">Añadir Campo</button>
                                     </div>
-                                </div> 
+                                </div> {# Fin Columna Izquierda #}
 
-                                {# --- ÁREA CENTRAL: LIENZO Y CONTROLES VISTA --- #}
-                                <div class="designer-center-column">
-                                    {# Barra de Controles de Vista #}
+                                {# --- INICIO DE LA ESTRUCTURA CENTRAL MODIFICADA --- #}
+                                {# Nuevo contenedor para la barra y el área de scroll #}
+                                <div class="designer-center-column-container">
+                                    
+                                    {# Barra de Controles (ahora fija arriba) #}
                                     <div class="view-controls-bar">
-                                        <button type="button" class="btn btn-sm btn-secondary" id="zoomIn" title="Acercar"><i class="fa fa-search-plus"></i></button>
                                         <button type="button" class="btn btn-sm btn-secondary" id="zoomOut" title="Alejar"><i class="fa fa-search-minus"></i></button>
-                                        <button type="button" class="btn btn-sm btn-secondary" id="zoomReset" title="Restaurar Zoom"><i class="fa fa-expand"></i></button>
+                                        <button type="button" class="btn btn-sm btn-secondary" id="zoomIn" title="Acercar"><i class="fa fa-search-plus"></i></button>
+                                        <span class="ml-1">Zoom: <span id="zoomLevel">100</span>%</span>
+                                        <button type="button" class="btn btn-sm btn-secondary ml-2" id="zoomReset" title="Zoom 100%">1:1</button>
+                                        <button type="button" class="btn btn-sm btn-secondary" id="zoomFit" title="Ajustar a la ventana"><i class="fa fa-arrows-alt"></i></button>
+                                        
                                         <span class="ml-2 mr-2">|</span>
-                                        <button type="button" id="undoCanvas" class="btn btn-sm btn-warning" title="Deshacer (Ctrl+Z)" disabled><i class="fa fa-undo"></i></button>
-                                        <button type="button" id="redoCanvas" class="btn btn-sm btn-warning" title="Rehacer (Ctrl+Y)" disabled><i class="fa fa-repeat"></i></button> {# fa-repeat es el ícono de rehacer en FontAwesome #}
-                                        <span class="ml-2 mr-2">|</span>
+                                        
                                         <div class="form-check form-check-inline">
                                             <input class="form-check-input" type="checkbox" value="" id="toggleGrid">
-                                            <label class="form-check-label" for="toggleGrid">Cuadrícula (<span id="gridSpacingValue">?</span>px)</label>
+                                            <label class="form-check-label" for="toggleGrid">Cuadrícula</label>
                                         </div>
                                         <div class="form-check form-check-inline">
                                             <input class="form-check-input" type="checkbox" value="" id="toggleSnap">
                                             <label class="form-check-label" for="toggleSnap">Alinear</label>
                                         </div>
-                                        <span class="ml-2">Zoom: <span id="zoomLevel">100</span>%</span>
+                                
+                                        <span class="ml-2 mr-2">|</span>
+                                
+                                        <button type="button" id="undoCanvas" class="btn btn-sm btn-warning" title="Deshacer (Ctrl+Z)" disabled><i class="fa fa-undo"></i></button>
+                                        <button type="button" id="redoCanvas" class="btn btn-sm btn-warning" title="Rehacer (Ctrl+Y)" disabled><i class="fa fa-repeat"></i></button>
                                     </div>
 
+                                    {# Área de scroll (fondo gris) #}
+                                    <div class="designer-center-column">
+                                        {# Lienzo de Diseño (la hoja blanca) #}
+                                        <div class="canvas-container-wrapper">
+                                            <canvas id="boletaCanvas"></canvas>
+                                        </div>
+                                    </div>
                                     
-                                    <div class="canvas-container-wrapper">
-                                        <canvas id="boletaCanvas"></canvas> {# El tamaño se controla por CSS/JS #}
-                                    </div>
-                                    <div class="mt-1"><small>Boleta (Tamaño Carta aprox.)</small></div>
-
-                                </div> 
+                                </div> {# Fin designer-center-column-container #}
+                                {# --- FIN DE LA ESTRUCTURA CENTRAL MODIFICADA --- #}
 
                                 {# --- COLUMNA DERECHA: PROPIEDADES --- #}
                                 <div class="designer-right-column">
                                      <div class="designer-section">
                                         <h4><i class="fa fa-edit fa-fw"></i> Propiedades</h4>
                                         <div id="propertiesPanel">
-                                             {# Propiedades Comunes #}
+                                            {# Propiedades Comunes #}
                                             <div class="prop-group common-props">
                                                 <label>Posición X:</label> <input type="number" id="propLeft" class="form-control form-control-sm">
                                                 <label>Posición Y:</label> <input type="number" id="propTop" class="form-control form-control-sm">
                                             </div>
-                                            {# Propiedades Texto #}
+                                            {# Propiedades de los diferentes tipos de objetos (Texto, Línea, etc.) #}
+                                            {# ... (tu código de propiedades permanece igual) ... #}
                                             <div class="prop-group text-props" style="display: none;">
                                                 <h5><i class="fa fa-font"></i> Texto</h5>
                                                 <label>Contenido:</label> <input type="text" id="propText" class="form-control form-control-sm">
@@ -180,7 +189,7 @@
                                                  <p><small>(Ajusta tamaño directamente en el lienzo)</small></p>
                                             </div>
 
-                                            <div class="prop-group common-props-extra" style="display: none;"> {# Oculto por defecto, se mostrará si hay objeto activo #}
+                                            <div class="prop-group common-props-extra" style="display: none;">
                                                 <h5><i class="fa fa-layer-group"></i> Orden (Z-Index)</h5>
                                                 <button type="button" id="sendToBack" class="btn btn-sm btn-outline-secondary mb-1 w-100"><i class="fa fa-arrow-down"></i> Enviar al Fondo</button>
                                                 <button type="button" id="bringToFront" class="btn btn-sm btn-outline-secondary mb-1 w-100"><i class="fa fa-arrow-up"></i> Traer al Frente</button>
@@ -188,68 +197,63 @@
                                                 <button type="button" id="bringForwards" class="btn btn-sm btn-outline-secondary mb-1 w-100"><i class="fa fa-chevron-up"></i> Traer Adelante</button>
                                             </div>
 
-
-
-                                            {# Botón Eliminar #}
                                             <button type="button" id="deleteSelected" class="btn btn-sm btn-danger mt-2 w-100" style="display: none;">Eliminar Seleccionado</button>
-                                        </div> 
-                                    </div> 
-                                </div> 
+                                        </div>
+                                    </div>
+                                </div> {# Fin Columna Derecha #}
+                            </div> {# Fin designer-wrapper #}
 
-                            </div> 
-
-                            {# Botones de Acción del Formulario (Guardar/Cancelar) #}
+                            {# Botones de Acción del Formulario #}
                             <div class="ln_solid mt-4"></div>
                             <div class="item form-group">
-                                <div class="col-md-6 col-sm-6 offset-md-3 text-center"> {# Centrar botones #}
+                                <div class="col-md-6 col-sm-6 offset-md-3 text-center">
                                     <button type="submit" class="btn btn-success"><i class="fa fa-save"></i> Guardar Plantilla</button>
-                                    <button type="button" class="btn btn-info" id="previewButton"
-                                        data-preview-url="{% url 'preview_plantilla_boleta' %}"> {# <-- URL aquí #}
+                                    <button type="button" class="btn btn-info" id="previewButton" data-preview-url="{% url 'preview_plantilla_boleta' %}">
                                         <i class="fa fa-eye"></i> Previsualizar
-                                    </button>                                    
-                                    <a href="{% url 'lista_plantillas_boleta' %}" class="btn btn-secondary">Cancelar</a> {# Botón secundario #}
+                                    </button>
+                                    <a href="{% url 'lista_plantillas_boleta' %}" class="btn btn-secondary">Cancelar</a>
                                 </div>
                             </div>
-                        </form> 
-                    </div> 
-                    <div class="modal fade" id="previewModal" tabindex="-1" role="dialog" aria-labelledby="previewModalLabel" aria-hidden="true">
-                        <div class="modal-dialog modal-lg" role="document"> {# modal-lg para más espacio #}
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="previewModalLabel">Previsualización de Boleta</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">×</span>
-                              </button>
-                            </div>
-                            <div class="modal-body" id="previewModalBody" style="min-height: 400px; background-color: #eee;">
-                              
-                              Cargando previsualización...
-                            </div>
-                            <div class="modal-footer">
-                              <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
-                            </div>
-                          </div>
-                        </div>
+                        </form>
                     </div>
-                      
-                </div> 
-            </div> 
-        </div> 
-    </div> 
-</div> 
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
+{# --- Modal de Previsualización (sin cambios) --- #}
+<div class="modal fade" id="previewModal" tabindex="-1" role="dialog" aria-labelledby="previewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="previewModalLabel">Previsualización de Boleta</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+        <div class="modal-body" id="previewModalBody" style="min-height: 400px; background-color: #eee;">
+          Cargando previsualización...
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+</div>
 
+{# Tag script para pasar datos JSON de forma segura #}
 <script id="django-to-js-data" type="application/json">
     {
         "plantillaDiseñoJSONString": "{{ datos_diseno_json_actual|escapejs }}",
         "placeholdersDisponiblesJSONString": "{{ placeholders_disponibles_json|escapejs }}"
     }
 </script>
-{% endblock %} 
+{% endblock %}
 
 {% block extra_js %}
-    
+    {# Cargar Fabric.js (local o CDN) #}
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/4.5.0/fabric.min.js"></script>
-    
+    {# Cargar tu script del diseñador #}
     <script src="{% static 'boletas/js/disenador_boleta.js' %}"></script>
 {% endblock %}

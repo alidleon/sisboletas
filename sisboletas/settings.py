@@ -75,8 +75,10 @@ INSTALLED_APPS = [
     'boletas.apps.BoletasConfig',
     'bitacora.apps.BitacoraConfig',
     'core',
+    'axes',
 
 ]
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -87,6 +89,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'auditlog.middleware.AuditlogMiddleware',
+    'axes.middleware.AxesMiddleware',
 ]
 
 ROOT_URLCONF = 'sisboletas.urls'
@@ -198,3 +201,34 @@ LOGOUT_REDIRECT_URL = 'login'
 MEDIA_URL = '/media/'
 
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+
+# --- CONFIGURACIÓN DE DJANGO-AXES ---
+
+AUTHENTICATION_BACKENDS = [
+    # AxesStandaloneBackend debe ser el primero para interceptar los logins
+    'axes.backends.AxesStandaloneBackend',
+
+    # Tu backend por defecto, que se ejecutará si Axes lo permite
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+# Número de intentos fallidos permitidos antes de bloquear.
+AXES_FAILURE_LIMIT = 5
+
+# Tiempo de enfriamiento (bloqueo) en horas.
+# 0.25 = 15 minutos, 0.5 = 30 minutos, 1 = 1 hora
+AXES_COOLOFF_TIME = 1
+
+# Qué combinación de credenciales se usa para contar los fallos.
+# Por defecto es solo por IP. Es más seguro incluir el username.
+# Esto significa: "bloquea después de 5 intentos fallidos desde la misma IP
+# O después de 5 intentos fallidos para el mismo nombre de usuario (incluso desde diferentes IPs)".
+AXES_LOCKOUT_PARAMETERS = ["ip_address", "username"]
+
+# Si quieres que el usuario vea una página de error 403 (Forbidden) en lugar de la de login
+# cuando está bloqueado, pon esto en True. Es más seguro porque no da pistas.
+AXES_LOCK_OUT_AT_FAILURE = True
+
+# Si quieres recibir un email cada vez que alguien es bloqueado (requiere configurar emails en Django)
+# AXES_ENABLE_ADMIN_NOTIFICATIONS = True

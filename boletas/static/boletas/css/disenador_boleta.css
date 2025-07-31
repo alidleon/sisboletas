@@ -1,261 +1,201 @@
 /* ==================================================
    Estilos para el Diseñador de Boletas de Pago
+   v2.1 - Layout optimizado y paneles compactos
    ================================================== */
 
-/* --- Layout Principal (3 Columnas) --- */
+/* --- 1. Contenedores de Layout de Gentelella --- */
+
+.x_panel > .x_content {
+    display: flex;
+    flex-direction: column;
+    /* La altura ahora la gestiona el JS, quitamos min-height */
+}
+
+#formPlantilla {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    flex-grow: 1; 
+}
+
+/* Estilos de ayuda para el layout de campos superiores */
+.align-items-center { align-items: center !important; }
+.align-self-center { align-self: center !important; }
+.mb-0 { margin-bottom: 0 !important; }
+.mb-3 { margin-bottom: 1rem !important; }
+.pt-3 { padding-top: 1rem !important; }
+
+
+/* --- 2. Layout Principal del Diseñador (3 Columnas) --- */
+
 .designer-wrapper {
     display: flex;
     flex-direction: row;
-    flex-wrap: nowrap; /* Evitar que las columnas pasen a la siguiente línea */
+    flex-wrap: nowrap;
     border-top: 1px solid #eee;
     margin-top: 20px;
-    /* Definir una altura, por ejemplo, usando viewport height menos la altura estimada de header/footer/padding */
-    /* Esto ayuda a controlar el scroll vertical de las columnas */
-    /* Ajusta el valor según tu layout */
-    /* height: calc(100vh - 250px); O una altura fija: height: 700px; */
-    overflow: hidden; /* Evitar scroll horizontal en el wrapper principal */
+    flex-grow: 1; /* Crece para llenar el espacio vertical del formulario */
+    overflow: hidden;
 }
 
-.designer-left-column {
-    width: 180px;  /* <-- Prueba con un valor menor */
+/* --- 3. Columnas Laterales (Izquierda y Derecha) --- */
+
+/* Reglas COMUNES a ambas columnas */
+.designer-left-column,
+.designer-right-column {
     flex-shrink: 0;
-    padding: 15px;
-    border-right: 1px solid #eee;
     background-color: #f8f9fa;
     overflow-y: auto;
-    height: 100%;        /* Intentar ocupar altura del wrapper */
+    height: auto;
+    /* AJUSTE: Padding reducido para compactar */
+    padding: 10px;
+}
+
+/* Reglas ESPECÍFICAS para cada columna */
+.designer-left-column {
+    /* AJUSTE: Ancho reducido */
+    width: 170px; 
+    border-right: 1px solid #eee;
+}
+.designer-right-column {
+    /* AJUSTE: Ancho reducido */
+    width: 200px;
+    border-left: 1px solid #eee;
+}
+
+
+/* --- 4. Sección Central (Barra de Herramientas y Área de Trabajo) --- */
+
+.designer-center-column-container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: #f0f0f0;
+    padding: 15px;
+    height: auto;
+    overflow: hidden;
+}
+
+.view-controls-bar {
+    width: 100%;
+    margin-bottom: 15px;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    text-align: center;
+    background-color: #f7f7f7;
+    flex-shrink: 0;
 }
 
 .designer-center-column {
-    flex-grow: 1;        /* Ocupa el espacio restante */
-    padding: 15px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    background-color: #f0f0f0;
-    overflow-y: auto;    /* Scroll si el canvas es muy alto o hay mucho espacio */
-    height: 100%;
-}
-
-.designer-right-column {
-    width: 220px;  /* <-- Prueba con un valor menor */
-    flex-shrink: 0;
-    padding: 15px;
-    border-left: 1px solid #eee;
-    background-color: #f8f9fa;
-    overflow-y: auto;
-    height: 100%; /* Mantener si funciona con la altura del wrapper */
-}
-
-/* --- Secciones dentro de las Columnas Laterales --- */
-.designer-section {
-    margin-bottom: 25px; /* Más separación entre secciones */
-}
-
-.designer-section h4 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    font-size: 1.1em; /* Tamaño Título Sección */
-    color: #337ab7; /* Azul distintivo */
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 8px;
-    display: flex; /* Para alinear icono y texto */
-    align-items: center;
-}
-.designer-section h4 i { /* Estilo para iconos en títulos */
-    margin-right: 8px;
-    color: #559acf; /* Un azul un poco más claro */
-}
-
-/* --- Barra de Controles de Vista (Zoom, Grid, Snap, Undo) --- */
-.view-controls-bar {
-    width: 100%;
-    max-width: 800px;
+    flex-grow: 1;
+    overflow: auto;
+    background-color: #e8e8e8;
+    padding: 20px;
     text-align: center;
-    margin-bottom: 15px;
-    background-color: #f1f1f1;
-    padding: 8px 10px; /* Ajustar padding */
-    border-radius: 4px;
-    border: 1px solid #dee2e6;
-    
 }
 
-.view-controls-bar .btn { /* Aplicar a todos los botones en la barra */
-     padding: 0.2rem 0.5rem; /* Hacer botones un poco más pequeños */
-     font-size: 0.85em;
-}
-
-.view-controls-bar .btn-secondary {
-    color: #495057;
-    background-color: #e9ecef;
-    border-color: #ced4da;
-}
-.view-controls-bar .btn-secondary:hover {
-    background-color: #d3d9df;
-    border-color: #b4bcc2;
-}
-.view-controls-bar .btn-warning { /* Para Undo/Redo */
-    background-color: #ffefc1;
-    border-color: #ffe8a1;
-    color: #664d03;
-}
-.view-controls-bar .btn-warning:hover {
-    background-color: #ffe8a1;
-    border-color: #ffda6a;
-}
-.view-controls-bar .btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-
-.view-controls-bar .form-check-inline {
-     margin: 0 0.5rem; /* Espacio alrededor de los checks */
-     padding-left: 0; /* Resetear padding por defecto */
-}
-.view-controls-bar .form-check-input {
-     margin-top: 0.2rem; /* Alinear mejor con el texto */
-     margin-right: 0.3rem;
-}
-.view-controls-bar .form-check-label {
-     font-weight: normal !important;
-     font-size: 0.9em;
-     padding-left: 0;
-     margin-bottom: 0; /* Alinear verticalmente */
-     line-height: 1.5; /* Ajustar altura de línea */
-}
-
-.view-controls-bar span { /* Texto Zoom y Grid */
-    font-size: 0.9em;
-    color: #6c757d;
-    margin: 0 0.5rem;
-}
-.view-controls-bar span#zoomLevel,
-.view-controls-bar span#gridSpacingValue {
-    font-weight: bold;
-    color: #495057;
-}
-
-/* --- Lienzo de Diseño --- */
 .canvas-container-wrapper {
-    border: 1px solid #ccc;
-    background-color: #ffffff; /* Fondo blanco explícito */
-
-    width: 595px;
-    height: 842px;
-    /* El tamaño se define en el canvas y su contenedor directo */
-    /* width: 595px; height: 842px; */
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15); /* Sombra más pronunciada */
-     /* margin: 0 auto; */
-    /* overflow: hidden; */ /* Quitamos esto para permitir scroll si el canvas es más grande que el contenedor */
-    position: relative; /* Para que el overlay de Fabric funcione bien */
-    /* Añadir un patrón de fondo opcional para transparencia */
-    /* background-image: linear-gradient(45deg, #eee 25%, transparent 25%), linear-gradient(-45deg, #eee 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #eee 75%), linear-gradient(-45deg, transparent 75%, #eee 75%);
-    background-size: 20px 20px;
-    background-position: 0 0, 0 10px, 10px -10px, -10px 0px; */
-    flex-shrink: 0;
+    display: inline-block; 
+    text-align: left;
+    width: 612px;
+    height: 792px;
+    border: 1px solid #b0b0b0;
+    background-color: #ffffff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 
-/* Contenedor interno de Fabric.js (asegurar tamaño) */
 .canvas-container {
     width: 100% !important;
     height: 100% !important;
-    position: relative !important; /* Asegurar posicionamiento */
 }
 
 #boletaCanvas {
     display: block;
 }
 
-/* --- Panel de Propiedades --- */
-#propertiesPanel label {
-    margin-top: 10px; /* Más espacio arriba */
+
+/* --- 5. Estilos de Componentes Internos y Herramientas --- */
+
+/* Barra de Herramientas Superior */
+.view-controls-bar .btn {
+     padding: 0.2rem 0.5rem;
+     font-size: 0.85em;
+}
+.view-controls-bar .form-check-inline { margin: 0 0.5rem; padding-left: 0; }
+.view-controls-bar .form-check-input { margin-top: 0.2rem; margin-right: 0.3rem; }
+.view-controls-bar .form-check-label { font-weight: normal; font-size: 0.9em; padding-left: 0; margin-bottom: 0; line-height: 1.5; }
+.view-controls-bar span { font-size: 0.9em; color: #6c757d; margin: 0 0.5rem; }
+.view-controls-bar span#zoomLevel { font-weight: bold; color: #495057; }
+.view-controls-bar #gridSpacingValue { display: none; }
+
+/* Secciones dentro de las Columnas Laterales */
+.designer-section {
+    margin-bottom: 20px; /* AJUSTE: Menos margen */
+}
+.designer-section h4 {
+    /* AJUSTE: Título más compacto */
+    font-size: 1em;
+    margin-bottom: 8px;
+    padding-bottom: 5px;
+    margin-top: 0;
+    color: #337ab7;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    align-items: center;
+}
+.designer-section h4 i {
+    margin-right: 6px; /* AJUSTE: Menos espacio */
+    color: #559acf;
+}
+
+/* Herramientas (Panel Izquierdo) */
+.designer-left-column .btn {
+    padding-top: 5px;
+    padding-bottom: 5px;
+    font-size: 0.9em;
+}
+.designer-left-column .btn i {
+    margin-right: 4px !important;
+}
+
+/* Panel de Propiedades (Panel Derecho) */
+#propertiesPanel .prop-group h5 {
+    font-size: 0.9em;
+    margin-bottom: 8px;
     font-weight: bold;
-    display: block;
-    font-size: 0.85em; /* Más pequeño */
-    color: #555;
-    margin-bottom: 3px;
-}
-
-#propertiesPanel .prop-group {
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    /* border-bottom: 1px solid #eee; */ /* Sin borde inferior */
-}
-#propertiesPanel .prop-group:last-of-type { /* Quitar margen inferior del último */
-     margin-bottom: 0;
-}
-
-#propertiesPanel .prop-group h5 { /* Título dentro de grupo */
-     font-size: 0.95em;
-     font-weight: bold;
-     color: #337ab7; /* Azul como títulos de sección */
-     margin-bottom: 10px;
-     border-bottom: 1px dotted #ccc; /* Línea punteada bajo título de grupo */
-     padding-bottom: 4px;
-     display: flex;
-     align-items: center;
+    color: #337ab7;
+    border-bottom: 1px dotted #ccc;
+    padding-bottom: 4px;
+    display: flex;
+    align-items: center;
 }
 #propertiesPanel .prop-group h5 i {
     margin-right: 6px;
-    color: #777; /* Icono gris */
+    color: #777;
 }
-
-
-#propertiesPanel input[type="number"],
-#propertiesPanel input[type="text"],
-#propertiesPanel select,
-#propertiesPanel input[type="color"] {
-    margin-bottom: 8px; /* Espacio consistente bajo inputs */
-}
-#propertiesPanel .form-check { /* Espacio para checkbox */
-    margin-bottom: 8px;
-}
-
-/* Botones de estilo B/I/U */
-.prop-style-button {
-    padding: 0.2rem 0.5rem;
+#propertiesPanel label {
     font-size: 0.8em;
-    margin-right: 2px;
-    margin-bottom: 5px; /* Espacio si van en varias líneas */
-}
-.prop-style-button.active {
-    background-color: #d4d4d4;
-    border-color: #adadad;
-    box-shadow: inset 0 1px 1px rgba(0, 0, 0, .075);
-}
-.prop-style-button:not(:disabled):not(.disabled):active { /* Evitar doble sombra al hacer clic */
-    box-shadow: inset 0 1px 1px rgba(0, 0, 0, .075);
+    margin-top: 8px;
+    margin-bottom: 2px;
+    font-weight: bold;
+    display: block;
+    color: #555;
 }
 
-
-/* Input de color */
-.form-control-color {
+/* Inputs y Selects un poco más pequeños */
+.designer-right-column .form-control-sm {
+    height: calc(1.5em + 0.5rem + 0px);
+    padding: 0.2rem 0.4rem;
+    font-size: 0.8rem;
+}
+.designer-right-column .form-control-color {
+    height: calc(1.5em + 0.5rem + 0px);
     padding: 0.1rem 0.2rem;
-    height: calc(1.5em + 0.5rem + 2px);
-    width: 50px; /* Ancho fijo pequeño */
-    display: inline-block; /* Alinear con etiqueta si es necesario */
+    width: 50px;
+    display: inline-block;
     vertical-align: middle;
 }
-
-/* Botón eliminar */
 #deleteSelected {
-    margin-top: 15px; /* Espacio antes del botón */
+    margin-top: 15px;
 }
-
-
-/* --- Utilidades Bootstrap/Gentelella (Asegurar que funcionen) --- */
-/* Puedes mantener o quitar estas si no son estrictamente necesarias o entran en conflicto */
-.w-100 { width: 100% !important; }
-.text-left { text-align: left !important; }
-.text-center { text-align: center !important; }
-small { font-size: 85%; }
-.mb-2 { margin-bottom: 0.5rem !important; }
-.mb-3 { margin-bottom: 1rem !important; }
-.mt-1 { margin-top: 0.25rem !important; }
-.mt-2 { margin-top: 0.5rem !important; }
-.mt-4 { margin-top: 1.5rem !important; }
-.ml-2 { margin-left: 0.5rem !important; }
-.mr-1 { margin-right: 0.25rem !important; }
-.mr-2 { margin-right: 0.5rem !important; }
-.fa-fw { width: 1.28571429em; text-align: center; } /* Para iconos en botones */
