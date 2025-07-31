@@ -71,8 +71,7 @@
 
                                         {# Botón Eliminar Grupo #}
                                         {% if perms.auth.delete_group or user.is_superuser %}
-                                            
-                                            {% if  grupo_actual not in user.group.all %}
+                                            {% if grupo_actual not in user.groups.all %}
                                                 <a href="{% url 'eliminar_grupo' grupo_actual.id %}"
                                                    class="btn btn-sm btn-danger"
                                                    title="Eliminar Grupo"
@@ -80,8 +79,8 @@
                                                     <i class="fa fa-trash"></i> Eliminar
                                                 </a>
                                             {% else %}
-                                                <span class ="badge badge-secondary" title="No puedes eliminar al grupo que perteneces">
-                                                    <i class="fa fa-lock"></i> Tu grupo
+                                                <span class="badge badge-secondary" title="No puedes eliminar al grupo que perteneces">
+                                                    <i class="fa fa-lock"></i> Tu Grupo
                                                 </span>
                                             {% endif %}
                                         {% endif %}
